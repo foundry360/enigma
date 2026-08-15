@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: enigma
+      POSTGRES_PASSWORD: enigma
+      POSTGRES_DB: enigma
+    ports:
+      - "5432:5432"
+    volumes:
+      - enigma_pg:/var/lib/postgresql/data
+
+volumes:
+  enigma_pg:
