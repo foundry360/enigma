@@ -2,7 +2,7 @@
 
 ## Current state (2026-08-15)
 
-The repository was empty. Sprint 1 foundation is now in the repo: Next.js 16, Supabase Postgres (`ppceqvoyexpkguzeseen`) via Prisma, tenant-scoped auth, UI shell, and this plan. Salesforce OAuth is documented, not implemented.
+The repository was empty. Sprint 1 foundation is now in the repo: Next.js 16, Supabase Postgres (`ppceqvoyexpkguzeseen`) via postgres.js, Supabase Auth plus tenant-scoped profiles, UI shell, and this plan. Salesforce OAuth is documented, not implemented.
 
 ## Success bar for MVP
 
@@ -17,7 +17,7 @@ Do not start Agentforce deployment automation until that assessment → value wo
 **Goal:** A running multi-tenant Enigma app with authentication, tenant model, and an executive UI shell.
 
 - Next.js + TypeScript + Tailwind
-- PostgreSQL + Prisma
+- PostgreSQL via postgres.js
 - Email/password auth (Auth.js)
 - Tenant + user + organization + assessment + connection + audit schema
 - Design system and navigation that makes the MVP workflow visible

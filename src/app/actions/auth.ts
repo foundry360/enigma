@@ -1,16 +1,15 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db/prisma";
-import { createSession, deleteSession } from "@/lib/auth/session";
-import { hashPassword, verifyPassword } from "@/lib/auth/password";
-import { slugifyTenantName, uniqueSlug } from "@/lib/tenants/slug";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   loginSchema,
   signupSchema,
   type AuthFormState,
 } from "@/lib/validations/auth";
-import { writeAuditLog } from "@/server/services/audit";
+import { findUserByEmail, findUserById } from "@/server/services/users";
+import { createWorkspaceForAuthUser } from "@/server/services/workspace";
 
 export async function signup(
   _state: AuthFormState,
@@ -28,56 +27,60 @@ export async function signup(
   }
 
   const { name, email, password, tenantName } = parsed.data;
-  const existingUser = await prisma.user.findUnique({ where: { email } });
+  const existingUser = await findUserByEmail(email);
 
   if (existingUser) {
     return { errors: { email: ["An account with this email already exists."] } };
   }
 
-  const baseSlug = slugifyTenantName(tenantName);
-  const colliding = await prisma.tenant.findMany({
-    where: { slug: { startsWith: baseSlug } },
-    select: { slug: true },
-  });
-  const slug = uniqueSlug(
-    baseSlug,
-    colliding.map((tenant) => tenant.slug),
-  );
-
-  const tenant = await prisma.tenant.create({
-    data: {
-      name: tenantName,
-      slug,
-      users: {
-        create: {
-          name,
-          email,
-          passwordHash: await hashPassword(password),
-          role: "ADMIN",
-        },
-      },
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { name, tenant_name: tenantName },
+      emailRedirectTo: `${process.env.APP_URL ?? "http://localhost:3000"}/auth/callback`,
     },
-    include: { users: true },
   });
 
-  const user = tenant.users[0];
+  let authUser = data.user;
+  let session = data.session;
 
-  await writeAuditLog({
-    tenantId: tenant.id,
-    userId: user.id,
-    action: "tenant.create",
-    entity: "Tenant",
-    entityId: tenant.id,
-    metadata: { slug },
-  });
+  if (error || !authUser) {
+    const signedIn = await supabase.auth.signInWithPassword({ email, password });
+    if (signedIn.error || !signedIn.data.user) {
+      return { message: error?.message ?? "Could not create the partner org." };
+    }
+    authUser = signedIn.data.user;
+    session = signedIn.data.session;
+  }
 
-  await createSession({
-    userId: user.id,
-    tenantId: tenant.id,
-    role: user.role,
-  });
+  const profile = await findUserById(authUser.id);
 
-  redirect("/dashboard");
+  if (!profile) {
+    try {
+      await createWorkspaceForAuthUser({
+        authUserId: authUser.id,
+        name,
+        email,
+        tenantName,
+      });
+    } catch (cause) {
+      if (!data.user) {
+        throw cause;
+      }
+      await createSupabaseAdminClient().auth.admin.deleteUser(authUser.id);
+      throw cause;
+    }
+  }
+
+  if (!session) {
+    return {
+      message: "Check your email to confirm the account, then sign in.",
+    };
+  }
+
+  redirect("/accounts");
 }
 
 export async function login(
@@ -93,24 +96,30 @@ export async function login(
     return { errors: parsed.error.flatten().fieldErrors };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: parsed.data.email },
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password,
   });
 
-  if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
+  if (error || !data.user) {
     return { message: "Email or password is incorrect." };
   }
 
-  await createSession({
-    userId: user.id,
-    tenantId: user.tenantId,
-    role: user.role,
-  });
+  const profile = await findUserById(data.user.id);
 
-  redirect("/dashboard");
+  if (!profile) {
+    await supabase.auth.signOut();
+    return {
+      message: "This login has no partner org. Create a partner org first.",
+    };
+  }
+
+  redirect("/accounts");
 }
 
 export async function logout() {
-  await deleteSession();
+  const supabase = await createSupabaseServerClient();
+  await supabase.auth.signOut();
   redirect("/login");
 }

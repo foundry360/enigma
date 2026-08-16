@@ -4,14 +4,14 @@ type Variant = "primary" | "secondary" | "ghost";
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-accent text-accent-fg hover:bg-[#e0b122] disabled:opacity-60",
+    "bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-60",
   secondary:
-    "border border-border bg-surface-2 text-foreground hover:border-accent/40",
-  ghost: "text-muted hover:text-foreground hover:bg-surface-2",
+    "border border-border bg-surface text-foreground hover:bg-surface-2",
+  ghost: "text-muted hover:bg-surface-2 hover:text-foreground",
 };
 
 export function buttonClassName(variant: Variant = "primary", className = "") {
-  return `inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors ${variants[variant]} ${className}`;
+  return `inline-flex h-8 items-center justify-center rounded-md px-2.5 text-sm font-medium transition-colors ${variants[variant]} ${className}`;
 }
 
 export function Button({

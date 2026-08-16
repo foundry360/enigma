@@ -14,13 +14,13 @@ export default async function HomePage() {
   const session = await getSession();
 
   return (
-    <div className="min-h-full bg-[radial-gradient(circle_at_top,_rgba(212,160,23,0.08),_transparent_32%),linear-gradient(#070b14,_#070b14)]">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <p className="font-serif text-2xl">Enigma</p>
-        <div className="flex gap-3 text-sm">
+    <div className="min-h-full">
+      <header className="flex h-12 items-center justify-between border-b border-border px-4">
+        <p className="text-sm font-semibold">Enigma</p>
+        <div className="flex items-center gap-3 text-sm">
           {session ? (
-            <Link href="/dashboard" className="text-accent">
-              Open workspace
+            <Link href="/accounts" className="text-accent">
+              Open partner org
             </Link>
           ) : (
             <>
@@ -28,48 +28,41 @@ export default async function HomePage() {
                 Sign in
               </Link>
               <Link href="/signup" className="text-accent">
-                Create workspace
+                Create partner org
               </Link>
             </>
           )}
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-6 pb-24 pt-16">
-        <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-accent">
-          AI consumption value platform
-        </p>
-        <h1 className="mt-4 max-w-3xl font-serif text-5xl leading-tight tracking-tight sm:text-6xl">
-          Where can Agentforce create measurable value in this environment?
+      <main className="mx-auto max-w-3xl px-4 py-10">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Agentforce opportunity assessment
         </h1>
-        <p className="mt-6 max-w-2xl text-lg leading-8 text-muted">
-          Enigma turns a Salesforce org into a quantified Agentforce opportunity
-          assessment: readiness, use cases, consumption, business value, and the
-          next step — in minutes, not weeks.
+        <p className="mt-2 max-w-xl text-sm text-muted">
+          Quantify readiness, use cases, consumption, and value from a
+          Salesforce org — then decide the next move.
         </p>
-        <div className="mt-10 flex flex-wrap gap-3">
+        <div className="mt-5 flex flex-wrap gap-2">
           <Link
-            href={session ? "/dashboard" : "/signup"}
-            className="rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-accent-fg"
+            href={session ? "/accounts" : "/signup"}
+            className="inline-flex h-8 items-center rounded-md bg-accent px-2.5 text-sm font-medium text-accent-fg"
           >
-            {session ? "Continue assessment" : "Start an assessment workspace"}
+            {session ? "Continue" : "Create partner org"}
           </Link>
           <Link
             href="/login"
-            className="rounded-md border border-border px-5 py-2.5 text-sm text-foreground"
+            className="inline-flex h-8 items-center rounded-md border border-border px-2.5 text-sm"
           >
             Sign in
           </Link>
         </div>
-        <ol className="mt-20 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ol className="mt-8 divide-y divide-border rounded-md border border-border bg-surface">
           {workflow.map((step, index) => (
-            <li
-              key={step}
-              className="rounded-xl border border-border bg-surface px-4 py-4"
-            >
-              <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+            <li key={step} className="flex items-center gap-3 px-3 py-2 text-sm">
+              <span className="w-6 font-mono text-xs text-muted">
                 {String(index + 1).padStart(2, "0")}
-              </p>
-              <p className="mt-2 text-sm">{step}</p>
+              </span>
+              {step}
             </li>
           ))}
         </ol>

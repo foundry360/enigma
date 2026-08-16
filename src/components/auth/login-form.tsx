@@ -11,10 +11,11 @@ export function LoginForm() {
   return (
     <form action={action} className="space-y-4">
       <Field
-        label="Work email"
+        label="Email"
         name="email"
         type="email"
         autoComplete="email"
+        placeholder="name@company.com"
         error={state?.errors?.email}
       />
       <Field
@@ -22,9 +23,14 @@ export function LoginForm() {
         name="password"
         type="password"
         autoComplete="current-password"
+        placeholder="Enter your password"
         error={state?.errors?.password}
       />
-      {state?.message ? <p className="text-sm text-risk">{state.message}</p> : null}
+      {state?.message ? (
+        <div className="rounded-md border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-sm text-accent">
+          {state.message}
+        </div>
+      ) : null}
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Signing in…" : "Sign in"}
       </Button>

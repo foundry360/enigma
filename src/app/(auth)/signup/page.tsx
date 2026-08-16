@@ -4,17 +4,19 @@ import { SignupForm } from "@/components/auth/signup-form";
 export default function SignupPage() {
   return (
     <>
-      <h1 className="font-serif text-2xl">Create a workspace</h1>
-      <p className="mb-6 mt-1 text-sm text-muted">
-        For Salesforce AEs, RVPs, and partners. Customer orgs come next.
-      </p>
-      <SignupForm />
-      <p className="mt-6 text-sm text-muted">
-        Already have access?{" "}
-        <Link href="/login" className="text-accent">
-          Sign in
-        </Link>
-      </p>
+      <Link href="/" className="text-sm font-semibold">
+        Enigma
+      </Link>
+      <div className="mt-6 rounded-md border border-border bg-surface p-4">
+        <h1 className="mb-4 text-sm font-semibold">Create a partner org</h1>
+        <SignupForm />
+        <p className="mt-4 text-sm text-muted">
+          Already have access?{" "}
+          <Link href="/login" className="text-accent hover:underline">
+            Sign in
+          </Link>
+        </p>
+      </div>
     </>
   );
 }

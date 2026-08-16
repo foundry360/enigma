@@ -1,10 +1,8 @@
 import type { ReactNode } from "react";
 
 const tones = {
-  neutral: "border-border text-muted",
-  accent: "border-accent/30 text-accent",
-  positive: "border-positive/30 text-positive",
-  caution: "border-caution/30 text-caution",
+  neutral: "border-border bg-surface-2 text-muted",
+  accent: "border-accent/30 bg-accent/10 text-accent",
 };
 
 export function Badge({
@@ -16,7 +14,7 @@ export function Badge({
 }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide ${tones[tone]}`}
+      className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium ${tones[tone]}`}
     >
       {children}
     </span>

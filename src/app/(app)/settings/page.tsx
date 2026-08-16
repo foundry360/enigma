@@ -1,44 +1,57 @@
-import { Card, CardLabel } from "@/components/ui/card";
+import { AvatarUpload } from "@/components/profile/avatar-upload";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { PageHeader } from "@/components/ui/page-header";
-import { prisma } from "@/lib/db/prisma";
+import { SettingsRow } from "@/components/ui/settings-row";
 import { requireSession } from "@/lib/auth/session";
+import { getProfileAvatarUrl } from "@/server/services/profile";
+import { getTenant, getUserProfile } from "@/server/services/users";
 
 export default async function SettingsPage() {
   const session = await requireSession();
-  const tenant = await prisma.tenant.findUnique({
-    where: { id: session.tenantId },
-  });
+  const [tenant, user] = await Promise.all([
+    getTenant(session.tenantId),
+    getUserProfile(session.tenantId, session.userId),
+  ]);
 
   return (
     <>
       <PageHeader
-        eyebrow="Settings"
-        title="Workspace"
-        description="Tenant isolation is enforced on the server. Salesforce credentials will never be stored in the browser."
+        title="Settings"
+        description="Partner org, profile, and connection details."
       />
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardLabel>Tenant</CardLabel>
-          <p className="mt-3 font-serif text-2xl">{tenant?.name}</p>
-          <p className="mt-1 text-sm text-muted">{tenant?.slug}</p>
-        </Card>
-        <Card>
-          <CardLabel>Database</CardLabel>
-          <p className="mt-3 font-serif text-2xl">Supabase</p>
-          <p className="mt-1 text-sm text-muted">ppceqvoyexpkguzeseen · us-east-2</p>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            Prisma talks to Postgres directly. Tenant tables are not exposed
-            through the Supabase anon API.
+      <div className="divide-y divide-border rounded-md border border-border bg-surface">
+        <SettingsRow title="Profile" description="Shown in the sidebar.">
+          <AvatarUpload
+            name={user?.name ?? "User"}
+            imageUrl={await getProfileAvatarUrl(user?.avatarPath)}
+          />
+        </SettingsRow>
+        <SettingsRow title="Partner org">
+          <p className="text-sm font-medium">{tenant?.name}</p>
+          <p className="mt-0.5 font-mono text-xs text-muted">{tenant?.slug}</p>
+        </SettingsRow>
+        <SettingsRow title="Appearance" description="Saved in this browser.">
+          <ThemeToggle />
+        </SettingsRow>
+        <SettingsRow title="Authentication">
+          <p className="text-sm">Supabase Auth</p>
+          <p className="mt-1 text-xs text-muted">
+            Email and password are verified by Supabase. Tenant membership stays
+            on the server.
           </p>
-        </Card>
-        <Card>
-          <CardLabel>Salesforce connection</CardLabel>
-          <p className="mt-3 font-serif text-2xl">Not configured</p>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            OAuth uses a Connected App and a server-side callback. See
-            docs/SALESFORCE.md for the Sprint 2 approach.
+        </SettingsRow>
+        <SettingsRow title="Database">
+          <p className="text-sm">Supabase Postgres</p>
+          <p className="mt-0.5 font-mono text-xs text-muted">
+            ppceqvoyexpkguzeseen · us-east-2
           </p>
-        </Card>
+        </SettingsRow>
+        <SettingsRow title="Salesforce">
+          <p className="text-sm">Not configured</p>
+          <p className="mt-1 text-xs text-muted">
+            OAuth uses a Connected App and a server-side callback.
+          </p>
+        </SettingsRow>
       </div>
     </>
   );

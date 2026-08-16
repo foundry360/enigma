@@ -8,7 +8,7 @@ The product question:
 
 ## Current status
 
-Sprint 1 foundation is in place: Next.js app, tenant model, authentication, design system, and the assessment workflow shell.
+Sprint 1 foundation is in place: Next.js app, tenant model, Supabase Auth, design system, and the assessment workflow shell.
 
 Salesforce OAuth, discovery, scoring, and economics are not built yet. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 
@@ -18,13 +18,13 @@ Requires Node 20+. The database is Supabase project `ppceqvoyexpkguzeseen`.
 
 ```bash
 cp .env.example .env
-# Fill DATABASE_URL, DIRECT_URL, SESSION_SECRET, and Supabase keys
+# Fill DATABASE_URL, DIRECT_URL, and Supabase keys
 
-npx prisma migrate deploy
+npm run db:migrate
 npm run dev
 ```
 
-Create a workspace at [http://localhost:3000/signup](http://localhost:3000/signup).
+Create a partner org at [http://localhost:3000/signup](http://localhost:3000/signup).
 
 ## Architecture
 
@@ -47,4 +47,4 @@ Details:
 | --- | --- |
 | `npm run dev` | Next.js development server |
 | `npm test` | Tenant isolation and unit tests |
-| `npx prisma migrate dev` | Apply schema changes |
+| `npm run db:migrate` | Apply SQL in `sql/migrations` |

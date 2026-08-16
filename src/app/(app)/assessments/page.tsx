@@ -7,9 +7,8 @@ export default function AssessmentsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Assessments"
-        title="Opportunity assessments"
-        description="An assessment will capture readiness, opportunities, consumption scenarios, value, ROC, ROA, and a recommended roadmap."
+        title="Assessments"
+        description="Readiness, opportunities, consumption, value, ROC, ROA, and roadmap."
       />
       <EmptyState
         title="Assessments start after Salesforce discovery"

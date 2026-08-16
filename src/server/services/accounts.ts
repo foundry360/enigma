@@ -1,22 +1,99 @@
-import { prisma } from "@/lib/db/prisma";
-import { scopedCreate, tenantWhere } from "@/lib/tenants/scope";
+import { createId, sql } from "@/lib/db/sql";
+import type {
+  AssessmentRow,
+  OrganizationRow,
+  PlatformConnectionRow,
+} from "@/lib/db/types";
+import { scopedCreate, requireTenantId } from "@/lib/tenants/scope";
 import { writeAuditLog } from "@/server/services/audit";
+import { getUserProfile } from "@/server/services/users";
+
+export function resolveSelectedAccount<T extends { id: string }>(
+  accounts: T[],
+  selectedId: string | null | undefined,
+) {
+  return accounts.find((account) => account.id === selectedId) ?? accounts[0] ?? null;
+}
+
+export async function getAccountSelection(tenantId: string, userId: string) {
+  const [accounts, profile] = await Promise.all([
+    listAccountChoices(tenantId),
+    getUserProfile(tenantId, userId),
+  ]);
+  const selected = resolveSelectedAccount(
+    accounts,
+    profile?.selectedOrganizationId,
+  );
+
+  return { accounts, selected };
+}
+
+export async function listAccountChoices(tenantId: string) {
+  const scoped = requireTenantId(tenantId);
+  return sql<Pick<OrganizationRow, "id" | "name">[]>`
+    select id, name
+    from "Organization"
+    where "tenantId" = ${scoped}
+    order by "updatedAt" desc
+  `;
+}
+
+export async function getAccount(tenantId: string, organizationId: string) {
+  const scoped = requireTenantId(tenantId);
+  const [organization] = await sql<OrganizationRow[]>`
+    select *
+    from "Organization"
+    where "tenantId" = ${scoped} and id = ${organizationId}
+    limit 1
+  `;
+  return organization ?? null;
+}
 
 export async function listAccounts(tenantId: string) {
-  return prisma.organization.findMany({
-    where: tenantWhere(tenantId),
-    include: {
-      connections: {
-        select: { id: true, platformType: true, status: true },
-      },
-      assessments: {
-        select: { id: true, status: true, createdAt: true },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
+  const scoped = requireTenantId(tenantId);
+  const organizations = await sql<OrganizationRow[]>`
+    select *
+    from "Organization"
+    where "tenantId" = ${scoped}
+    order by "updatedAt" desc
+  `;
+
+  if (organizations.length === 0) {
+    return [];
+  }
+
+  const ids = organizations.map((organization) => organization.id);
+  const [connections, assessments] = await Promise.all([
+    sql<
+      Pick<
+        PlatformConnectionRow,
+        "id" | "organizationId" | "platformType" | "status"
+      >[]
+    >`
+      select id, "organizationId", "platformType", status
+      from "PlatformConnection"
+      where "tenantId" = ${scoped} and "organizationId" in ${sql(ids)}
+    `,
+    sql<
+      Pick<AssessmentRow, "id" | "organizationId" | "status" | "createdAt">[]
+    >`
+      select distinct on ("organizationId")
+        id, "organizationId", status, "createdAt"
+      from "Assessment"
+      where "tenantId" = ${scoped} and "organizationId" in ${sql(ids)}
+      order by "organizationId", "createdAt" desc
+    `,
+  ]);
+
+  return organizations.map((organization) => ({
+    ...organization,
+    connections: connections.filter(
+      (connection) => connection.organizationId === organization.id,
+    ),
+    assessments: assessments.filter(
+      (assessment) => assessment.organizationId === organization.id,
+    ),
+  }));
 }
 
 export async function createAccount(input: {
@@ -24,13 +101,40 @@ export async function createAccount(input: {
   userId: string;
   name: string;
   industry?: string;
+  organizationType?: string;
+  employeeRange?: string;
+  primaryContact?: string;
+  customerStatus?: string;
 }) {
-  const organization = await prisma.organization.create({
-    data: scopedCreate(input.tenantId, {
-      name: input.name,
-      industry: input.industry || null,
-    }),
+  const data = scopedCreate(input.tenantId, {
+    name: input.name,
+    industry: input.industry || null,
+    organizationType: input.organizationType || null,
+    employeeRange: input.employeeRange || null,
+    primaryContact: input.primaryContact || null,
+    customerStatus: input.customerStatus || null,
   });
+  const id = createId();
+
+  const [organization] = await sql<OrganizationRow[]>`
+    insert into "Organization" (
+      id, "tenantId", name, industry, "organizationType", "employeeRange",
+      "primaryContact", "customerStatus", "createdAt", "updatedAt"
+    )
+    values (
+      ${id},
+      ${data.tenantId},
+      ${data.name},
+      ${data.industry},
+      ${data.organizationType},
+      ${data.employeeRange},
+      ${data.primaryContact},
+      ${data.customerStatus},
+      now(),
+      now()
+    )
+    returning *
+  `;
 
   await writeAuditLog({
     tenantId: input.tenantId,
@@ -44,12 +148,89 @@ export async function createAccount(input: {
   return organization;
 }
 
+export async function updateAccount(input: {
+  tenantId: string;
+  userId: string;
+  organizationId: string;
+  name: string;
+  industry?: string;
+  organizationType?: string;
+  employeeRange?: string;
+  primaryContact?: string;
+  customerStatus?: string;
+}) {
+  const scoped = requireTenantId(input.tenantId);
+  const [organization] = await sql<OrganizationRow[]>`
+    update "Organization"
+    set
+      name = ${input.name},
+      industry = ${input.industry || null},
+      "organizationType" = ${input.organizationType || null},
+      "employeeRange" = ${input.employeeRange || null},
+      "primaryContact" = ${input.primaryContact || null},
+      "customerStatus" = ${input.customerStatus || null},
+      "updatedAt" = now()
+    where id = ${input.organizationId} and "tenantId" = ${scoped}
+    returning *
+  `;
+
+  if (organization) {
+    await writeAuditLog({
+      tenantId: input.tenantId,
+      userId: input.userId,
+      action: "organization.update",
+      entity: "Organization",
+      entityId: organization.id,
+      metadata: { name: organization.name },
+    });
+  }
+
+  return organization ?? null;
+}
+
+export async function listConnections(tenantId: string, organizationId: string) {
+  const scoped = requireTenantId(tenantId);
+  return sql<PlatformConnectionRow[]>`
+    select *
+    from "PlatformConnection"
+    where "tenantId" = ${scoped} and "organizationId" = ${organizationId}
+    order by "updatedAt" desc
+  `;
+}
+
+export async function listAssessments(tenantId: string, organizationId: string) {
+  const scoped = requireTenantId(tenantId);
+  return sql<AssessmentRow[]>`
+    select *
+    from "Assessment"
+    where "tenantId" = ${scoped} and "organizationId" = ${organizationId}
+    order by "updatedAt" desc
+  `;
+}
+
 export async function getWorkspaceSummary(tenantId: string) {
-  const [accountCount, assessmentCount, connectionCount] = await Promise.all([
-    prisma.organization.count({ where: tenantWhere(tenantId) }),
-    prisma.assessment.count({ where: tenantWhere(tenantId) }),
-    prisma.platformConnection.count({ where: tenantWhere(tenantId) }),
+  const scoped = requireTenantId(tenantId);
+  const [accounts, assessments, connections] = await Promise.all([
+    sql<{ count: number }[]>`
+      select count(*)::int as count
+      from "Organization"
+      where "tenantId" = ${scoped}
+    `,
+    sql<{ count: number }[]>`
+      select count(*)::int as count
+      from "Assessment"
+      where "tenantId" = ${scoped}
+    `,
+    sql<{ count: number }[]>`
+      select count(*)::int as count
+      from "PlatformConnection"
+      where "tenantId" = ${scoped}
+    `,
   ]);
 
-  return { accountCount, assessmentCount, connectionCount };
+  return {
+    accountCount: accounts[0]?.count ?? 0,
+    assessmentCount: assessments[0]?.count ?? 0,
+    connectionCount: connections[0]?.count ?? 0,
+  };
 }

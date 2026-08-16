@@ -9,7 +9,7 @@ export function Card({
 }) {
   return (
     <section
-      className={`rounded-xl border border-border bg-surface p-5 ${className}`}
+      className={`rounded-md border border-border bg-surface p-4 ${className}`}
     >
       {children}
     </section>
@@ -18,8 +18,6 @@ export function Card({
 
 export function CardLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
-      {children}
-    </p>
+    <p className="text-xs font-medium text-muted">{children}</p>
   );
 }

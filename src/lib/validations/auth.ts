@@ -1,4 +1,11 @@
 import { z } from "zod";
+import { industries } from "@/lib/industries";
+import {
+  customerStatuses,
+  employeeRanges,
+  organizationTypes,
+} from "@/lib/organizations";
+import { projectPlatforms } from "@/lib/platforms";
 
 export const signupSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters."),
@@ -11,7 +18,7 @@ export const signupSchema = z.object({
   tenantName: z
     .string()
     .trim()
-    .min(2, "Workspace name must be at least 2 characters."),
+    .min(2, "Partner org name must be at least 2 characters."),
 });
 
 export const loginSchema = z.object({
@@ -20,8 +27,21 @@ export const loginSchema = z.object({
 });
 
 export const createAccountSchema = z.object({
-  name: z.string().trim().min(2, "Account name must be at least 2 characters."),
-  industry: z.string().trim().optional(),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Organization name must be at least 2 characters."),
+  industry: z.enum(industries, "Choose an industry.").optional(),
+  organizationType: z.enum(organizationTypes).optional(),
+  employeeRange: z.enum(employeeRanges).optional(),
+  primaryContact: z.string().trim().optional(),
+  customerStatus: z.enum(customerStatuses).optional(),
+});
+
+export const createProjectSchema = z.object({
+  name: z.string().trim().min(2, "Project name must be at least 2 characters."),
+  platformType: z.enum(projectPlatforms, "Choose a platform."),
+  organizationId: z.string().uuid("Choose a customer account."),
 });
 
 export type AuthFormState = {

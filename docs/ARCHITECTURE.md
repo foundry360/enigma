@@ -35,7 +35,7 @@ src/
   components/          Design system and layout
   lib/
     auth/              Enigma user authentication
-    db/                Prisma client
+    db/                Postgres client (postgres.js)
     tenants/           Tenant isolation helpers
     validations/       Zod schemas
   modules/
@@ -65,12 +65,13 @@ Every customer-owned row has `tenantId`.
 - Authorization is enforced on the server, never by UI filtering alone.
 - Queries go through tenant-scoped helpers.
 - A user session always carries `tenantId`.
+- Supabase Auth owns identity and session cookies. `User.id` is the Auth user id. Tenant membership and roles stay in Enigma tables and are loaded after the JWT is verified.
 
-Sprint 1 tenancy model: one user belongs to one tenant. An AE/RVP/partner firm is a tenant. Customer Salesforce orgs are `Organization` records inside that tenant.
+Sprint 1 tenancy model: one user belongs to one tenant. A tenant is a partner org (the firm), not an individual AE or RVP. AEs, RVPs, and other users on that org share customers and projects. Customer companies are `Organization` records inside the partner org.
 
 ## Security baseline
 
-- OAuth for Salesforce (Sprint 2); no credentials in the browser
+- Supabase Auth for Enigma users; OAuth for Salesforce (Sprint 2); no credentials in the browser
 - Secrets only in environment variables
 - Encrypted-in-transit database and API calls
 - Explicit connect/disconnect and later data deletion

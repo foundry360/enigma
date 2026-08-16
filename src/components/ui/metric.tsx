@@ -16,10 +16,14 @@ export function Metric({
     <Card>
       <div className="flex items-start justify-between gap-3">
         <CardLabel>{label}</CardLabel>
-        {estimate ? <span className="text-[10px] uppercase tracking-wide text-muted">Estimate</span> : null}
+        {estimate ? (
+          <span className="text-[10px] text-muted">Estimate</span>
+        ) : null}
       </div>
-      <p className="mt-3 font-serif text-3xl tracking-tight text-foreground">{value}</p>
-      {hint ? <p className="mt-2 text-sm text-muted">{hint}</p> : null}
+      <p className="mt-2 font-mono text-2xl font-semibold tabular-nums tracking-tight">
+        {value}
+      </p>
+      {hint ? <p className="mt-1 text-xs text-muted">{hint}</p> : null}
     </Card>
   );
 }

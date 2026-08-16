@@ -24,11 +24,10 @@ export function SignupForm() {
         error={state?.errors?.email}
       />
       <Field
-        label="Workspace name"
+        label="Partner org name"
         name="tenantName"
-        placeholder="Acme Partner or West AE team"
+        placeholder="Acme Partner"
         error={state?.errors?.tenantName}
-        hint="This is your Enigma tenant — not the Salesforce customer yet."
       />
       <Field
         label="Password"
@@ -38,9 +37,9 @@ export function SignupForm() {
         error={state?.errors?.password}
         hint="At least 8 characters, with a letter and a number."
       />
-      {state?.message ? <p className="text-sm text-risk">{state.message}</p> : null}
+      {state?.message ? <p className="text-sm text-accent">{state.message}</p> : null}
       <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Creating workspace…" : "Create Enigma workspace"}
+        {pending ? "Creating partner org…" : "Create partner org"}
       </Button>
     </form>
   );

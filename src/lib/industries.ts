@@ -1,0 +1,28 @@
+export const industries = [
+  "Aerospace and defense",
+  "Agriculture",
+  "Automotive",
+  "Construction",
+  "Consumer goods",
+  "Education",
+  "Energy and utilities",
+  "Financial services",
+  "Healthcare",
+  "Hospitality",
+  "Insurance",
+  "Life sciences",
+  "Manufacturing",
+  "Media and entertainment",
+  "Nonprofit",
+  "Oil and gas",
+  "Professional services",
+  "Public sector",
+  "Real estate",
+  "Retail",
+  "Software",
+  "Technology",
+  "Telecommunications",
+  "Transportation and logistics",
+] as const;
+
+export type Industry = (typeof industries)[number];

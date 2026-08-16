@@ -1,18 +1,47 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Only these brand colors:
+   https://huemint.com/brand-2/#palette=fdfdfe-2d3340-0072b8 */
 :root {
-  --background: #070b14;
-  --foreground: #eef2f8;
-  --surface: #0e1524;
-  --surface-2: #141c2e;
-  --border: #243049;
-  --muted: #8a96ad;
-  --accent: #d4a017;
-  --accent-fg: #1a1403;
-  --info: #6b8cff;
-  --positive: #3ddc97;
-  --caution: #e8b84a;
-  --risk: #e06c75;
+  --cream: #fdfdfe;
+  --ink: #2d3340;
+  --brand: #0072b8;
+
+  --background: var(--cream);
+  --foreground: var(--ink);
+  --surface: var(--cream);
+  --surface-2: color-mix(in srgb, var(--ink) 8%, var(--cream));
+  --border: color-mix(in srgb, var(--ink) 16%, var(--cream));
+  --muted: color-mix(in srgb, var(--ink) 55%, var(--cream));
+  --accent: var(--brand);
+  --accent-hover: color-mix(in srgb, var(--ink) 28%, var(--brand));
+  --accent-fg: var(--cream);
+  --hero-glow: color-mix(in srgb, var(--brand) 16%, transparent);
+  --sidebar: #ffffff;
+  --sidebar-fg: var(--ink);
+  --sidebar-muted: color-mix(in srgb, var(--ink) 55%, var(--cream));
+  --sidebar-hover: color-mix(in srgb, var(--ink) 6%, #ffffff);
+  --sidebar-border: color-mix(in srgb, var(--ink) 16%, #ffffff);
+}
+
+.dark {
+  --background: var(--ink);
+  --foreground: var(--cream);
+  --surface: color-mix(in srgb, var(--cream) 8%, var(--ink));
+  --surface-2: color-mix(in srgb, var(--cream) 13%, var(--ink));
+  --border: color-mix(in srgb, var(--cream) 18%, var(--ink));
+  --muted: color-mix(in srgb, var(--cream) 62%, var(--ink));
+  --accent: var(--brand);
+  --accent-hover: color-mix(in srgb, var(--cream) 14%, var(--brand));
+  --accent-fg: var(--cream);
+  --hero-glow: color-mix(in srgb, var(--brand) 18%, transparent);
+  --sidebar: color-mix(in srgb, var(--cream) 8%, var(--ink));
+  --sidebar-fg: var(--cream);
+  --sidebar-muted: color-mix(in srgb, var(--cream) 62%, var(--ink));
+  --sidebar-hover: color-mix(in srgb, var(--cream) 13%, var(--ink));
+  --sidebar-border: color-mix(in srgb, var(--cream) 18%, var(--ink));
 }
 
 @theme inline {
@@ -23,14 +52,24 @@
   --color-border: var(--border);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --color-accent-fg: var(--accent-fg);
-  --color-info: var(--info);
-  --color-positive: var(--positive);
-  --color-caution: var(--caution);
-  --color-risk: var(--risk);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-fg: var(--sidebar-fg);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-border: var(--sidebar-border);
   --font-sans: var(--font-instrument-sans);
-  --font-serif: var(--font-instrument-serif);
+  --font-display: var(--font-sora);
   --font-mono: var(--font-geist-mono);
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 body {
@@ -41,4 +80,135 @@ body {
 
 ::selection {
   background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.app-header {
+  height: 3rem;
+  overflow: visible;
+}
+
+.app-sidebar {
+  width: 14rem;
+  transition: width 160ms ease;
+}
+
+.app-main {
+  min-height: 100%;
+  padding-top: 3rem;
+}
+
+.sidebar-initial {
+  display: none;
+}
+
+.sidebar-icon-open {
+  display: flex;
+}
+
+.sidebar-icon-closed {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .app-main {
+    padding-left: 14rem;
+    transition: padding-left 160ms ease;
+  }
+
+  html.sidebar-collapsed .app-sidebar {
+    width: 3.25rem;
+  }
+
+  html.sidebar-collapsed .app-main {
+    padding-left: 3.25rem;
+  }
+
+  html.sidebar-collapsed .sidebar-label {
+    display: none;
+  }
+
+  html.sidebar-collapsed .sidebar-initial {
+    display: inline;
+  }
+
+  html.sidebar-collapsed .sidebar-nav-link {
+    justify-content: center;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  html.sidebar-collapsed .sidebar-toggle-wrap,
+  html.sidebar-hover .sidebar-toggle-wrap {
+    align-self: center;
+  }
+
+  html.sidebar-collapsed .sidebar-icon-open,
+  html.sidebar-hover .sidebar-icon-open {
+    display: none;
+  }
+
+  html.sidebar-collapsed .sidebar-icon-closed,
+  html.sidebar-hover .sidebar-icon-closed {
+    display: flex;
+  }
+
+  html.sidebar-hover .app-sidebar {
+    width: 3.25rem;
+    z-index: 20;
+  }
+
+  html.sidebar-hover .app-main {
+    padding-left: 3.25rem;
+  }
+
+  html.sidebar-hover .sidebar-label {
+    display: none;
+  }
+
+  html.sidebar-hover .sidebar-nav-link {
+    justify-content: center;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  html.sidebar-hover .app-sidebar:hover,
+  html.sidebar-hover .app-sidebar:focus-within {
+    width: 14rem;
+    box-shadow: 0.5rem 0 1.5rem color-mix(in srgb, var(--ink) 18%, transparent);
+  }
+
+  html.sidebar-hover .app-sidebar:hover .sidebar-label,
+  html.sidebar-hover .app-sidebar:focus-within .sidebar-label {
+    display: inline;
+  }
+
+  html.sidebar-hover .app-sidebar:hover .sidebar-nav-link,
+  html.sidebar-hover .app-sidebar:focus-within .sidebar-nav-link {
+    justify-content: flex-start;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  html.sidebar-hover .app-sidebar:hover .sidebar-toggle-wrap,
+  html.sidebar-hover .app-sidebar:focus-within .sidebar-toggle-wrap {
+    align-self: flex-start;
+  }
+
+  html.sidebar-hover .app-sidebar:hover .sidebar-icon-open,
+  html.sidebar-hover .app-sidebar:focus-within .sidebar-icon-open {
+    display: flex;
+  }
+
+  html.sidebar-hover .app-sidebar:hover .sidebar-icon-closed,
+  html.sidebar-hover .app-sidebar:focus-within .sidebar-icon-closed {
+    display: none;
+  }
+
+  html.sidebar-collapsed .sidebar-layout-menu,
+  html.sidebar-hover .sidebar-layout-menu {
+    right: auto;
+    bottom: 0;
+    left: calc(100% + 0.5rem);
+    margin-bottom: 0;
+  }
 }
