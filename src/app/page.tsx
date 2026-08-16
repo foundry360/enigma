@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 
+export const dynamic = "force-dynamic";
+
 const workflow = [
   "Connect Salesforce",
   "Discover the environment",

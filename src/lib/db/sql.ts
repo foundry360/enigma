@@ -2,6 +2,8 @@ import "server-only";
 
 import postgres from "postgres";
 
+type Sql = ReturnType<typeof postgres>;
+
 function createSql() {
   const url = process.env.DATABASE_URL;
 
@@ -16,14 +18,27 @@ function createSql() {
 }
 
 const globalForSql = globalThis as unknown as {
-  sql?: ReturnType<typeof createSql>;
+  sql?: Sql;
 };
 
-export const sql = globalForSql.sql ?? createSql();
+function getSql() {
+  if (!globalForSql.sql) {
+    globalForSql.sql = createSql();
+  }
 
-if (process.env.NODE_ENV !== "production") {
-  globalForSql.sql = sql;
+  return globalForSql.sql;
 }
+
+export const sql: Sql = new Proxy(function sqlProxy() {} as unknown as Sql, {
+  apply(_target, thisArg, args) {
+    return Reflect.apply(getSql(), thisArg, args);
+  },
+  get(_target, prop) {
+    const client = getSql();
+    const value = Reflect.get(client, prop, client);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
 
 export function createId() {
   return crypto.randomUUID();
