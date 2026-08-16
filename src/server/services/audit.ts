@@ -2,13 +2,17 @@ import { createId, sql } from "@/lib/db/sql";
 import type { AuditLogRow } from "@/lib/db/types";
 import { requireTenantId, scopedCreate } from "@/lib/tenants/scope";
 
+type AuditMetadata = {
+  [key: string]: string | number | boolean | null | undefined;
+};
+
 export async function writeAuditLog(input: {
   tenantId: string;
   userId?: string;
   action: string;
   entity: string;
   entityId?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: AuditMetadata;
 }) {
   const data = scopedCreate(input.tenantId, {
     userId: input.userId ?? null,
