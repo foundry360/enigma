@@ -4,7 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
 import { createAccountSchema, type AuthFormState } from "@/lib/validations/auth";
-import { createAccount, updateAccount } from "@/server/services/accounts";
+import {
+  createAccount,
+  deleteAccount,
+  getAccount,
+  setOrganizationDisabled,
+  updateAccount,
+} from "@/server/services/accounts";
 import { setSelectedOrganizationId } from "@/server/services/users";
 
 export async function createAccountAction(
@@ -62,6 +68,13 @@ export async function selectAccountAction(organizationId: string) {
   return { ok: true };
 }
 
+export async function clearSelectedOrganizationAction() {
+  const session = await requireSession();
+  await setSelectedOrganizationId(session.tenantId, session.userId, null);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 export async function updateAccountAction(
   _state: AuthFormState,
   formData: FormData,
@@ -99,4 +112,47 @@ export async function updateAccountAction(
 
   revalidatePath("/", "layout");
   redirect(`/accounts/${organization.id}`);
+}
+
+export async function disableOrganizationAction(formData: FormData) {
+  const session = await requireSession();
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const disabled = String(formData.get("disabled") ?? "") === "true";
+  const updated = await setOrganizationDisabled({
+    tenantId: session.tenantId,
+    userId: session.userId,
+    organizationId,
+    disabled,
+  });
+
+  if (!updated) {
+    redirect("/accounts");
+  }
+
+  revalidatePath("/", "layout");
+  redirect(`/accounts/${updated.id}/settings`);
+}
+
+export async function deleteOrganizationAction(formData: FormData) {
+  const session = await requireSession();
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const confirmName = String(formData.get("confirmName") ?? "").trim();
+  const organization = await getAccount(session.tenantId, organizationId);
+
+  if (!organization) {
+    redirect("/accounts");
+  }
+
+  if (confirmName !== organization.name) {
+    redirect(`/accounts/${organization.id}/settings`);
+  }
+
+  await deleteAccount({
+    tenantId: session.tenantId,
+    userId: session.userId,
+    organizationId,
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/accounts");
 }

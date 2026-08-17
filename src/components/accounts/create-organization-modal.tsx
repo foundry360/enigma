@@ -120,7 +120,7 @@ function CreateOrganizationModal({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-surface p-5 shadow-sm"
+        className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-modal p-5 shadow-sm [&_input]:bg-modal [&_select]:bg-modal"
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>

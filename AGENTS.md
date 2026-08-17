@@ -10,10 +10,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Enigma
 
-Read `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md` before adding features.
+Read `docs/ARCHITECTURE.md`, `docs/MCP.md`, and `docs/IMPLEMENTATION_PLAN.md` before adding features.
 
-- Salesforce is an adapter under `src/modules/connectors`. Do not leak Salesforce types into engines or UI.
-- Keep scoring, consumption, ROC, and ROA deterministic and tested.
-- Every customer-owned query must include `tenantId` from the server session.
+- Enigma is Synthetic Intelligence: an assessment is an agent pass over MCP tools, not a static describe dump.
+- Salesforce is an adapter under `src/modules/connectors`. Do not leak Salesforce types into intelligence, economics, or UI.
+- MCP (`src/modules/mcp`) is internal and tenant-scoped. No public MCP. No generic SOQL tool. Tokens never appear in tool results.
+- Discovery is metadata-only (objects, fields, automations, security shape). Do not pull CRM records.
+- Intelligence outputs must include score, evidence (tool citations), reason, risk, and recommendation.
+- Keep consumption, ROC, and ROA **arithmetic** deterministic and tested. Intelligence may propose inputs; it must not invent official Salesforce prices.
+- Every customer-owned query and MCP call must include `tenantId` from the server session.
 - Never put secrets, OAuth client secrets, or Salesforce tokens in client code.
 - Do not hard-code Salesforce pricing.

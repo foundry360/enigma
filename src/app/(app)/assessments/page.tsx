@@ -1,24 +1,43 @@
-import Link from "next/link";
-import { buttonClassName } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/ui/page-header";
+import { redirect } from "next/navigation";
+import { AssessmentViews } from "@/components/assessments/assessment-views";
+import { PageFrame } from "@/components/ui/page-frame";
+import { requireSession } from "@/lib/auth/session";
+import { getAccountSelection } from "@/server/services/accounts";
+import { listTenantAssessments } from "@/server/services/assessments";
 
-export default function AssessmentsPage() {
+export default async function AssessmentsPage() {
+  const session = await requireSession();
+  const { selected } = await getAccountSelection(
+    session.tenantId,
+    session.userId,
+  );
+
+  if (!selected) {
+    redirect("/accounts");
+  }
+
+  const assessments = await listTenantAssessments(
+    session.tenantId,
+    selected.id,
+  );
+
   return (
-    <>
-      <PageHeader
-        title="Assessments"
-        description="Readiness, opportunities, consumption, value, ROC, ROA, and roadmap."
+    <PageFrame
+      title="Assessments"
+      description={`Assessment runs for ${selected.name}.`}
+    >
+      <AssessmentViews
+        assessments={assessments.map((assessment) => ({
+          id: assessment.id,
+          href: assessment.projectId
+            ? `/projects/${assessment.projectId}/assessments`
+            : `/accounts/${assessment.organizationId}/assessments`,
+          title: assessment.projectName ?? "Assessment",
+          organizationName: assessment.organizationName,
+          status: assessment.status,
+          createdAt: assessment.createdAt,
+        }))}
       />
-      <EmptyState
-        title="Assessments start after Salesforce discovery"
-        body="Sprint 2 connects a Developer Org and stores a metadata-first snapshot. Sprint 3 turns that snapshot into explainable scores."
-        action={
-          <Link href="/accounts" className={buttonClassName("secondary")}>
-            Prepare an account
-          </Link>
-        }
-      />
-    </>
+    </PageFrame>
   );
 }

@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 
 const tones = {
   neutral: "border-border bg-surface-2 text-muted",
-  accent: "border-accent/30 bg-accent/10 text-accent",
+  accent: "border-accent bg-accent text-accent-fg",
+  connected: "border-transparent bg-connected text-white",
 };
 
 export function Badge({

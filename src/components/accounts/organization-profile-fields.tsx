@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Field } from "@/components/ui/field";
 import { SelectField } from "@/components/ui/select-field";
 import { industries } from "@/lib/industries";
@@ -16,14 +17,33 @@ export type OrganizationProfileValues = {
   customerStatus?: string | null;
 };
 
+function SettingsCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <h2 className="mb-2 text-sm font-semibold">{title}</h2>
+      <section className="rounded-lg border border-border bg-background p-5">
+        <div className="space-y-4">{children}</div>
+      </section>
+    </div>
+  );
+}
+
 export function OrganizationProfileFields({
   defaults,
   errors,
+  grouped = false,
 }: {
   defaults?: OrganizationProfileValues;
   errors?: Record<string, string[] | undefined>;
+  grouped?: boolean;
 }) {
-  return (
+  const organization = (
     <>
       <Field
         layout="horizontal"
@@ -76,6 +96,11 @@ export function OrganizationProfileFields({
           </option>
         ))}
       </SelectField>
+    </>
+  );
+
+  const relationship = (
+    <>
       <Field
         layout="horizontal"
         label="Primary contact"
@@ -88,15 +113,32 @@ export function OrganizationProfileFields({
         layout="horizontal"
         label="Customer status"
         name="customerStatus"
-        defaultValue={defaults?.customerStatus ?? "Prospect"}
+        defaultValue={defaults?.customerStatus ?? ""}
         error={errors?.customerStatus}
       >
+        <option value="">-</option>
         {customerStatuses.map((status) => (
           <option key={status} value={status}>
             {status}
           </option>
         ))}
       </SelectField>
+    </>
+  );
+
+  if (!grouped) {
+    return (
+      <>
+        {organization}
+        {relationship}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <SettingsCard title="Organization">{organization}</SettingsCard>
+      <SettingsCard title="Relationship">{relationship}</SettingsCard>
     </>
   );
 }

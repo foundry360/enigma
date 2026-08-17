@@ -3,23 +3,26 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* Only these brand colors:
-   https://huemint.com/brand-2/#palette=fdfdfe-2d3340-0072b8 */
+   https://huemint.com/brand-2/#palette=fdfdfe-2d3340-173e76 */
 :root {
   --cream: #fdfdfe;
   --ink: #2d3340;
-  --brand: #0072b8;
+  --brand: #173e76;
 
   --background: var(--cream);
   --foreground: var(--ink);
   --surface: var(--cream);
   --surface-2: color-mix(in srgb, var(--ink) 8%, var(--cream));
+  --modal: var(--cream);
   --border: color-mix(in srgb, var(--ink) 16%, var(--cream));
   --muted: color-mix(in srgb, var(--ink) 55%, var(--cream));
+  --placeholder: color-mix(in srgb, var(--ink) 32%, var(--cream));
   --accent: var(--brand);
   --accent-hover: color-mix(in srgb, var(--ink) 28%, var(--brand));
   --accent-fg: var(--cream);
+  --connected: #008000;
   --hero-glow: color-mix(in srgb, var(--brand) 16%, transparent);
-  --sidebar: #ffffff;
+  --sidebar: var(--background);
   --sidebar-fg: var(--ink);
   --sidebar-muted: color-mix(in srgb, var(--ink) 55%, var(--cream));
   --sidebar-hover: color-mix(in srgb, var(--ink) 6%, #ffffff);
@@ -27,21 +30,23 @@
 }
 
 .dark {
-  --background: var(--ink);
+  --background: #0d1117;
   --foreground: var(--cream);
-  --surface: color-mix(in srgb, var(--cream) 8%, var(--ink));
-  --surface-2: color-mix(in srgb, var(--cream) 13%, var(--ink));
-  --border: color-mix(in srgb, var(--cream) 18%, var(--ink));
+  --surface: #161b22;
+  --surface-2: #1c2128;
+  --modal: #161b22;
+  --border: #252b32;
   --muted: color-mix(in srgb, var(--cream) 62%, var(--ink));
+  --placeholder: color-mix(in srgb, var(--cream) 34%, var(--ink));
   --accent: var(--brand);
   --accent-hover: color-mix(in srgb, var(--cream) 14%, var(--brand));
   --accent-fg: var(--cream);
   --hero-glow: color-mix(in srgb, var(--brand) 18%, transparent);
-  --sidebar: color-mix(in srgb, var(--cream) 8%, var(--ink));
+  --sidebar: var(--background);
   --sidebar-fg: var(--cream);
   --sidebar-muted: color-mix(in srgb, var(--cream) 62%, var(--ink));
-  --sidebar-hover: color-mix(in srgb, var(--cream) 13%, var(--ink));
-  --sidebar-border: color-mix(in srgb, var(--cream) 18%, var(--ink));
+  --sidebar-hover: #161b22;
+  --sidebar-border: #252b32;
 }
 
 @theme inline {
@@ -49,11 +54,14 @@
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-modal: var(--modal);
   --color-border: var(--border);
   --color-muted: var(--muted);
+  --color-placeholder: var(--placeholder);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-fg: var(--accent-fg);
+  --color-connected: var(--connected);
   --color-sidebar: var(--sidebar);
   --color-sidebar-fg: var(--sidebar-fg);
   --color-sidebar-muted: var(--sidebar-muted);
@@ -76,6 +84,33 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), sans-serif;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d4 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #d4d4d4;
+  border-radius: 999px;
+}
+
+html.dark * {
+  scrollbar-color: #000000 transparent;
+}
+
+html.dark *::-webkit-scrollbar-thumb {
+  background: #000000;
 }
 
 ::selection {
@@ -113,6 +148,12 @@ body {
   .app-main {
     padding-left: 14rem;
     transition: padding-left 160ms ease;
+  }
+
+  .workspace-unsigned .app-main,
+  html.sidebar-collapsed .workspace-unsigned .app-main,
+  html.sidebar-hover .workspace-unsigned .app-main {
+    padding-left: 0;
   }
 
   html.sidebar-collapsed .app-sidebar {

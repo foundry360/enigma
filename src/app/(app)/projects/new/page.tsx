@@ -1,6 +1,4 @@
 import { redirect } from "next/navigation";
-import { CreateProjectForm } from "@/components/projects/create-project-form";
-import { PageHeader } from "@/components/ui/page-header";
 import { requireSession } from "@/lib/auth/session";
 import { getAccountSelection } from "@/server/services/accounts";
 
@@ -11,7 +9,7 @@ export default async function NewProjectPage({
 }) {
   const session = await requireSession();
   const { organizationId } = await searchParams;
-  const { accounts, selected } = await getAccountSelection(
+  const { accounts } = await getAccountSelection(
     session.tenantId,
     session.userId,
   );
@@ -20,19 +18,9 @@ export default async function NewProjectPage({
     redirect("/accounts?new=1");
   }
 
-  const preferred =
-    accounts.find((account) => account.id === organizationId) ?? selected;
+  if (organizationId) {
+    redirect(`/accounts/${organizationId}?newProject=1`);
+  }
 
-  return (
-    <>
-      <PageHeader
-        title="New project"
-        description="Name the engagement and choose the platform to assess."
-      />
-      <CreateProjectForm
-        accounts={accounts}
-        selectedAccountId={preferred?.id}
-      />
-    </>
-  );
+  redirect("/dashboard?newProject=1");
 }

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { buttonClassName } from "@/components/ui/button";
+import { CreateProjectButton } from "@/components/projects/create-project-modal";
+import { ProjectIcon } from "@/components/ui/entity-icons";
+import { PageFrame } from "@/components/ui/page-frame";
 import { requireSession } from "@/lib/auth/session";
 import { formatLastActivity } from "@/lib/format";
 import { getOrganizationOverview } from "@/server/services/organization-overview";
@@ -19,17 +21,17 @@ export default async function OrganizationProjectsPage({
   }
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">Projects</h2>
-        <Link
-          href={`/projects/new?organizationId=${id}`}
-          className={buttonClassName("primary", "gap-1")}
-        >
+    <PageFrame
+      title="Projects"
+      description="Transformation initiatives for this organization."
+      icon={<ProjectIcon size={20} />}
+      actions={
+        <CreateProjectButton organizationId={id}>
           <span aria-hidden="true">+</span>
           Create project
-        </Link>
-      </div>
+        </CreateProjectButton>
+      }
+    >
       {overview.projects.length === 0 ? (
         <p className="text-sm text-muted">No transformation projects yet.</p>
       ) : (
@@ -48,6 +50,6 @@ export default async function OrganizationProjectsPage({
           ))}
         </div>
       )}
-    </section>
+    </PageFrame>
   );
 }

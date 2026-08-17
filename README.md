@@ -10,7 +10,7 @@ The product question:
 
 Sprint 1 foundation is in place: Next.js app, tenant model, Supabase Auth, design system, and the assessment workflow shell.
 
-Salesforce OAuth, discovery, scoring, and economics are not built yet. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
+Salesforce OAuth, the internal MCP server, Synthetic Intelligence, and economics are not built yet. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
 
 ## Local setup
 
@@ -28,15 +28,16 @@ Create a partner org at [http://localhost:3000/signup](http://localhost:3000/sig
 
 ## Architecture
 
-Salesforce is an adapter, not the core model:
+Salesforce is an adapter. Intelligence uses an internal MCP server:
 
 ```
-Platform Connector → Normalized Enterprise Model → Intelligence → Economics → UX
+Platform Connector → MCP tools → Synthetic Intelligence → Economics → UX
 ```
 
 Details:
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [MCP tool surface](docs/MCP.md)
 - [Database](docs/DATABASE.md)
 - [Salesforce OAuth and first APIs](docs/SALESFORCE.md)
 - [Phased plan](docs/IMPLEMENTATION_PLAN.md)

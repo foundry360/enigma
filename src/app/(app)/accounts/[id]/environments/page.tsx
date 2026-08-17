@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { PageFrame } from "@/components/ui/page-frame";
 import { requireSession } from "@/lib/auth/session";
 import { platformLabel } from "@/lib/platforms";
 import { getOrganizationOverview } from "@/server/services/organization-overview";
@@ -18,19 +19,17 @@ export default async function OrganizationEnvironmentsPage({
   }
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-4">
-      <h2 className="text-sm font-semibold">Environments</h2>
-      <p className="mt-1 text-sm text-muted">
-        An environment is a connected instance inside a platform, such as
-        production or sandbox. It is not the customer organization.
-      </p>
+    <PageFrame
+      title="Environments"
+      description="An environment is a connected instance inside a platform, such as production or sandbox. It is not the customer organization."
+    >
       {overview.connections.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">
+        <p className="text-sm text-muted">
           No environments connected. Platform adapters will attach environments
           here.
         </p>
       ) : (
-        <ul className="mt-4 space-y-2">
+        <ul className="space-y-2">
           {overview.connections.map((connection) => (
             <li
               key={connection.id}
@@ -53,6 +52,6 @@ export default async function OrganizationEnvironmentsPage({
           ))}
         </ul>
       )}
-    </section>
+    </PageFrame>
   );
 }

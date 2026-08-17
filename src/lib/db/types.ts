@@ -22,7 +22,13 @@ export type TenantRow = {
   updatedAt: Date;
 };
 
-export const projectPlatforms = ["SALESFORCE", "PEGA", "SERVICENOW"] as const;
+export const projectPlatforms = [
+  "SALESFORCE",
+  "PEGA",
+  "SERVICENOW",
+  "MICROSOFT",
+  "OTHER",
+] as const;
 
 export type ProjectPlatform = (typeof projectPlatforms)[number];
 
@@ -35,6 +41,7 @@ export type OrganizationRow = {
   employeeRange: string | null;
   primaryContact: string | null;
   customerStatus: string | null;
+  disabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -44,9 +51,41 @@ export type ProjectRow = {
   tenantId: string;
   organizationId: string;
   name: string;
-  platformType: ProjectPlatform;
+  platformType: ProjectPlatform | null;
+  projectType: string;
+  objective: string;
+  outcomes: string[];
+  outcomeOther: string | null;
+  ownerId: string | null;
+  status: string;
+  description: string | null;
+  businessUnit: string | null;
+  department: string | null;
+  executiveSponsor: string | null;
+  customerLead: string | null;
+  targetDate: Date | string | null;
+  priority: string | null;
+  successMetrics: string | null;
+  notes: string | null;
+  connectPlatformLater: boolean;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type ProjectPlatformScopeRow = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  platformType: ProjectPlatform;
+  createdAt: Date;
+};
+
+export type ProjectEnvironmentScopeRow = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  connectionId: string;
+  createdAt: Date;
 };
 
 export type PlatformConnectionRow = {
@@ -77,6 +116,7 @@ export type AssessmentRow = {
   id: string;
   tenantId: string;
   organizationId: string;
+  projectId: string | null;
   status: "DRAFT" | "DISCOVERING" | "ANALYZING" | "COMPLETE" | "FAILED";
   createdAt: Date;
   updatedAt: Date;

@@ -40,9 +40,19 @@ export async function getUserProfile(tenantId: string, userId: string) {
 export async function setSelectedOrganizationId(
   tenantId: string,
   userId: string,
-  organizationId: string,
+  organizationId: string | null,
 ) {
   const scoped = requireTenantId(tenantId);
+
+  if (!organizationId) {
+    const updated = await sql`
+      update "User"
+      set "selectedOrganizationId" = null, "updatedAt" = now()
+      where id = ${userId} and "tenantId" = ${scoped}
+    `;
+    return updated.count;
+  }
+
   const updated = await sql`
     update "User"
     set "selectedOrganizationId" = ${organizationId}, "updatedAt" = now()
@@ -81,6 +91,16 @@ export async function setUserAvatarPath(
   `;
 
   return updated.count;
+}
+
+export async function listTenantUsers(tenantId: string) {
+  const scoped = requireTenantId(tenantId);
+  return sql<Pick<UserRow, "id" | "name">[]>`
+    select id, name
+    from "User"
+    where "tenantId" = ${scoped}
+    order by name
+  `;
 }
 
 export async function getTenant(tenantId: string) {

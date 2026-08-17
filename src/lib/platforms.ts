@@ -5,10 +5,12 @@ import {
 
 export { projectPlatforms, type ProjectPlatform };
 
-export const platformLabels: Record<ProjectPlatform, string> = {
+export const platformLabels: Record<string, string> = {
   SALESFORCE: "Salesforce",
   PEGA: "Pega",
   SERVICENOW: "ServiceNow",
+  MICROSOFT: "Microsoft",
+  OTHER: "Other",
 };
 
 export function isProjectPlatform(
@@ -17,12 +19,9 @@ export function isProjectPlatform(
   return projectPlatforms.some((platform) => platform === value);
 }
 
-export function platformLabel(platform: string) {
-  if (isProjectPlatform(platform)) {
-    return platformLabels[platform];
+export function platformLabel(platform: string | null | undefined) {
+  if (!platform) {
+    return "No platform in scope";
   }
-  if (platform === "MICROSOFT") {
-    return "Microsoft";
-  }
-  return platform;
+  return platformLabels[platform] ?? platform;
 }

@@ -27,7 +27,7 @@ erDiagram
 | `Assessment` | One analysis run against an organization |
 | `AuditLog` | Tenant-scoped security and activity trail |
 
-`PlatformConnection.platformType` is an enum (`SALESFORCE` first). Tokens are not stored until Sprint 2.
+`PlatformConnection.platformType` is an enum (`SALESFORCE` first). Encrypted tokens and a deletable metadata snapshot are Sprint 2.
 
 ## Tenant isolation rule
 
@@ -37,12 +37,12 @@ Server queries must include `{ tenantId }` from the session. Frontend filtering 
 
 ## Later tables (not created in Sprint 1)
 
-- Normalized discovery: `EnterpriseObject`, `Field`, `Automation`, `KnowledgeSource`, `BusinessProcess`
-- Intelligence: `ReadinessAssessment`, `ReadinessDimension`, `Opportunity`
+- Normalized discovery: `EnterpriseObject`, `Field`, `Automation`, `KnowledgeSource`, `BusinessProcess` (deletable snapshot behind MCP)
+- Intelligence: `ReadinessAssessment`, `ReadinessDimension`, `Opportunity`, assessment run / tool-trace records (no tokens, no raw Salesforce HTTP)
 - Economics: `ConsumptionModel`, `ConsumptionScenario`, `ValueModel`
 - Delivery: `Recommendation`, `Roadmap`, `RoadmapPhase`, `ExecutiveBrief`
 
-These belong to an `Assessment` and inherit `tenantId`.
+These belong to an `Assessment` and inherit `tenantId`. MCP denials and tool calls also write to `AuditLog`.
 
 ## Pricing
 

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { PageFrame } from "@/components/ui/page-frame";
 import { requireSession } from "@/lib/auth/session";
 import { formatDate } from "@/lib/format";
 import { getOrganizationOverview } from "@/server/services/organization-overview";
@@ -18,19 +19,17 @@ export default async function OrganizationPlatformsPage({
   }
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-4">
-      <h2 className="text-sm font-semibold">Platforms</h2>
-      <p className="mt-1 text-sm text-muted">
-        Platforms are technology systems used by this organization. Salesforce
-        is one adapter, not the organization.
-      </p>
+    <PageFrame
+      title="Platforms"
+      description="Platforms are technology systems used by this organization. Salesforce is one adapter, not the organization."
+    >
       {overview.landscape.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">
+        <p className="text-sm text-muted">
           No platforms connected. Connect your first platform to begin building
           the organization&apos;s technology landscape.
         </p>
       ) : (
-        <ul className="mt-4 space-y-2">
+        <ul className="space-y-2">
           {overview.landscape.map((platform) => (
             <li
               key={platform.platformType}
@@ -50,6 +49,6 @@ export default async function OrganizationPlatformsPage({
           ))}
         </ul>
       )}
-    </section>
+    </PageFrame>
   );
 }

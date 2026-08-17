@@ -1,6 +1,6 @@
 # Salesforce Integration Approach
 
-Sprint 2 work. Documented now so Sprint 1 does not paint us into a Salesforce-shaped core.
+Sprint 2 work. Salesforce is the first connector behind Enigma MCP, not the intelligence layer.
 
 ## OAuth
 
@@ -11,13 +11,15 @@ Use the Salesforce Web Server flow (authorization code) with a Connected App.
 3. Salesforce redirects to a server-side Enigma callback.
 4. The server exchanges `code` for tokens. The client never sees the client secret or refresh token.
 5. Tokens are stored encrypted, associated with `PlatformConnection`.
-6. Disconnect revokes the token where possible and deletes stored credentials.
+6. Disconnect revokes the token where possible and deletes stored credentials and cached metadata.
 
 Required Connected App settings:
 
 - Callback URL: `{APP_URL}/api/connectors/salesforce/callback`
 - Selected OAuth scopes: `api`, `refresh_token`, `id`
 - Require secret for Web Server flow
+
+`api` can read records. Enigma must not. There is no metadata-only Salesforce scope; the adapter and MCP allowlist are the control.
 
 Environment variables (never client-side):
 
@@ -28,7 +30,9 @@ SALESFORCE_LOGIN_URL=https://login.salesforce.com
 SALESFORCE_CALLBACK_URL=
 ```
 
-Use `https://test.salesforce.com` for Developer/sandbox orgs when needed.
+Use `https://test.salesforce.com` for Developer/sandbox orgs for MVP.
+
+Use OAuth `state` and PKCE. Do not log tokens.
 
 ## Adapter boundary
 
@@ -36,13 +40,15 @@ Use `https://test.salesforce.com` for Developer/sandbox orgs when needed.
 Salesforce REST / Metadata / Tooling
   → Salesforce Adapter (modules/connectors/salesforce)
     → Normalized Enigma Model (modules/enterprise)
+      → MCP tools (modules/mcp)
+        → Synthetic Intelligence
 ```
 
-No page, engine, or economic calculator may import Salesforce API types.
+No page, intelligence prompt, or economic calculator may import Salesforce API types or hold tokens.
 
-## First discovery APIs (Sprint 2)
+## What we read (Sprint 2)
 
-Metadata-first. Do not pull unnecessary record data.
+Metadata-first. Org **shape**, not customer **rows**.
 
 | Need | API | Endpoint / type |
 | --- | --- | --- |
@@ -53,11 +59,15 @@ Metadata-first. Do not pull unnecessary record data.
 | Apex | Tooling | `ApexClass` (names, namespaces, size — not source unless required) |
 | Validation rules | Tooling | `ValidationRule` |
 | Custom objects | Metadata or Tooling | `CustomObject` |
-| Service/sales signals | REST describe + limits | Case, Lead, Opportunity, KnowledgeArticle presence |
+| Service/sales signals | REST describe + limits | Case, Lead, Opportunity, KnowledgeArticle **presence** |
 | Security posture | REST / Tooling | Profile, PermissionSet counts and object-permission summaries |
 | Knowledge posture | REST describe | Knowledge article objects and data categories if present |
 
-Prefer describe/list metadata over querying customer records. If volume is needed later, use aggregate counts only.
+Do not SOQL Account, Contact, Case, Opportunity, or any other business object. Do not pull field values, emails, files, or Chatter.
+
+If volume is needed later, use aggregate counts only, behind an allowlisted MCP tool.
+
+`describe` still returns field names, types, and picklist labels. Treat that snapshot as confidential org design.
 
 ## Mapping examples
 
@@ -72,8 +82,10 @@ Prefer describe/list metadata over querying customer records. If volume is neede
 
 ## Safety
 
-- Least-privilege Connected App
-- Server-side only token use
+- Least-privilege Connected App; Developer/sandbox first
+- Server-side only token use; encrypt at rest
 - No secrets in frontend bundles
-- Explicit disconnect and later deletion of cached metadata
+- No generic SOQL tool
+- Explicit disconnect and deletion of tokens, cached metadata, and assessment traces
 - Treat all connected org metadata as sensitive enterprise information
+- Never send raw Salesforce payloads or tokens to a model

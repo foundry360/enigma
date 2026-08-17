@@ -1,58 +1,68 @@
 # Phased Implementation Plan
 
-## Current state (2026-08-15)
+## Current state (2026-08-16)
 
-The repository was empty. Sprint 1 foundation is now in the repo: Next.js 16, Supabase Postgres (`ppceqvoyexpkguzeseen`) via postgres.js, Supabase Auth plus tenant-scoped profiles, UI shell, and this plan. Salesforce OAuth is documented, not implemented.
+Sprint 1 foundation and workspace UX are in the repo: Next.js 16, Supabase Postgres (`ppceqvoyexpkguzeseen`) via postgres.js, Supabase Auth, tenant-scoped profiles, organizations, projects, assessments shell, and connection UI. Salesforce OAuth, MCP, and Synthetic Intelligence are documented, not implemented.
+
+Architecture revision: Enigma is an AI-first assessment product. Discovery is metadata-only. Intelligence is an agent that uses an internal MCP server. Economics stay calculated.
 
 ## Success bar for MVP
 
 A user can create an Enigma account, connect a Salesforce Developer Org, run an assessment, and in under 15 minutes see readiness (with evidence), at least three opportunities, consumption scenarios, business value, ROC, ROA, a roadmap, and an executive brief.
 
+The assessment is a Synthetic Intelligence run grounded in MCP tool evidence, not a static checklist over a describe dump.
+
 Do not start Agentforce deployment automation until that assessment → value workflow works end to end.
 
 ---
 
-## Sprint 1 — Foundation (this sprint)
+## Sprint 1 — Foundation
 
 **Goal:** A running multi-tenant Enigma app with authentication, tenant model, and an executive UI shell.
 
 - Next.js + TypeScript + Tailwind
 - PostgreSQL via postgres.js
-- Email/password auth (Auth.js)
-- Tenant + user + organization + assessment + connection + audit schema
-- Design system and navigation that makes the MVP workflow visible
+- Email/password auth (Supabase Auth)
+- Tenant + user + organization + project + assessment + connection + audit schema
+- Design system, workspace sign-in, and navigation that makes the MVP workflow visible
 - Tenant-isolation helpers and tests
 
-**Out of scope:** Salesforce OAuth, discovery, scoring, economics.
+**Status:** In place.
 
-**Next step after this sprint:** Salesforce connection and metadata discovery.
+**Out of scope (then and now until later sprints):** Salesforce OAuth, MCP, intelligence, economics.
 
 ---
 
-## Sprint 2 — Salesforce
+## Sprint 2 — Salesforce adapter and MCP
 
-**Goal:** Connect a Salesforce Developer Org and persist a normalized snapshot of safe metadata.
+**Goal:** Connect a Salesforce Developer Org and let intelligence ask metadata questions through MCP.
 
-- Connected App OAuth
-- Connection management (connect, status, disconnect)
-- Salesforce adapter isolated from app logic
-- Object/automation/security/knowledge inventory via describe + Tooling
-- Map into normalized enterprise types
+- Connected App OAuth (Web Server flow); encrypted tokens on `PlatformConnection`
+- Connection management (connect, status, disconnect + revoke)
+- Salesforce adapter isolated under `modules/connectors/salesforce`
+- Metadata-only APIs: describe, Tooling, org identity — no CRM rows
+- Internal MCP server (`modules/mcp`) with the [MVP tool catalog](MCP.md)
+- Normalized types in `modules/enterprise`; persist a snapshot that can be deleted
+- Audit every connect, disconnect, and tool call
 
 **Dependencies:** Sprint 1 auth, tenant, `PlatformConnection`.
 
+**Out of scope:** Opportunity narrative, scoring UI, economics, public MCP, record SOQL.
+
 ---
 
-## Sprint 3 — Intelligence
+## Sprint 3 — Synthetic Intelligence
 
-**Goal:** Explainable readiness and opportunity detection from the normalized model.
+**Goal:** An assessment run that reasons over the connected org via MCP.
 
-- Readiness engine (0–100) across data, process, knowledge, automation, security, governance
-- Each dimension: score, evidence, reason, risk, recommendation
+- Assessment agent that calls only allowlisted MCP tools
+- Readiness across data, process, knowledge, automation, security, governance
+- Each dimension: score, evidence (tool citations), reason, risk, recommendation
 - Opportunity detection for a small, credible Agentforce catalog
-- Explainable opportunity scores
+- Persist run traces needed for explainability; do not persist tokens or raw Salesforce HTTP
+- No unexplained scores
 
-**Dependencies:** Sprint 2 normalized snapshot. Deterministic scoring only.
+**Dependencies:** Sprint 2 connection + MCP tools.
 
 ---
 
@@ -65,6 +75,7 @@ Do not start Agentforce deployment automation until that assessment → value wo
 - Value model (labor, deflection, implementation cost)
 - Return on Consumption and Return on Acceleration
 - Tests for every formula
+- Intelligence may propose inputs; formulas calculate results
 
 **Dependencies:** Sprint 3 opportunities and volume/readiness inputs.
 
@@ -74,7 +85,7 @@ Do not start Agentforce deployment automation until that assessment → value wo
 
 **Goal:** The AE-facing assessment story.
 
-- Account assessment dashboard
+- Account and project assessment views fed by intelligence outputs
 - Opportunity detail
 - Prioritized roadmap
 - Executive opportunity brief
@@ -88,14 +99,14 @@ Do not start Agentforce deployment automation until that assessment → value wo
 
 **Goal:** Safe to put in front of a Salesforce AE on a Developer Org.
 
-- Error handling, logging, audit events
-- Performance on typical metadata volumes
+- Error handling, logging, audit events (including MCP denials)
+- Performance on typical metadata volumes and typical agent tool-call counts
 - Demo data
-- Security review of OAuth, tenant isolation, and deletion
+- Security review of OAuth, token encryption, tenant isolation, MCP allowlist, and deletion
 - End-to-end Developer Org test of the MVP success bar
 
 ---
 
 ## Explicitly deferred
 
-Pega, ServiceNow, Microsoft, production deployment automation, Agentforce configuration automation, real-time monitoring, a warehouse, a broad multi-platform UI, and a managed Salesforce package.
+Pega, ServiceNow, Microsoft, production deployment automation, Agentforce configuration automation, real-time monitoring, a warehouse, a public MCP endpoint, a broad multi-platform UI, and a managed Salesforce package.

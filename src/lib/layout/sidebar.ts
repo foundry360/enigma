@@ -12,6 +12,13 @@ export function isSidebarPreference(
   );
 }
 
+export function isWorkspaceSigned(
+  pathname: string,
+  selectedAccountId?: string | null,
+) {
+  return Boolean(selectedAccountId) && pathname !== "/accounts";
+}
+
 export function applySidebarPreference(preference: SidebarPreference | null) {
   const next = preference ?? "expanded";
   document.documentElement.classList.toggle(

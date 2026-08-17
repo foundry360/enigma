@@ -43,10 +43,10 @@ export function SelectField({
         <select
           id={inputId}
           name={name}
-          className={`h-9 w-full rounded-md border bg-background px-2.5 text-sm text-foreground outline-none ${
+          className={`h-9 w-full rounded-md border bg-background px-2.5 text-sm text-foreground outline-none has-[option[value='']:checked]:text-placeholder [&_option]:text-foreground ${
             message
-              ? "border-accent focus:border-accent"
-              : "border-border focus:border-accent"
+              ? "border-accent focus:border-foreground"
+              : "border-border focus:border-foreground"
           }`}
           {...props}
         >

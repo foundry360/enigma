@@ -1,3 +1,15 @@
+export function dateInputValue(value: Date | string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    return value.slice(0, 10);
+  }
+
+  return value.toISOString().slice(0, 10);
+}
+
 export function formatDate(value: Date | string) {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",

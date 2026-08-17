@@ -1,97 +1,87 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import Link from "next/link";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { selectAccountAction } from "@/app/actions/accounts";
 import { CreateOrganizationButton } from "@/components/accounts/create-organization-modal";
-import { Badge } from "@/components/ui/badge";
+import {
+  emptyOrganizationFilters,
+  OrganizationFilter,
+  type OrganizationFilters,
+} from "@/components/accounts/organization-filter";
+import {
+  connectionLabel,
+  connectionTone,
+  StatusDot,
+} from "@/components/ui/status-dot";
+import { OrganizationIcon } from "@/components/ui/entity-icons";
+import { ViewToggle, type CollectionView } from "@/components/ui/view-toggle";
+import { formatLastActivity } from "@/lib/format";
 
 const VIEW_STORAGE_KEY = "enigma-organization-view";
-const DEFAULT_VIEW: OrganizationView = "cards";
-
-type OrganizationView = "cards" | "list";
+const DEFAULT_VIEW: CollectionView = "cards";
 
 export type OrganizationListItem = {
   id: string;
   name: string;
   industry: string | null;
+  organizationType: string | null;
+  employeeRange: string | null;
+  primaryContact: string | null;
+  customerStatus: string | null;
   connectionStatus: string;
+  environmentCount: number;
+  projectCount: number;
   assessmentStatus: string;
+  updatedAt: Date | string;
 };
 
-function isOrganizationView(
-  value: string | null,
-): value is OrganizationView {
-  return value === "cards" || value === "list";
-}
+function CustomerStatusMark({ status }: { status: string | null }) {
+  if (!status) {
+    return null;
+  }
 
-function ViewIcon({ children }: { children: ReactNode }) {
+  const icon =
+    status === "Active" ? (
+      <path d="m8 12 2.5 2.5L16 9" />
+    ) : status === "Inactive" ? (
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    ) : (
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+    );
+
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
+    <span
+      title={status}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
+        status === "Active"
+          ? "border-connected text-connected"
+          : status === "Inactive"
+            ? "border-red-500/70 text-red-500"
+            : "border-muted text-muted"
+      }`}
     >
-      {children}
-    </svg>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {icon}
+      </svg>
+      <span className="sr-only">{status}</span>
+    </span>
   );
 }
 
-export function OrganizationViewToggle({
-  view,
-  onChange,
-}: {
-  view: OrganizationView;
-  onChange: (view: OrganizationView) => void;
-}) {
-  return (
-    <div className="inline-flex">
-      <button
-        type="button"
-        className={`inline-flex h-7 w-7 items-center justify-center rounded-sm ${
-          view === "cards"
-            ? "bg-surface-2 text-foreground"
-            : "text-muted hover:text-foreground"
-        }`}
-        aria-label="Card view"
-        aria-pressed={view === "cards"}
-        onClick={() => onChange("cards")}
-      >
-        <ViewIcon>
-          <rect width="7" height="7" x="3" y="3" rx="1" />
-          <rect width="7" height="7" x="14" y="3" rx="1" />
-          <rect width="7" height="7" x="3" y="14" rx="1" />
-          <rect width="7" height="7" x="14" y="14" rx="1" />
-        </ViewIcon>
-      </button>
-      <button
-        type="button"
-        className={`inline-flex h-7 w-7 items-center justify-center rounded-sm ${
-          view === "list"
-            ? "bg-surface-2 text-foreground"
-            : "text-muted hover:text-foreground"
-        }`}
-        aria-label="List view"
-        aria-pressed={view === "list"}
-        onClick={() => onChange("list")}
-      >
-        <ViewIcon>
-          <path d="M8 6h13" />
-          <path d="M8 12h13" />
-          <path d="M8 18h13" />
-          <path d="M3 6h.01" />
-          <path d="M3 12h.01" />
-          <path d="M3 18h.01" />
-        </ViewIcon>
-      </button>
-    </div>
-  );
+function isOrganizationView(value: string | null): value is CollectionView {
+  return value === "cards" || value === "list";
 }
 
 export function OrganizationViews({
@@ -99,8 +89,24 @@ export function OrganizationViews({
 }: {
   organizations: OrganizationListItem[];
 }) {
-  const [view, setView] = useState<OrganizationView>(DEFAULT_VIEW);
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [view, setView] = useState<CollectionView>(DEFAULT_VIEW);
   const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<OrganizationFilters>(
+    emptyOrganizationFilters,
+  );
+
+  function openOrganization(organizationId: string) {
+    if (pending) {
+      return;
+    }
+
+    startTransition(async () => {
+      await selectAccountAction(organizationId);
+      router.push(`/accounts/${organizationId}`);
+    });
+  }
 
   useEffect(() => {
     window.localStorage.removeItem("enigma-org-view");
@@ -110,13 +116,34 @@ export function OrganizationViews({
     }
   }, []);
 
-  function changeView(next: OrganizationView) {
+  function changeView(next: CollectionView) {
     setView(next);
     window.localStorage.setItem(VIEW_STORAGE_KEY, next);
   }
 
   const normalized = query.trim().toLowerCase();
   const visible = organizations.filter((organization) => {
+    if (filters.industry && organization.industry !== filters.industry) {
+      return false;
+    }
+    if (
+      filters.connectionStatus &&
+      organization.connectionStatus !== filters.connectionStatus
+    ) {
+      return false;
+    }
+    if (
+      filters.customerStatus &&
+      organization.customerStatus !== filters.customerStatus
+    ) {
+      return false;
+    }
+    if (
+      filters.assessmentStatus &&
+      organization.assessmentStatus !== filters.assessmentStatus
+    ) {
+      return false;
+    }
     if (!normalized) {
       return true;
     }
@@ -124,6 +151,10 @@ export function OrganizationViews({
     return [
       organization.name,
       organization.industry,
+      organization.organizationType,
+      organization.employeeRange,
+      organization.primaryContact,
+      organization.customerStatus,
       organization.connectionStatus,
       organization.assessmentStatus,
     ].some((value) => value?.toLowerCase().includes(normalized));
@@ -131,7 +162,7 @@ export function OrganizationViews({
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-3 flex items-center justify-end gap-2">
         <label className="sr-only" htmlFor="organization-search">
           Search organizations
         </label>
@@ -141,77 +172,128 @@ export function OrganizationViews({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search organizations"
-          className="h-8 w-full max-w-sm rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none placeholder:text-muted focus:border-accent"
+          className="h-8 w-64 rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none placeholder:text-placeholder focus:border-foreground"
         />
-        <div className="flex shrink-0 items-center gap-2">
-          <OrganizationViewToggle view={view} onChange={changeView} />
-          <CreateOrganizationButton />
-        </div>
+        <ViewToggle view={view} onChange={changeView} />
+        <OrganizationFilter filters={filters} onChange={setFilters} />
+        <CreateOrganizationButton />
       </div>
       {organizations.length === 0 ? (
-        <p className="rounded-md border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted">
+        <p className="rounded-md border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted">
           No organizations yet. Create the customer you want to assess.
         </p>
       ) : visible.length === 0 ? (
-        <p className="rounded-md border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted">
-          No organizations match that search.
+        <p className="rounded-md border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted">
+          No organizations match that search or filter.
         </p>
       ) : view === "cards" ? (
-        <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(340px,1fr))]">
           {visible.map((organization) => (
-            <Link
+            <button
               key={organization.id}
-              href={`/accounts/${organization.id}`}
-              className="flex min-h-[168px] flex-col rounded-md border border-border bg-surface p-6 hover:bg-surface-2"
+              type="button"
+              disabled={pending}
+              onClick={() => openOrganization(organization.id)}
+              className="flex min-h-[168px] flex-col rounded-md border border-border bg-background p-6 text-left hover:bg-surface-2 disabled:opacity-70"
             >
-              <h2 className="truncate text-base font-semibold">
-                {organization.name}
-              </h2>
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold">
+                  <OrganizationIcon />
+                  <span className="truncate">{organization.name}</span>
+                </h2>
+                <CustomerStatusMark status={organization.customerStatus} />
+              </div>
               <p className="mt-2 text-sm text-muted">
-                {organization.industry ?? "No industry"}
+                {[organization.industry, organization.organizationType]
+                  .filter(Boolean)
+                  .join(" · ") || "No profile yet"}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {organization.primaryContact ?? "No primary contact"}
               </p>
               <div className="mt-auto flex items-center justify-between gap-2 pt-6">
-                <Badge>{organization.connectionStatus}</Badge>
+                <span className="inline-flex items-center text-xs text-muted">
+                  <StatusDot
+                    tone={connectionTone(
+                      organization.connectionStatus === "Not connected"
+                        ? "DISCONNECTED"
+                        : organization.connectionStatus,
+                    )}
+                  />
+                  {organization.connectionStatus === "Not connected"
+                    ? "Not connected"
+                    : connectionLabel(organization.connectionStatus)}
+                </span>
                 <span className="text-xs text-muted">
-                  {organization.assessmentStatus}
+                  {organization.projectCount}{" "}
+                  {organization.projectCount === 1 ? "project" : "projects"}
                 </span>
               </div>
-            </Link>
+            </button>
           ))}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-md border border-border">
+        <div className="overflow-x-auto rounded-md border border-border">
           <table className="w-full text-left text-sm">
             <thead className="bg-surface-2 text-xs text-muted">
               <tr>
                 <th className="px-3 py-2 font-medium">Organization</th>
-                <th className="px-3 py-2 font-medium">Industry</th>
-                <th className="px-3 py-2 font-medium">Connection</th>
-                <th className="px-3 py-2 font-medium">Assessment</th>
+                <th className="px-3 py-2 font-medium">Type</th>
+                <th className="px-3 py-2 font-medium">Employees</th>
+                <th className="px-3 py-2 font-medium">Contact</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Environments</th>
+                <th className="px-3 py-2 font-medium">Projects</th>
+                <th className="px-3 py-2 font-medium">Last activity</th>
               </tr>
             </thead>
             <tbody>
               {visible.map((organization) => (
                 <tr
                   key={organization.id}
-                  className="border-t border-border bg-surface hover:bg-surface-2"
+                  className="cursor-pointer border-t border-border bg-background hover:bg-surface-2"
+                  onClick={() => openOrganization(organization.id)}
                 >
                   <td className="px-3 py-2 font-medium">
-                    <Link
-                      href={`/accounts/${organization.id}`}
-                      className="hover:underline"
-                    >
-                      {organization.name}
-                    </Link>
+                    <span className="inline-flex min-w-0 items-center gap-2 hover:underline">
+                      <OrganizationIcon />
+                      <span className="truncate">{organization.name}</span>
+                    </span>
+                    <p className="text-xs text-muted">
+                      {organization.industry ?? "—"}
+                    </p>
                   </td>
                   <td className="px-3 py-2 text-muted">
-                    {organization.industry ?? "—"}
+                    {organization.organizationType ?? "—"}
+                  </td>
+                  <td className="px-3 py-2 text-muted">
+                    {organization.employeeRange ?? "—"}
+                  </td>
+                  <td className="px-3 py-2 text-muted">
+                    {organization.primaryContact ?? "—"}
                   </td>
                   <td className="px-3 py-2">
-                    <Badge>{organization.connectionStatus}</Badge>
+                    {organization.customerStatus ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <CustomerStatusMark
+                          status={organization.customerStatus}
+                        />
+                        <span className="text-muted">
+                          {organization.customerStatus}
+                        </span>
+                      </span>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="px-3 py-2 text-muted">
-                    {organization.assessmentStatus}
+                    {organization.environmentCount}
+                  </td>
+                  <td className="px-3 py-2 text-muted">
+                    {organization.projectCount}
+                  </td>
+                  <td className="px-3 py-2 text-muted">
+                    {formatLastActivity(organization.updatedAt)}
                   </td>
                 </tr>
               ))}

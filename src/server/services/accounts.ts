@@ -12,7 +12,11 @@ export function resolveSelectedAccount<T extends { id: string }>(
   accounts: T[],
   selectedId: string | null | undefined,
 ) {
-  return accounts.find((account) => account.id === selectedId) ?? accounts[0] ?? null;
+  if (!selectedId) {
+    return null;
+  }
+
+  return accounts.find((account) => account.id === selectedId) ?? null;
 }
 
 export async function getAccountSelection(tenantId: string, userId: string) {
@@ -63,7 +67,7 @@ export async function listAccounts(tenantId: string) {
   }
 
   const ids = organizations.map((organization) => organization.id);
-  const [connections, assessments] = await Promise.all([
+  const [connections, assessments, projectCounts] = await Promise.all([
     sql<
       Pick<
         PlatformConnectionRow,
@@ -83,7 +87,17 @@ export async function listAccounts(tenantId: string) {
       where "tenantId" = ${scoped} and "organizationId" in ${sql(ids)}
       order by "organizationId", "createdAt" desc
     `,
+    sql<{ organizationId: string; count: number }[]>`
+      select "organizationId", count(*)::int as count
+      from "Project"
+      where "tenantId" = ${scoped} and "organizationId" in ${sql(ids)}
+      group by "organizationId"
+    `,
   ]);
+
+  const projectsByOrg = new Map(
+    projectCounts.map((row) => [row.organizationId, row.count]),
+  );
 
   return organizations.map((organization) => ({
     ...organization,
@@ -93,6 +107,7 @@ export async function listAccounts(tenantId: string) {
     assessments: assessments.filter(
       (assessment) => assessment.organizationId === organization.id,
     ),
+    projectCount: projectsByOrg.get(organization.id) ?? 0,
   }));
 }
 
@@ -186,6 +201,75 @@ export async function updateAccount(input: {
   }
 
   return organization ?? null;
+}
+
+export async function setOrganizationDisabled(input: {
+  tenantId: string;
+  userId: string;
+  organizationId: string;
+  disabled: boolean;
+}) {
+  const scoped = requireTenantId(input.tenantId);
+  const [organization] = await sql<OrganizationRow[]>`
+    update "Organization"
+    set disabled = ${input.disabled}, "updatedAt" = now()
+    where id = ${input.organizationId} and "tenantId" = ${scoped}
+    returning *
+  `;
+
+  if (organization) {
+    await writeAuditLog({
+      tenantId: input.tenantId,
+      userId: input.userId,
+      action: input.disabled
+        ? "organization.disable"
+        : "organization.enable",
+      entity: "Organization",
+      entityId: organization.id,
+      metadata: { name: organization.name },
+    });
+  }
+
+  return organization ?? null;
+}
+
+export async function deleteAccount(input: {
+  tenantId: string;
+  userId: string;
+  organizationId: string;
+}) {
+  const scoped = requireTenantId(input.tenantId);
+  const organization = await getAccount(input.tenantId, input.organizationId);
+
+  if (!organization) {
+    return null;
+  }
+
+  await sql`
+    delete from "Organization"
+    where id = ${organization.id} and "tenantId" = ${scoped}
+  `;
+
+  await writeAuditLog({
+    tenantId: input.tenantId,
+    userId: input.userId,
+    action: "organization.delete",
+    entity: "Organization",
+    entityId: organization.id,
+    metadata: { name: organization.name },
+  });
+
+  return organization;
+}
+
+export async function listTenantConnections(tenantId: string) {
+  const scoped = requireTenantId(tenantId);
+  return sql<PlatformConnectionRow[]>`
+    select *
+    from "PlatformConnection"
+    where "tenantId" = ${scoped}
+    order by "updatedAt" desc
+  `;
 }
 
 export async function listConnections(tenantId: string, organizationId: string) {

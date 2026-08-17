@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CreateProjectButton } from "@/components/projects/create-project-modal";
 import { Badge } from "@/components/ui/badge";
 import { buttonClassName } from "@/components/ui/button";
+import { connectionLabel } from "@/components/ui/status-dot";
 import { requireSession } from "@/lib/auth/session";
 import { formatDate, formatLastActivity } from "@/lib/format";
 import { platformLabel } from "@/lib/platforms";
@@ -20,16 +22,6 @@ function MetaRow({
       <dt className="text-muted">{label}</dt>
       <dd className="min-w-0">{children}</dd>
     </div>
-  );
-}
-
-function StatusDot({ on }: { on: boolean }) {
-  return (
-    <span
-      className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${
-        on ? "bg-accent" : "bg-muted"
-      }`}
-    />
   );
 }
 
@@ -85,7 +77,6 @@ export default async function OrganizationOverviewPage({
   const connected = connections.some(
     (connection) => connection.status === "CONNECTED",
   );
-  const primary = connections[0];
   const checklist = [
     { label: "Create organization", done: true },
     { label: "Connect a platform", done: connected },
@@ -101,21 +92,19 @@ export default async function OrganizationOverviewPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">
-          {organization.name}
-        </h1>
-        <Link
-          href={`/projects/new?organizationId=${id}`}
-          className={buttonClassName("primary", "gap-1")}
-        >
-          <span aria-hidden="true">+</span>
-          New project
-        </Link>
-      </div>
-
       <section className="overflow-hidden rounded-lg border border-border bg-surface">
-        <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:p-6">
+        <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between lg:p-6">
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-semibold tracking-tight">
+              {organization.name}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted">
+              Where this customer stands and what is in motion.
+            </p>
+          </div>
+          <CreateProjectButton organizationId={id} />
+        </div>
+        <div className="grid gap-6 border-t border-border p-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:p-6">
           <div className="flex min-h-56 flex-col rounded-md border border-border bg-background p-4">
             <div className="mb-2 flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">Enterprise intelligence</h2>
@@ -160,20 +149,7 @@ export default async function OrganizationOverviewPage({
               {organization.customerStatus ?? "—"}
             </MetaRow>
             <MetaRow label="Environments">
-              {environmentCount} connected
-            </MetaRow>
-            <MetaRow label="Connection">
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-flex items-center">
-                  <StatusDot on={connected} />
-                  {primary?.status ?? "Not connected"}
-                </span>
-                <span className="text-muted">
-                  {primary
-                    ? platformLabel(primary.platformType)
-                    : "No platform attached"}
-                </span>
-              </span>
+              Connected ({environmentCount})
             </MetaRow>
             <MetaRow label="Created">
               {formatDate(organization.createdAt)}
@@ -195,7 +171,7 @@ export default async function OrganizationOverviewPage({
             </p>
           </div>
           <Link
-            href={`/projects/new?organizationId=${id}`}
+            href={`/accounts/${id}/projects`}
             className={buttonClassName("secondary")}
           >
             Projects
@@ -218,12 +194,14 @@ export default async function OrganizationOverviewPage({
                 key={item.label}
                 className={`flex items-center justify-between rounded-md px-2.5 py-2 text-sm ${
                   item.done
-                    ? "bg-accent/10 text-foreground"
-                    : "bg-surface-2 text-muted"
+                    ? "bg-surface-2 text-foreground"
+                    : "bg-background text-muted"
                 }`}
               >
                 {item.label}
-                {item.done ? <span className="text-accent">✓</span> : null}
+                {item.done ? (
+                  <span className="text-connected">✓</span>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -236,13 +214,10 @@ export default async function OrganizationOverviewPage({
           {projects.length === 0 ? (
             <div className="flex min-h-40 flex-col items-center justify-center text-center">
               <Empty>No transformation projects yet.</Empty>
-              <Link
-                href={`/projects/new?organizationId=${id}`}
+              <CreateProjectButton
+                organizationId={id}
                 className={buttonClassName("primary", "mt-3 gap-1")}
-              >
-                <span aria-hidden="true">+</span>
-                New project
-              </Link>
+              />
             </div>
           ) : (
             <div className="space-y-2">
@@ -262,59 +237,24 @@ export default async function OrganizationOverviewPage({
           )}
         </Card>
 
-        <Card title="Connection">
-          <div className="flex min-h-40 flex-col items-center justify-center text-center">
-            <p className="text-sm text-muted">
-              {connected && primary
-                ? `${platformLabel(primary.platformType)} is connected.`
-                : "Attach a platform when connectors are ready."}
-            </p>
-          </div>
-        </Card>
-      </div>
-
-      <Card title="Technology landscape">
-        {landscape.length === 0 ? (
-          <Empty>
-            No platforms connected. Connect your first platform to begin
-            building the organization&apos;s technology landscape.
-          </Empty>
-        ) : (
-          <ul className="space-y-2">
-            {landscape.map((platform) => (
-              <li
-                key={platform.platformType}
-                className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2.5 text-sm"
-              >
-                <div>
-                  <p className="font-medium">{platform.name}</p>
-                  <p className="mt-0.5 text-xs text-muted">
-                    {platform.environments}{" "}
-                    {platform.environments === 1
-                      ? "environment"
-                      : "environments"}
-                    {platform.lastSync
-                      ? ` · Last sync ${formatDate(platform.lastSync)}`
-                      : ""}
-                  </p>
-                </div>
-                <Badge>{platform.status}</Badge>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-2">
         <Card
           title="Connected environments"
           action={<Badge>{environmentCount}</Badge>}
         >
           {connections.length === 0 ? (
-            <Empty>
-              No environments connected. An environment is a specific instance
-              such as production or sandbox, not the organization itself.
-            </Empty>
+            <div className="flex min-h-40 flex-col items-center justify-center text-center">
+              <Empty>
+                No environments connected. An environment is a specific
+                instance such as production or sandbox, not the organization
+                itself.
+              </Empty>
+              <Link
+                href={`/accounts/${id}/platforms`}
+                className={buttonClassName("secondary", "mt-3")}
+              >
+                Platforms
+              </Link>
+            </div>
           ) : (
             <ul className="space-y-2">
               {connections.map((connection) => (
@@ -322,45 +262,29 @@ export default async function OrganizationOverviewPage({
                   key={connection.id}
                   className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2.5 text-sm"
                 >
-                  <div>
-                    <p className="font-medium">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">
                       {connection.externalOrgName ??
                         `${platformLabel(connection.platformType)} environment`}
                     </p>
-                    <p className="mt-0.5 text-xs text-muted">
+                    <p className="mt-0.5 truncate text-xs text-muted">
                       {platformLabel(connection.platformType)}
+                      {connection.externalOrgId
+                        ? ` · ${connection.externalOrgId}`
+                        : connection.externalOrgName
+                          ? ` · ${connection.externalOrgName}`
+                          : ""}
                     </p>
                   </div>
-                  <Badge>{connection.status}</Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card title="Platform distribution">
-          {landscape.length === 0 ? (
-            <Empty>No platform distribution yet.</Empty>
-          ) : (
-            <ul className="space-y-3">
-              {landscape.map((platform) => (
-                <li key={platform.platformType}>
-                  <div className="mb-1 flex justify-between text-sm">
-                    <span>{platform.name}</span>
-                    <span className="text-muted">{platform.environments}</span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
-                    <div
-                      className="h-full bg-accent"
-                      style={{
-                        width: `${
-                          maxEnvironments
-                            ? (platform.environments / maxEnvironments) * 100
-                            : 0
-                        }%`,
-                      }}
-                    />
-                  </div>
+                  <Badge
+                    tone={
+                      connection.status === "CONNECTED"
+                        ? "connected"
+                        : "neutral"
+                    }
+                  >
+                    {connectionLabel(connection.status)}
+                  </Badge>
                 </li>
               ))}
             </ul>
@@ -368,7 +292,7 @@ export default async function OrganizationOverviewPage({
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Card
           title="Assessments"
           action={<Badge>{assessmentSummary.total}</Badge>}
@@ -411,6 +335,35 @@ export default async function OrganizationOverviewPage({
                   <span className="shrink-0 text-xs text-muted">
                     {formatLastActivity(event.at)}
                   </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card title="Platform distribution">
+          {landscape.length === 0 ? (
+            <Empty>No platform distribution yet.</Empty>
+          ) : (
+            <ul className="space-y-3">
+              {landscape.map((platform) => (
+                <li key={platform.platformType}>
+                  <div className="mb-1 flex justify-between text-sm">
+                    <span>{platform.name}</span>
+                    <span className="text-muted">{platform.environments}</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+                    <div
+                      className="h-full bg-accent"
+                      style={{
+                        width: `${
+                          maxEnvironments
+                            ? (platform.environments / maxEnvironments) * 100
+                            : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>

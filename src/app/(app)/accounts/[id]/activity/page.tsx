@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PageFrame } from "@/components/ui/page-frame";
 import { requireSession } from "@/lib/auth/session";
 import { formatLastActivity } from "@/lib/format";
 import { getOrganizationOverview } from "@/server/services/organization-overview";
@@ -17,14 +18,16 @@ export default async function OrganizationActivityPage({
   }
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-4">
-      <h2 className="text-sm font-semibold">Activity</h2>
+    <PageFrame
+      title="Activity"
+      description="Recent changes for this organization and its projects."
+    >
       {overview.activity.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">
+        <p className="text-sm text-muted">
           No recorded activity for this organization yet.
         </p>
       ) : (
-        <ul className="mt-4 space-y-2">
+        <ul className="space-y-2">
           {overview.activity.map((event) => (
             <li
               key={event.id}
@@ -38,6 +41,6 @@ export default async function OrganizationActivityPage({
           ))}
         </ul>
       )}
-    </section>
+    </PageFrame>
   );
 }

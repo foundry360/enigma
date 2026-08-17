@@ -5,7 +5,13 @@ import {
   employeeRanges,
   organizationTypes,
 } from "@/lib/organizations";
-import { projectPlatforms } from "@/lib/platforms";
+import {
+  primaryOutcomes,
+  projectPriorities,
+  projectStatuses,
+  projectTypes,
+  scopePlatforms,
+} from "@/lib/projects";
 
 export const signupSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters."),
@@ -40,8 +46,29 @@ export const createAccountSchema = z.object({
 
 export const createProjectSchema = z.object({
   name: z.string().trim().min(2, "Project name must be at least 2 characters."),
-  platformType: z.enum(projectPlatforms, "Choose a platform."),
-  organizationId: z.string().uuid("Choose a customer account."),
+  organizationId: z.string().uuid("Choose an organization."),
+  projectType: z.enum(projectTypes, "Choose a project type."),
+  objective: z
+    .string()
+    .trim()
+    .min(8, "Describe the objective in a short sentence."),
+  outcomes: z
+    .array(z.enum(primaryOutcomes))
+    .min(1, "Choose at least one desired outcome."),
+  outcomeOther: z.string().trim().optional(),
+  ownerId: z.string().min(1, "Choose a project owner."),
+  status: z.enum(projectStatuses, "Choose a status."),
+  platforms: z.array(z.enum(scopePlatforms)).optional(),
+  environmentIds: z.array(z.string().uuid()).optional(),
+  description: z.string().trim().optional(),
+  businessUnit: z.string().trim().optional(),
+  department: z.string().trim().optional(),
+  executiveSponsor: z.string().trim().optional(),
+  customerLead: z.string().trim().optional(),
+  targetDate: z.string().optional(),
+  priority: z.enum(projectPriorities).optional(),
+  successMetrics: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
 });
 
 export type AuthFormState = {

@@ -12,6 +12,9 @@ import { listProjects } from "@/server/services/projects";
 const activityLabels: Record<string, string> = {
   "organization.create": "Organization created",
   "organization.update": "Organization updated",
+  "organization.disable": "Organization disabled",
+  "organization.enable": "Organization enabled",
+  "organization.delete": "Organization deleted",
   "project.create": "New transformation project created",
 };
 
@@ -57,14 +60,15 @@ export const getOrganizationOverview = cache(async function getOrganizationOverv
   }
 
   for (const project of projects) {
-    if (!platforms.has(project.platformType)) {
-      platforms.set(project.platformType, {
-        platformType: project.platformType,
-        environments: 0,
-        connected: 0,
-        lastSync: null,
-      });
+    if (!project.platformType || platforms.has(project.platformType)) {
+      continue;
     }
+    platforms.set(project.platformType, {
+      platformType: project.platformType,
+      environments: 0,
+      connected: 0,
+      lastSync: null,
+    });
   }
 
   const landscape = [...platforms.values()].map((platform) => ({

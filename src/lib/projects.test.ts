@@ -1,0 +1,37 @@
+import { describe, expect, it } from "vitest";
+import { projectProgress } from "@/lib/projects";
+
+describe("projectProgress", () => {
+  it("starts in Connect before a platform is connected", () => {
+    expect(projectProgress({ connected: false })).toMatchObject({
+      current: "Connect",
+      completed: 0,
+      total: 6,
+    });
+  });
+
+  it("moves to Discover after a platform is connected", () => {
+    expect(projectProgress({ connected: true })).toMatchObject({
+      current: "Discover",
+      completed: 1,
+    });
+  });
+
+  it("moves to Assess while discovery is in progress", () => {
+    expect(
+      projectProgress({ connected: true, assessmentStatus: "DISCOVERING" }),
+    ).toMatchObject({
+      current: "Assess",
+      completed: 2,
+    });
+  });
+
+  it("moves to Prioritize after assessment is complete", () => {
+    expect(
+      projectProgress({ connected: true, assessmentStatus: "COMPLETE" }),
+    ).toMatchObject({
+      current: "Prioritize",
+      completed: 3,
+    });
+  });
+});

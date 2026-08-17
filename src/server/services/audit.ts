@@ -42,6 +42,24 @@ export async function writeAuditLog(input: {
   return row;
 }
 
+export async function listProjectActivity(
+  tenantId: string,
+  projectId: string,
+) {
+  const scoped = requireTenantId(tenantId);
+  return sql<AuditLogRow[]>`
+    select *
+    from "AuditLog"
+    where "tenantId" = ${scoped}
+      and (
+        (entity = 'Project' and "entityId" = ${projectId})
+        or metadata ->> 'projectId' = ${projectId}
+      )
+    order by "createdAt" desc
+    limit 12
+  `;
+}
+
 export async function listOrganizationActivity(
   tenantId: string,
   organizationId: string,

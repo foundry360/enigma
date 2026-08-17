@@ -28,9 +28,10 @@ export function EditAccountForm({
   );
 
   return (
-    <form action={action} className="max-w-lg space-y-4">
+    <form action={action} className="space-y-4">
       <input type="hidden" name="organizationId" value={organizationId} />
       <OrganizationProfileFields
+        grouped
         defaults={{
           name,
           industry,
@@ -44,9 +45,11 @@ export function EditAccountForm({
       {state?.message ? (
         <p className="text-sm text-accent">{state.message}</p>
       ) : null}
-      <Button type="submit" disabled={pending}>
-        {pending ? "Saving…" : "Save organization"}
-      </Button>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={pending}>
+          {pending ? "Saving…" : "Save organization"}
+        </Button>
+      </div>
     </form>
   );
 }
