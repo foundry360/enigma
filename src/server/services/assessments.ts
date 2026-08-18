@@ -250,7 +250,7 @@ export async function startProjectDiscovery(input: {
           ${trace.tool},
           ${trace.apiName ?? null},
           ${trace.ok},
-          ${sql.json(trace.summary as object)},
+          ${sql.json(asSqlJson(trace.summary))},
           now()
         )
       `;
@@ -349,4 +349,8 @@ export async function startProjectDiscovery(input: {
       message,
     };
   }
+}
+
+function asSqlJson(value: unknown) {
+  return JSON.parse(JSON.stringify(value ?? null));
 }
