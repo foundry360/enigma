@@ -4,11 +4,22 @@ import type {
   AssessmentRow,
   AssessmentTraceRow,
 } from "@/lib/db/types";
+import { toUtcDate } from "@/lib/format";
 import { runAssessmentPass } from "@/modules/intelligence";
 import { requireTenantId, scopedCreate } from "@/lib/tenants/scope";
 import { writeAuditLog } from "@/server/services/audit";
 import { probeSalesforceConnection } from "@/server/services/connections";
 import { getProject } from "@/server/services/projects";
+
+function withUtcTimestamps<T extends { createdAt: Date; updatedAt?: Date }>(
+  row: T,
+): T {
+  return {
+    ...row,
+    createdAt: toUtcDate(row.createdAt),
+    ...(row.updatedAt ? { updatedAt: toUtcDate(row.updatedAt) } : {}),
+  };
+}
 
 export async function listTenantAssessments(
   tenantId: string,
@@ -33,7 +44,7 @@ export async function listTenantAssessments(
     where a."tenantId" = ${scoped}
       ${organizationId ? sql`and a."organizationId" = ${organizationId}` : sql``}
     order by a."updatedAt" desc
-  `;
+  `.then((rows) => rows.map(withUtcTimestamps));
 }
 
 export async function listProjectAssessments(
@@ -46,7 +57,7 @@ export async function listProjectAssessments(
     from "Assessment"
     where "tenantId" = ${scoped} and "projectId" = ${projectId}
     order by "updatedAt" desc
-  `;
+  `.then((rows) => rows.map(withUtcTimestamps));
 }
 
 export async function getLatestProjectAssessment(
@@ -88,7 +99,11 @@ export async function getAssessmentDetail(
     `,
   ]);
 
-  return { assessment, traces, judgments };
+  return {
+    assessment: withUtcTimestamps(assessment),
+    traces,
+    judgments,
+  };
 }
 
 export async function getLatestAssessmentDetail(
@@ -101,6 +116,48 @@ export async function getLatestAssessmentDetail(
   }
 
   return getAssessmentDetail(tenantId, latest.id);
+}
+
+export async function getProjectAssessmentDetail(
+  tenantId: string,
+  projectId: string,
+  assessmentId: string,
+) {
+  const detail = await getAssessmentDetail(tenantId, assessmentId);
+  if (!detail || detail.assessment.projectId !== projectId) {
+    return null;
+  }
+
+  return detail;
+}
+
+export async function getProjectConsumptionSnapshots(
+  tenantId: string,
+  projectId: string,
+) {
+  const assessments = await listProjectAssessments(tenantId, projectId);
+  const complete = assessments.filter(
+    (assessment) => assessment.status === "COMPLETE",
+  );
+  const latest = complete[0] ?? null;
+  const previous = complete[1] ?? null;
+  const running = assessments.find(
+    (assessment) =>
+      assessment.status === "DISCOVERING" || assessment.status === "ANALYZING",
+  );
+
+  const [latestDetail, previousDetail] = await Promise.all([
+    latest ? getAssessmentDetail(tenantId, latest.id) : null,
+    previous ? getAssessmentDetail(tenantId, previous.id) : null,
+  ]);
+
+  return {
+    assessments,
+    complete,
+    running: running ?? null,
+    latest: latestDetail,
+    previous: previousDetail,
+  };
 }
 
 async function resolveAssessmentConnection(
@@ -349,6 +406,39 @@ export async function startProjectDiscovery(input: {
       message,
     };
   }
+}
+
+export async function setOpportunityCandidateStatus(input: {
+  tenantId: string;
+  assessmentId: string;
+  key: string;
+  status: "candidate" | "promoted" | "rejected";
+}) {
+  const detail = await getAssessmentDetail(input.tenantId, input.assessmentId);
+  if (!detail || detail.assessment.status !== "COMPLETE") {
+    return { error: "not-found" as const };
+  }
+
+  const summary = {
+    overallScore: 0,
+    toolCalls: 0,
+    failedTools: 0,
+    ...detail.assessment.summary,
+    candidates: {
+      ...(detail.assessment.summary?.candidates ?? {}),
+      [input.key]: input.status,
+    },
+  };
+
+  await sql`
+    update "Assessment"
+    set
+      summary = ${sql.json(summary)},
+      "updatedAt" = now()
+    where "tenantId" = ${input.tenantId} and id = ${detail.assessment.id}
+  `;
+
+  return { assessment: detail.assessment };
 }
 
 function asSqlJson(value: unknown) {

@@ -55,7 +55,7 @@ export function OrganizationDangerZone({
             <p className="text-sm font-medium">Delete organization</p>
             <p className="mt-1 text-sm text-muted">
               Permanently delete this organization, its projects, connections,
-              and assessments. Type {name} to confirm.
+              and intelligence runs. Type {name} to confirm.
             </p>
             <form
               action={deleteOrganizationAction}

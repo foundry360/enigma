@@ -36,9 +36,13 @@ function isCollectionView(value: string | null): value is CollectionView {
 export function AssessmentViews({
   assessments,
   actions,
+  title = "Runs",
+  description,
 }: {
   assessments: AssessmentListItem[];
   actions?: ReactNode;
+  title?: string;
+  description?: string;
 }) {
   const [view, setView] = useState<CollectionView>(DEFAULT_VIEW);
   const [query, setQuery] = useState("");
@@ -102,23 +106,40 @@ export function AssessmentViews({
     visible,
     `${query}|${from}|${to}|${JSON.stringify(filters)}`,
   );
+  const latestId = assessments.reduce<AssessmentListItem | null>(
+    (latest, item) => {
+      if (!latest) {
+        return item;
+      }
+
+      return new Date(item.createdAt) > new Date(latest.createdAt)
+        ? item
+        : latest;
+    },
+    null,
+  )?.id;
 
   return (
     <div>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="shrink-0 text-2xl font-semibold tracking-tight">
-          Assessments
-        </h1>
+        <div className="min-w-0">
+          <h1 className="shrink-0 text-2xl font-semibold tracking-tight">
+            {title}
+          </h1>
+          {description ? (
+            <p className="mt-1 text-sm text-muted">{description}</p>
+          ) : null}
+        </div>
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           <label className="sr-only" htmlFor="assessment-search">
-            Search Assessments
+            Search runs
           </label>
           <input
             id="assessment-search"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search assessments"
+            placeholder="Search runs"
             className="h-8 w-64 rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none placeholder:text-placeholder focus:border-foreground"
           />
           <ViewToggle view={view} onChange={changeView} />
@@ -135,17 +156,21 @@ export function AssessmentViews({
             onChange={setFilters}
             organizations={showOrganization ? organizations : []}
           />
-          {actions}
+          {actions ? (
+            <div key="assessment-actions" className="contents">
+              {actions}
+            </div>
+          ) : null}
         </div>
       </div>
       {assessments.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted">
-          No assessments yet. Start one from a project after a platform is
-          connected.
+          No intelligence runs yet. Start one from a project after a platform
+          is connected.
         </p>
       ) : visible.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted">
-          No assessments match that search or filter.
+          No runs match that search or filter.
         </p>
       ) : view === "cards" ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -178,14 +203,14 @@ export function AssessmentViews({
           <table className="w-full text-left text-sm">
             <thead className="border-b border-border text-xs text-muted">
               <tr>
-                <th className="py-2 pr-3 font-medium">Assessment</th>
+                <th className="py-2 pr-3 font-medium">Run</th>
                 {showOrganization ? (
                   <th className="px-3 py-2 font-medium">Organization</th>
                 ) : null}
                 <th className="px-3 py-2 font-medium">Score</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">Started</th>
-                <th className="py-2 pl-3 font-medium">Ran</th>
+                <th className="py-2 pl-3 font-medium">Run Complete</th>
               </tr>
             </thead>
             <tbody>
@@ -218,8 +243,16 @@ export function AssessmentViews({
                   <td className="px-3 py-2.5 text-muted">
                     {formatDate(assessment.createdAt)}
                   </td>
-                  <td className="py-2.5 pl-3 text-muted">
-                    {formatTimeAgo(assessment.createdAt)}
+                  <td className="py-2.5 pl-3">
+                    <span
+                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${
+                        assessment.id === latestId
+                          ? "border-accent bg-accent text-accent-fg"
+                          : "border-border bg-transparent text-muted"
+                      }`}
+                    >
+                      {formatTimeAgo(assessment.createdAt)}
+                    </span>
                   </td>
                 </tr>
               ))}

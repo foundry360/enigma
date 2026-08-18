@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { RiskBadge, ScoreRing, riskColors } from "@/components/ui/score-ring";
 import { titleCase } from "@/lib/format";
-import { readinessRisk } from "@/modules/intelligence/score";
+import { readinessRisk, signalState } from "@/modules/intelligence/score";
 
 export type CategoryItem = {
   id: string;
@@ -13,14 +13,23 @@ export type CategoryItem = {
   reason: string;
   risk: string;
   recommendation: string;
+  consumption?: string;
 };
+
+const stateLabel = {
+  strong: "Strong",
+  mixed: "Mixed",
+  weak: "Weak",
+} as const;
 
 export function ReadinessCategories({
   items,
   title = "Categories",
+  tone = "readiness",
 }: {
   items: CategoryItem[];
   title?: string;
+  tone?: "readiness" | "signal";
 }) {
   const [selectedId, setSelectedId] = useState(items[0]?.id ?? "");
   const selected = items.find((item) => item.id === selectedId) ?? items[0];
@@ -32,7 +41,7 @@ export function ReadinessCategories({
   return (
     <div className="grid gap-4 xl:grid-cols-[30%_minmax(0,1fr)]">
       <section className="rounded-lg border border-border bg-surface p-5">
-        <h2 className="mb-3 text-sm font-semibold">{title}</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase">{title}</h2>
         <div className="space-y-1">
           {items.map((item) => {
             const active = item.id === selected.id;
@@ -52,8 +61,14 @@ export function ReadinessCategories({
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold">{titleCase(item.title)}</p>
-                  <p className="text-xs tabular-nums text-muted">{item.score}</p>
+                  <p className="text-sm font-semibold">
+                    {titleCase(item.title)}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {tone === "signal"
+                      ? `${stateLabel[signalState(item.score)]} · ${item.evidence.length}`
+                      : item.score}
+                  </p>
                 </div>
                 <div
                   className="mt-2 h-2 overflow-hidden rounded-full bg-border"
@@ -75,15 +90,38 @@ export function ReadinessCategories({
 
       <section className="rounded-lg border border-border bg-surface p-5">
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">{titleCase(selected.title)}</h2>
-          <RiskBadge risk={readinessRisk(selected.score)} />
+          <h2 className="text-sm font-semibold uppercase">
+            {titleCase(selected.title)}
+          </h2>
+          {tone === "signal" ? (
+            <span className="text-xs text-muted">
+              {stateLabel[signalState(selected.score)]}
+            </span>
+          ) : (
+            <RiskBadge risk={readinessRisk(selected.score)} />
+          )}
         </div>
-        <div className="grid gap-4 md:grid-cols-[auto_minmax(0,1fr)] md:items-start md:gap-6">
-          <div className="flex justify-center md:justify-start">
-            <ScoreRing score={selected.score} showBadge={false} />
-          </div>
+        <div
+          className={
+            tone === "signal"
+              ? ""
+              : "grid gap-4 md:grid-cols-[auto_minmax(0,1fr)] md:items-start md:gap-6"
+          }
+        >
+          {tone === "readiness" ? (
+            <div className="flex justify-center md:justify-start">
+              <ScoreRing score={selected.score} showBadge={false} />
+            </div>
+          ) : null}
           <dl className="min-w-0 divide-y divide-border">
-            <MetaRow label="Finding">{selected.reason}</MetaRow>
+            <MetaRow label="Meaning">{selected.reason}</MetaRow>
+            {tone === "signal" ? (
+              <MetaRow label="Consumption">
+                {selected.consumption || "—"}
+              </MetaRow>
+            ) : selected.consumption ? (
+              <MetaRow label="Consumption">{selected.consumption}</MetaRow>
+            ) : null}
             <MetaRow label="Risk">{selected.risk}</MetaRow>
             <MetaRow label="Recommendation">{selected.recommendation}</MetaRow>
             {selected.evidence.length > 0 ? (

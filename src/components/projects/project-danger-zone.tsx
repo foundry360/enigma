@@ -23,7 +23,7 @@ export function ProjectDangerZone({
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">Delete project</p>
             <p className="mt-1 text-sm text-muted">
-              Permanently delete this project and its assessments. Connected
+              Permanently delete this project and its intelligence runs. Connected
               environments stay on the organization. Type {name} to confirm.
             </p>
             <form

@@ -2,7 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
-import { startProjectDiscovery } from "@/server/services/assessments";
+import {
+  setOpportunityCandidateStatus,
+  startProjectDiscovery,
+} from "@/server/services/assessments";
 
 export async function startDiscoveryAction(formData: FormData) {
   const session = await requireSession();
@@ -25,4 +28,32 @@ export async function startDiscoveryAction(formData: FormData) {
   }
 
   redirect(`/projects/${projectId}/intelligence`);
+}
+
+export async function setCandidateStatusAction(formData: FormData) {
+  const session = await requireSession();
+  const assessmentId = String(formData.get("assessmentId") ?? "");
+  const key = String(formData.get("key") ?? "");
+  const status = String(formData.get("status") ?? "");
+
+  if (
+    status !== "candidate" &&
+    status !== "promoted" &&
+    status !== "rejected"
+  ) {
+    return;
+  }
+
+  const result = await setOpportunityCandidateStatus({
+    tenantId: session.tenantId,
+    assessmentId,
+    key,
+    status,
+  });
+
+  if ("error" in result || !result.assessment.projectId) {
+    return;
+  }
+
+  redirect(`/projects/${result.assessment.projectId}/opportunities`);
 }

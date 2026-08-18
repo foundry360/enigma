@@ -16,15 +16,15 @@ const activityLabels: Record<string, string> = {
   "project.update": "Project updated",
   "project.connection.attach": "Environment attached",
   "project.connection.detach": "Environment removed",
-  "assessment.start": "Assessment started",
+  "assessment.start": "Intelligence started",
 };
 
 const phaseCopy: Record<string, string> = {
   Connect: "Connect a platform environment before discovery can start.",
-  Discover: "A platform is connected. Start discovery when you are ready.",
-  Assess: "Discovery is in progress. Scoring is not finished.",
-  Prioritize: "Assessment is complete. Review findings before modeling value.",
-  Model: "Value and consumption models are not implemented yet.",
+  Discover: "A platform is connected. Run intelligence when you are ready.",
+  Assess: "Intelligence is in progress. Signals are not finished.",
+  Prioritize: "Review opportunity candidates, then model consumption.",
+  Model: "Consumption, ROC, and ROA are not built yet.",
   Recommend: "Recommendations and roadmap are not implemented yet.",
 };
 
@@ -156,17 +156,17 @@ export default async function ProjectDetailsPage({
     },
     discover: {
       title: `Start ${playbook}`,
-      detail: "Start a readiness assessment for the connected organization.",
+      detail: "Run intelligence against the connected environment.",
       href: null,
     },
     continue: {
-      title: "Continue assessment",
-      detail: `${playbook} is in progress. Discovery and scoring are not finished.`,
-      href: `/projects/${project.id}/assessments`,
+      title: "Continue intelligence",
+      detail: `${playbook} is in progress. Signals are not finished.`,
+      href: `/projects/${project.id}/intelligence`,
     },
     prioritize: {
       title: "Prioritize opportunities",
-      detail: `${playbook} is complete. Rank the opportunities before modeling value.`,
+      detail: "Review opportunity candidates from the latest intelligence run.",
       href: `/projects/${project.id}/opportunities`,
     },
   }[nextAction];
@@ -226,7 +226,7 @@ export default async function ProjectDetailsPage({
           }
         />
         <Metric
-          label="Assessments"
+          label="Runs"
           count={assessments.length}
           hint={
             assessment

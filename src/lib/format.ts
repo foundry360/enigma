@@ -18,10 +18,45 @@ export function dateInputValue(value: Date | string | null | undefined) {
   return value.toISOString().slice(0, 10);
 }
 
+export function toUtcDate(value: Date | string) {
+  const date =
+    value instanceof Date
+      ? value
+      : parseTimestamp(value.trim());
+
+  if (date.getTime() > Date.now() + 60_000) {
+    return new Date(
+      Date.UTC(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        date.getHours(),
+        date.getMinutes(),
+        date.getSeconds(),
+        date.getMilliseconds(),
+      ),
+    );
+  }
+
+  return date;
+}
+
+function parseTimestamp(value: string) {
+  if (/(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(value) || value.includes("T")) {
+    return new Date(value.replace(" ", "T"));
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(`${value}T00:00:00Z`);
+  }
+
+  return new Date(`${value.replace(" ", "T")}Z`);
+}
+
 export function formatDate(value: Date | string) {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
-  }).format(new Date(value));
+  }).format(toUtcDate(value));
 }
 
 export function formatDateTime(value: Date | string | null | undefined) {
@@ -32,7 +67,7 @@ export function formatDateTime(value: Date | string | null | undefined) {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(new Date(value));
+  }).format(toUtcDate(value));
 }
 
 export function formatTimeAgo(value: Date | string | null | undefined) {
@@ -40,8 +75,11 @@ export function formatTimeAgo(value: Date | string | null | undefined) {
     return "—";
   }
 
-  const date = new Date(value);
-  const minutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60_000));
+  const date = toUtcDate(value);
+  const minutes = Math.max(
+    0,
+    Math.floor((Date.now() - date.getTime()) / 60_000),
+  );
 
   if (minutes < 1) {
     return "Just now";

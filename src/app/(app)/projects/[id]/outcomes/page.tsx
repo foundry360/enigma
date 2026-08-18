@@ -11,7 +11,7 @@ export default async function ProjectOutcomesPage({
     <ProjectPlaceholderPage
       projectId={id}
       title="Outcomes"
-      description="Realized value and outcome tracking are not implemented yet."
+      description="Realized consumption versus forecast will land here after the model exists."
     />
   );
 }

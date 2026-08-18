@@ -1,6 +1,7 @@
 import "server-only";
 
 import postgres from "postgres";
+import { toUtcDate } from "@/lib/format";
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -14,16 +15,29 @@ function createSql() {
   return postgres(url, {
     prepare: false,
     max: 10,
+    types: {
+      date: {
+        to: 1184,
+        from: [1082, 1114, 1184],
+        serialize: (value: Date | string) =>
+          (value instanceof Date ? value : new Date(value)).toISOString(),
+        parse: toUtcDate,
+      },
+    },
   });
 }
 
+const SQL_CLIENT_VERSION = 2;
+
 const globalForSql = globalThis as unknown as {
   sql?: Sql;
+  sqlVersion?: number;
 };
 
 function getSql() {
-  if (!globalForSql.sql) {
+  if (!globalForSql.sql || globalForSql.sqlVersion !== SQL_CLIENT_VERSION) {
     globalForSql.sql = createSql();
+    globalForSql.sqlVersion = SQL_CLIENT_VERSION;
   }
 
   return globalForSql.sql;

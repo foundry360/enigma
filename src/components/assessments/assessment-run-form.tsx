@@ -53,7 +53,7 @@ function AssessmentRunOverlay({
       role="alertdialog"
       aria-live="assertive"
       aria-busy="true"
-      aria-label="Assessment starting"
+      aria-label="Intelligence starting"
     >
       <div className="w-full max-w-sm rounded-lg border border-border bg-surface px-8 py-7">
         <div className="flex flex-col items-center gap-4">
@@ -61,7 +61,7 @@ function AssessmentRunOverlay({
             className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-accent"
             aria-hidden="true"
           />
-          <p className="text-sm font-semibold">Starting Assessment</p>
+          <p className="text-sm font-semibold">Starting intelligence</p>
         </div>
         <dl className="mt-5 space-y-2 text-sm">
           <div className="flex justify-between gap-4">

@@ -11,7 +11,7 @@ export default async function ProjectBusinessCasePage({
     <ProjectPlaceholderPage
       projectId={id}
       title="Business Case"
-      description="Consumption, value, ROC, and ROA models are not implemented yet."
+      description="Consumption scenarios, ROC, and ROA are not built yet."
     />
   );
 }

@@ -42,10 +42,10 @@ export function ViewToggle({
         onClick={() => onChange("cards")}
       >
         <ViewIcon>
-          <rect width="7" height="7" x="3" y="3" rx="1" />
-          <rect width="7" height="7" x="14" y="3" rx="1" />
-          <rect width="7" height="7" x="3" y="14" rx="1" />
-          <rect width="7" height="7" x="14" y="14" rx="1" />
+          <rect key="tl" width="7" height="7" x="3" y="3" rx="1" />
+          <rect key="tr" width="7" height="7" x="14" y="3" rx="1" />
+          <rect key="bl" width="7" height="7" x="3" y="14" rx="1" />
+          <rect key="br" width="7" height="7" x="14" y="14" rx="1" />
         </ViewIcon>
       </button>
       <button
@@ -60,12 +60,12 @@ export function ViewToggle({
         onClick={() => onChange("list")}
       >
         <ViewIcon>
-          <path d="M8 6h13" />
-          <path d="M8 12h13" />
-          <path d="M8 18h13" />
-          <path d="M3 6h.01" />
-          <path d="M3 12h.01" />
-          <path d="M3 18h.01" />
+          <path key="l1" d="M8 6h13" />
+          <path key="l2" d="M8 12h13" />
+          <path key="l3" d="M8 18h13" />
+          <path key="d1" d="M3 6h.01" />
+          <path key="d2" d="M3 12h.01" />
+          <path key="d3" d="M3 18h.01" />
         </ViewIcon>
       </button>
     </div>

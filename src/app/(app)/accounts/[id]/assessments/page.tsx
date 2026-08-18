@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { AssessmentViews } from "@/components/assessments/assessment-views";
 import { requireSession } from "@/lib/auth/session";
+import { toUtcDate } from "@/lib/format";
 import { getOrganizationOverview } from "@/server/services/organization-overview";
 
 export default async function OrganizationAssessmentsPage({
@@ -21,12 +22,12 @@ export default async function OrganizationAssessmentsPage({
       assessments={overview.assessments.map((assessment) => ({
         id: assessment.id,
         href: assessment.projectId
-          ? `/projects/${assessment.projectId}/intelligence`
+          ? `/projects/${assessment.projectId}/intelligence?assessment=${assessment.id}`
           : `/accounts/${id}/assessments`,
-        title: "Assessment",
+        title: "Intelligence run",
         status: assessment.status,
         score: assessment.summary?.overallScore ?? null,
-        createdAt: assessment.createdAt,
+        createdAt: toUtcDate(assessment.createdAt).toISOString(),
       }))}
     />
   );

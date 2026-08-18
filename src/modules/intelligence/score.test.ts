@@ -48,14 +48,23 @@ describe("assessment scoring", () => {
         { kind: "flow", name: "Case_Route", namespace: null, status: "Active", size: null },
       ],
       security: { profileCount: 12, permissionSetCount: 8 },
-      knowledge: { enabled: false, articleObjects: [], dataCategories: [] },
+      knowledge: {
+        enabled: true,
+        articleObjects: ["Knowledge__kav"],
+        dataCategories: [],
+      },
+      validationRules: [
+        { name: "Require_Origin", objectApiName: "Case", active: true },
+      ],
     });
 
     expect(first.every((item) => item.evidence.length > 0)).toBe(true);
     expect(first.every((item) => item.reason && item.risk && item.recommendation)).toBe(
       true,
     );
+    expect(first.some((item) => item.key === "addressable_work")).toBe(true);
     expect(first.some((item) => item.key === "case_service_agent")).toBe(true);
+    expect(first.some((item) => item.title === "Data")).toBe(false);
     expect(scoreAssessment(emptyFacts).map((item) => item.score)).not.toEqual(
       first.map((item) => item.score),
     );
@@ -74,18 +83,18 @@ describe("assessment scoring", () => {
     const finding = overallFinding({
       overallScore: 61,
       dimensions: [
-        { title: "Data", score: 100 },
-        { title: "Process", score: 100 },
-        { title: "Knowledge", score: 80 },
-        { title: "Automation", score: 15 },
-        { title: "Security", score: 40 },
-        { title: "Governance", score: 30 },
+        { title: "Addressable work", score: 100 },
+        { title: "Operating path", score: 100 },
+        { title: "Grounded answers", score: 80 },
+        { title: "Automation collision", score: 15 },
+        { title: "Access surface", score: 40 },
+        { title: "Write-back control", score: 30 },
       ],
     });
 
     expect(finding).toContain("uneven");
-    expect(finding).toContain("Data 100");
-    expect(finding).toContain("Governance 30");
+    expect(finding).toContain("Addressable work 100");
+    expect(finding).toContain("Write-back control 30");
   });
 
   it("does not invent Salesforce prices", () => {

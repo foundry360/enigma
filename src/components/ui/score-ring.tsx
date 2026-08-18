@@ -2,6 +2,7 @@ import {
   readinessRisk,
   type ReadinessRisk,
 } from "@/modules/intelligence/score";
+import type { SignalStrength } from "@/modules/intelligence/types";
 
 export const riskColors: Record<ReadinessRisk, string> = {
   low: "#3ECF8E",
@@ -20,6 +21,42 @@ const riskLabel: Record<ReadinessRisk, string> = {
   medium: "Medium Risk",
   high: "High Risk",
 };
+
+const strengthBadge: Record<SignalStrength, string> = {
+  strong: "border-transparent bg-[#3ECF8E] text-white",
+  mixed: "border-transparent bg-[#F5C542] text-[#2d3340]",
+  weak: "border-transparent bg-[#F16A50] text-white",
+};
+
+const strengthLabel: Record<SignalStrength, string> = {
+  strong: "Strong",
+  mixed: "Mixed",
+  weak: "Weak",
+};
+
+export const strengthColors: Record<SignalStrength, string> = {
+  strong: "#3ECF8E",
+  mixed: "#F5C542",
+  weak: "#F16A50",
+};
+
+export function StrengthBadge({
+  state,
+}: {
+  state: SignalStrength | null;
+}) {
+  if (!state) {
+    return null;
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium ${strengthBadge[state]}`}
+    >
+      {strengthLabel[state]}
+    </span>
+  );
+}
 
 export function RiskBadge({ risk }: { risk: ReadinessRisk | null }) {
   if (!risk) {
@@ -48,6 +85,13 @@ const ringSize = {
     score: "text-5xl",
     unit: "mt-1 text-sm",
     label: "mt-2 max-w-[8rem] text-sm leading-snug",
+    stroke: "7",
+  },
+  xl: {
+    box: "h-48 w-48",
+    score: "text-4xl",
+    unit: "mt-0.5 text-xs",
+    label: "mt-1.5 max-w-[6rem] text-xs leading-snug",
     stroke: "7",
   },
 } as const;

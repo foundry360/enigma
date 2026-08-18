@@ -81,7 +81,7 @@ export default async function OrganizationOverviewPage({
     { label: "Create organization", done: true },
     { label: "Connect a platform", done: connected },
     { label: "Create a project", done: projects.length > 0 },
-    { label: "Run an assessment", done: assessments.length > 0 },
+    { label: "Run intelligence", done: assessments.length > 0 },
     { label: "Review opportunities", done: false },
   ];
   const complete = checklist.filter((item) => item.done).length;
@@ -294,12 +294,12 @@ export default async function OrganizationOverviewPage({
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card
-          title="Assessments"
+          title="Runs"
           action={<Badge>{assessmentSummary.total}</Badge>}
         >
           {assessmentSummary.total === 0 ? (
             <Empty>
-              No assessments have been completed for this organization.
+              No intelligence runs have been completed for this organization.
             </Empty>
           ) : (
             <dl className="grid grid-cols-3 gap-3 text-sm">

@@ -14,7 +14,7 @@ const emptyResults: SearchResults = {
 const groups: { key: keyof SearchResults; label: string }[] = [
   { key: "organizations", label: "Organizations" },
   { key: "projects", label: "Projects" },
-  { key: "assessments", label: "Assessments" },
+  { key: "assessments", label: "Runs" },
 ];
 
 function hasHits(results: SearchResults) {
@@ -87,7 +87,7 @@ export function GlobalSearch() {
   return (
     <div ref={rootRef} className="relative">
       <label className="sr-only" htmlFor="global-search">
-        Search organizations, projects, and assessments
+        Search organizations, projects, and runs
       </label>
       <div className="flex h-8 w-56 items-center gap-2 rounded-md border border-border bg-transparent px-2 sm:w-72">
         <svg

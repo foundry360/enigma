@@ -124,10 +124,10 @@ export async function searchWorkspace(
     assessments: assessments.map((assessment) => ({
       id: assessment.id,
       type: "assessment",
-      title: `${assessmentLabel(assessment.status)} assessment`,
+      title: `${assessmentLabel(assessment.status)} run`,
       subtitle: assessment.organizationName,
       href: assessment.projectId
-        ? `/projects/${assessment.projectId}/assessments`
+        ? `/projects/${assessment.projectId}/intelligence?assessment=${assessment.id}`
         : `/accounts/${assessment.organizationId}/assessments`,
     })),
   };

@@ -128,6 +128,7 @@ export type AssessmentRow = {
     toolCalls: number;
     failedTools: number;
     error?: string;
+    candidates?: Record<string, "candidate" | "promoted" | "rejected">;
   } | null;
   createdAt: Date;
   updatedAt: Date;

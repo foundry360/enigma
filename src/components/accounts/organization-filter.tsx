@@ -154,7 +154,7 @@ export function OrganizationFilter({
             }
           />
           <FilterSelect
-            label="Assessment"
+            label="Run"
             value={filters.assessmentStatus}
             options={assessmentFilters}
             labels={assessmentLabels}
