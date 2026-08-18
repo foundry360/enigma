@@ -294,7 +294,7 @@ export default async function OrganizationOverviewPage({
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card
-          title="Runs"
+          title="Run History"
           action={<Badge>{assessmentSummary.total}</Badge>}
         >
           {assessmentSummary.total === 0 ? (

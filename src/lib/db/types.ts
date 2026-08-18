@@ -128,7 +128,10 @@ export type AssessmentRow = {
     toolCalls: number;
     failedTools: number;
     error?: string;
-    candidates?: Record<string, "candidate" | "promoted" | "rejected">;
+    candidates?: Record<
+      string,
+      "candidate" | "validated" | "rejected" | "promoted"
+    >;
   } | null;
   createdAt: Date;
   updatedAt: Date;
@@ -159,4 +162,64 @@ export type AssessmentJudgmentRow = {
   recommendation: string;
   sortOrder: number;
   createdAt: Date;
+};
+
+export type CandidateStatus =
+  | "candidate"
+  | "validated"
+  | "rejected"
+  | "promoted";
+
+export type CandidateConfidence = "high" | "medium" | "low";
+
+export type CandidateSignalRef = {
+  key: string;
+  title: string;
+  strength: "strong" | "mixed" | "weak";
+  score: number;
+};
+
+export type OpportunityCandidateRow = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  assessmentId: string;
+  judgmentId: string | null;
+  key: string;
+  name: string;
+  description: string;
+  candidateType: string;
+  businessArea: string;
+  businessProcess: string;
+  recommendedCapability: string;
+  supportingSignals: CandidateSignalRef[];
+  evidence: { tool: string; citation: string }[];
+  finding: string;
+  confidence: CandidateConfidence;
+  consumptionDrivers: string[];
+  valueDrivers: string[];
+  constraints: string[];
+  dependencies: string[];
+  status: CandidateStatus;
+  rejectionReason: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  promotedAt: Date | null;
+  promotedBy: string | null;
+};
+
+export type ProjectOpportunityRow = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  candidateId: string;
+  assessmentId: string;
+  name: string;
+  description: string;
+  businessArea: string;
+  businessProcess: string;
+  recommendedCapability: string;
+  confidence: CandidateConfidence;
+  createdAt: Date;
+  updatedAt: Date;
 };

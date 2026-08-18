@@ -1,17 +1,52 @@
+import { forecastConfidence } from "@/modules/intelligence/consumption";
 import type {
   Evidence,
   Judgment,
   SignalContext,
   SignalKey,
+  SignalStrength,
 } from "@/modules/intelligence/types";
 
 export type OpportunityDefinition = {
   key: string;
   title: string;
   process: string;
+  description: string;
+  businessArea: string;
+  recommendedCapability: string;
   requiredSignals: SignalKey[];
+  watchSignals: SignalKey[];
   consumptionDrivers: string[];
   valueDrivers: string[];
+  constraints: string[];
+  dependencies: string[];
+  reason: string;
+  risk: string;
+  recommendation: string;
+};
+
+export type CandidateDraft = {
+  key: string;
+  title: string;
+  score: number;
+  description: string;
+  candidateType: string;
+  businessArea: string;
+  businessProcess: string;
+  recommendedCapability: string;
+  supportingSignals: {
+    key: SignalKey;
+    title: string;
+    strength: SignalStrength;
+    score: number;
+  }[];
+  evidence: Evidence[];
+  finding: string;
+  confidence: "high" | "medium" | "low";
+  consumptionDrivers: string[];
+  valueDrivers: string[];
+  constraints: string[];
+  dependencies: string[];
   reason: string;
   risk: string;
   recommendation: string;
@@ -22,13 +57,38 @@ export const opportunityCatalog: OpportunityDefinition[] = [
     key: "case_service_agent",
     title: "Service agent",
     process: "Service work handling",
+    description:
+      "High-volume recurring service activity with a defined operating path and available grounding sources.",
+    businessArea: "Service",
+    recommendedCapability: "Service agent",
     requiredSignals: [
       "addressable_work",
       "operating_path",
       "grounded_answers",
     ],
-    consumptionDrivers: ["Work volume", "Sessions", "Escalations"],
-    valueDrivers: ["Handle time", "Resolution rate"],
+    watchSignals: ["writeback_control", "automation_collision", "access_surface"],
+    consumptionDrivers: [
+      "Customer interactions",
+      "Agent sessions",
+      "Automated resolutions",
+      "Knowledge retrieval",
+    ],
+    valueDrivers: [
+      "Handle time",
+      "Resolution rate",
+      "Escalation reduction",
+      "Response time",
+    ],
+    constraints: [
+      "Existing automation may collide with agent writes",
+      "Write-back controls must stay narrow",
+      "Agent identity should not reuse a broad human profile",
+    ],
+    dependencies: [
+      "A durable service work object",
+      "Approved content for the first topic",
+      "A single handoff path",
+    ],
     reason:
       "Addressable work, an operating path, and grounded answers are present, so a service agent is a supported hypothesis.",
     risk: "Write-back without a narrow topic will create incomplete or ungrounded updates.",
@@ -39,9 +99,22 @@ export const opportunityCatalog: OpportunityDefinition[] = [
     key: "knowledge_assist",
     title: "Grounded Q&A",
     process: "Trusted answer retrieval",
+    description:
+      "Existing knowledge sources and a usable access surface provide a potential grounding layer.",
+    businessArea: "Service",
+    recommendedCapability: "Grounded Q&A",
     requiredSignals: ["grounded_answers", "access_surface"],
-    consumptionDrivers: ["Retrieval turns", "Sessions"],
-    valueDrivers: ["Handle time", "Productivity"],
+    watchSignals: ["writeback_control", "addressable_work"],
+    consumptionDrivers: ["Retrieval turns", "Agent sessions"],
+    valueDrivers: ["Handle time", "Human touches", "Productivity"],
+    constraints: [
+      "Stale or thin articles will show up as confident wrong answers",
+      "Write-back should wait until retrieval is trusted",
+    ],
+    dependencies: [
+      "Approved content on one high-volume reason",
+      "A dedicated agent identity",
+    ],
     reason:
       "Approved content and a usable access surface support a grounded Q&A hypothesis.",
     risk: "Stale or thin articles will show up as confident wrong answers.",
@@ -52,9 +125,22 @@ export const opportunityCatalog: OpportunityDefinition[] = [
     key: "guided_case_flow",
     title: "Guided workflow",
     process: "Guided operating path",
+    description:
+      "A repeatable operating path exists, so an agent can participate without inventing the process.",
+    businessArea: "Operations",
+    recommendedCapability: "Guided workflow",
     requiredSignals: ["operating_path", "writeback_control"],
-    consumptionDrivers: ["Actions", "Workflow runs"],
-    valueDrivers: ["Automation", "Handle time"],
+    watchSignals: ["automation_collision", "addressable_work"],
+    consumptionDrivers: ["Actions", "Workflow runs", "Records processed"],
+    valueDrivers: ["Automation volume", "Handle time", "Human touches"],
+    constraints: [
+      "Dense automation can turn the agent into a shadow process",
+      "Assignment and SLAs may still be informal",
+    ],
+    dependencies: [
+      "One documented handoff",
+      "A single topic paired with write-back",
+    ],
     reason:
       "A repeatable path and write-back controls support a guided workflow hypothesis.",
     risk: "The agent may become a shadow process if assignment and SLAs stay informal.",
@@ -70,33 +156,164 @@ export function opportunityDefinition(key: string) {
 export function detectOpportunityCandidates(
   context: SignalContext,
 ): Judgment[] {
+  return draftOpportunityCandidates(context).map((draft) => ({
+    kind: "opportunity" as const,
+    key: draft.key,
+    title: draft.title,
+    score: draft.score,
+    evidence: draft.evidence,
+    reason: draft.reason,
+    risk: draft.risk,
+    recommendation: draft.recommendation,
+  }));
+}
+
+export function draftOpportunityCandidates(
+  context: SignalContext,
+): CandidateDraft[] {
   return opportunityCatalog.flatMap((definition) => {
-    const supporting = definition.requiredSignals.filter((key) => {
+    const required = definition.requiredSignals.map((key) => {
       const signal = context.signals.find((item) => item.key === key);
-      return signal && signal.strength !== "weak";
+      return signal ?? null;
     });
 
-    if (supporting.length < definition.requiredSignals.length) {
+    if (
+      required.some((signal) => !signal || signal.strength === "weak")
+    ) {
       return [];
     }
 
-    const scores = supporting.map(
-      (key) => context.signals.find((item) => item.key === key)?.score ?? 0,
-    );
+    const supporting = [
+      ...required.filter((signal): signal is NonNullable<typeof signal> =>
+        Boolean(signal),
+      ),
+      ...definition.watchSignals.flatMap((key) => {
+        const signal = context.signals.find((item) => item.key === key);
+        return signal ? [signal] : [];
+      }),
+    ];
+    const unique = [
+      ...new Map(supporting.map((signal) => [signal.key, signal])).values(),
+    ];
+    const requiredScores = required.map((signal) => signal?.score ?? 0);
     const score = Math.round(
-      scores.reduce((sum, value) => sum + value, 0) / scores.length,
+      requiredScores.reduce((sum, value) => sum + value, 0) /
+        requiredScores.length,
     );
 
     return [
       {
-        kind: "opportunity" as const,
         key: definition.key,
         title: definition.title,
         score,
-        evidence: evidenceFromSignals(context, definition.requiredSignals),
+        description: definition.description,
+        candidateType: definition.key,
+        businessArea: definition.businessArea,
+        businessProcess: definition.process,
+        recommendedCapability: definition.recommendedCapability,
+        supportingSignals: unique.map((signal) => ({
+          key: signal.key,
+          title: signal.title,
+          strength: signal.strength,
+          score: signal.score,
+        })),
+        evidence: evidenceFromSignals(
+          context,
+          unique.map((signal) => signal.key),
+        ),
+        finding: definition.reason,
+        confidence: forecastConfidence(score),
+        consumptionDrivers: definition.consumptionDrivers,
+        valueDrivers: definition.valueDrivers,
+        constraints: definition.constraints,
+        dependencies: definition.dependencies,
         reason: definition.reason,
         risk: definition.risk,
         recommendation: definition.recommendation,
+      },
+    ];
+  });
+}
+
+export function hydrateCandidateDrafts(
+  judgments: {
+    kind: string;
+    key: string;
+    title: string;
+    score: number;
+    evidence: { tool: string; citation: string }[];
+    reason: string;
+    risk: string;
+    recommendation: string;
+  }[],
+): CandidateDraft[] {
+  const signals = judgments.filter((item) => item.kind === "dimension");
+  const emitted = new Set(
+    judgments
+      .filter((item) => item.kind === "opportunity")
+      .map((item) => item.key),
+  );
+
+  return opportunityCatalog.flatMap((definition) => {
+    if (!emitted.has(definition.key)) {
+      return [];
+    }
+
+    const required = definition.requiredSignals.map((key) =>
+      signals.find((item) => item.key === key),
+    );
+    if (required.some((signal) => !signal)) {
+      return [];
+    }
+
+    const supporting = [
+      ...required.filter((signal): signal is NonNullable<typeof signal> =>
+        Boolean(signal),
+      ),
+      ...definition.watchSignals.flatMap((key) => {
+        const signal = signals.find((item) => item.key === key);
+        return signal ? [signal] : [];
+      }),
+    ];
+    const unique = [
+      ...new Map(supporting.map((signal) => [signal.key, signal])).values(),
+    ];
+    const judgment = judgments.find(
+      (item) => item.kind === "opportunity" && item.key === definition.key,
+    );
+    const score = judgment?.score ?? 0;
+
+    return [
+      {
+        key: definition.key,
+        title: definition.title,
+        score,
+        description: definition.description,
+        candidateType: definition.key,
+        businessArea: definition.businessArea,
+        businessProcess: definition.process,
+        recommendedCapability: definition.recommendedCapability,
+        supportingSignals: unique.map((signal) => ({
+          key: signal.key as SignalKey,
+          title: signal.title,
+          strength:
+            signal.score >= 75
+              ? "strong"
+              : signal.score >= 45
+                ? "mixed"
+                : "weak",
+          score: signal.score,
+        })),
+        evidence: (judgment?.evidence ?? []) as Evidence[],
+        finding: judgment?.reason ?? definition.reason,
+        confidence: forecastConfidence(score),
+        consumptionDrivers: definition.consumptionDrivers,
+        valueDrivers: definition.valueDrivers,
+        constraints: definition.constraints,
+        dependencies: definition.dependencies,
+        reason: judgment?.reason ?? definition.reason,
+        risk: judgment?.risk ?? definition.risk,
+        recommendation: judgment?.recommendation ?? definition.recommendation,
       },
     ];
   });

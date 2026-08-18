@@ -36,7 +36,7 @@ function isCollectionView(value: string | null): value is CollectionView {
 export function AssessmentViews({
   assessments,
   actions,
-  title = "Runs",
+  title = "Run History",
   description,
 }: {
   assessments: AssessmentListItem[];
@@ -132,14 +132,14 @@ export function AssessmentViews({
         </div>
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           <label className="sr-only" htmlFor="assessment-search">
-            Search runs
+            Search run history
           </label>
           <input
             id="assessment-search"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search runs"
+            placeholder="Search run history"
             className="h-8 w-64 rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none placeholder:text-placeholder focus:border-foreground"
           />
           <ViewToggle view={view} onChange={changeView} />
@@ -170,7 +170,7 @@ export function AssessmentViews({
         </p>
       ) : visible.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted">
-          No runs match that search or filter.
+          No run history matches that search or filter.
         </p>
       ) : view === "cards" ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

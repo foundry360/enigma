@@ -68,7 +68,7 @@ export function overallFinding(input: {
   return `${headline}${strength}${gap}`;
 }
 
-export function overallScore(judgments: Judgment[]) {
+export function overallScore(judgments: { kind: string; score: number }[]) {
   const dimensions = judgments.filter((item) => item.kind === "dimension");
   if (dimensions.length === 0) {
     return 0;

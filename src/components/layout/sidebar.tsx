@@ -167,7 +167,7 @@ function PanelRightIcon() {
 const nav = [
   { href: "/accounts", label: "Organizations", icon: AccountsIcon },
   { href: "/dashboard", label: "Projects", icon: ProjectsIcon },
-  { href: "/assessments", label: "Runs", icon: AssessmentsIcon },
+  { href: "/assessments", label: "Run History", icon: AssessmentsIcon },
 ];
 
 function projectNavContext(pathname: string) {
@@ -195,7 +195,7 @@ function projectNavContext(pathname: string) {
       },
       {
         href: `/projects/${projectId}/assessments`,
-        label: "Runs",
+        label: "Run History",
         icon: AssessmentsIcon,
         exact: false,
       },

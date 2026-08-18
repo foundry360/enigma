@@ -11,7 +11,7 @@ export function OrganizationNav({ organizationId }: { organizationId: string }) 
     { href: `${base}/platforms`, label: "Platforms" },
     { href: `${base}/environments`, label: "Environments" },
     { href: `${base}/projects`, label: "Projects" },
-    { href: `${base}/assessments`, label: "Runs" },
+    { href: `${base}/assessments`, label: "Run History" },
     { href: `${base}/activity`, label: "Activity" },
   ];
 

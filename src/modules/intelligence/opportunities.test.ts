@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { detectOpportunityCandidates } from "@/modules/intelligence/opportunities";
+import {
+  detectOpportunityCandidates,
+  hydrateCandidateDrafts,
+} from "@/modules/intelligence/opportunities";
 import { normalizeSignals } from "@/modules/intelligence/signals";
 import type { AssessmentFacts } from "@/modules/intelligence/types";
 
@@ -75,5 +78,56 @@ describe("opportunity candidates", () => {
       "guided_case_flow",
     ]);
     expect(JSON.stringify(candidates)).not.toMatch(/\$\d/);
+  });
+
+  it("hydrates catalog context from stored judgments", () => {
+    const facts = normalizeSignals({
+      ...emptyFacts,
+      objects: [
+        { apiName: "Case", label: "Case", custom: false, queryable: true },
+        { apiName: "Account", label: "Account", custom: false, queryable: true },
+      ],
+      describes: {
+        Case: {
+          apiName: "Case",
+          label: "Case",
+          custom: false,
+          fields: Array.from({ length: 24 }, (_, index) => ({
+            apiName: `Field${index}`,
+            label: `Field ${index}`,
+            type: "string",
+            required: false,
+            custom: false,
+          })),
+          recordTypes: [],
+        },
+      },
+      knowledge: {
+        enabled: true,
+        articleObjects: ["Knowledge__kav"],
+        dataCategories: [],
+      },
+      security: { profileCount: 8, permissionSetCount: 4 },
+      validationRules: [
+        { name: "Require_Origin", objectApiName: "Case", active: true },
+      ],
+    });
+    const drafts = hydrateCandidateDrafts([
+      ...facts.signals.map((signal) => ({
+        kind: "dimension",
+        key: signal.key,
+        title: signal.title,
+        score: signal.score,
+        evidence: signal.evidence,
+        reason: signal.meaning,
+        risk: signal.risk,
+        recommendation: signal.recommendation,
+      })),
+      ...detectOpportunityCandidates(facts),
+    ]);
+
+    expect(drafts[0]?.constraints.length).toBeGreaterThan(0);
+    expect(drafts[0]?.confidence).toMatch(/high|medium|low/);
+    expect(JSON.stringify(drafts)).not.toMatch(/\$\d/);
   });
 });

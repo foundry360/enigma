@@ -8,6 +8,7 @@ import { toUtcDate } from "@/lib/format";
 import { runAssessmentPass } from "@/modules/intelligence";
 import { requireTenantId, scopedCreate } from "@/lib/tenants/scope";
 import { writeAuditLog } from "@/server/services/audit";
+import { persistOpportunityCandidates } from "@/server/services/opportunities";
 import { probeSalesforceConnection } from "@/server/services/connections";
 import { getProject } from "@/server/services/projects";
 
@@ -313,14 +314,16 @@ export async function startProjectDiscovery(input: {
       `;
     }
 
+    const storedJudgments: AssessmentJudgmentRow[] = [];
     for (const [index, judgment] of result.judgments.entries()) {
+      const judgmentId = createId();
       await sql`
         insert into "AssessmentJudgment" (
           id, "tenantId", "assessmentId", kind, key, title, score,
           evidence, reason, risk, recommendation, "sortOrder", "createdAt"
         )
         values (
-          ${createId()},
+          ${judgmentId},
           ${input.tenantId},
           ${assessment.id},
           ${judgment.kind},
@@ -335,6 +338,30 @@ export async function startProjectDiscovery(input: {
           now()
         )
       `;
+      storedJudgments.push({
+        id: judgmentId,
+        tenantId: input.tenantId,
+        assessmentId: assessment.id,
+        kind: judgment.kind,
+        key: judgment.key,
+        title: judgment.title,
+        score: judgment.score,
+        evidence: judgment.evidence,
+        reason: judgment.reason,
+        risk: judgment.risk,
+        recommendation: judgment.recommendation,
+        sortOrder: index,
+        createdAt: new Date(),
+      });
+    }
+
+    if (project.id) {
+      await persistOpportunityCandidates({
+        tenantId: input.tenantId,
+        projectId: project.id,
+        assessmentId: assessment.id,
+        judgments: storedJudgments,
+      });
     }
 
     const failedTools = result.traces.filter((trace) => !trace.ok).length;

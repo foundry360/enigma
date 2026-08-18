@@ -6,13 +6,13 @@ import { ReadinessCategories } from "@/components/intelligence/readiness-categor
 import { ScoreRing } from "@/components/ui/score-ring";
 import { requireSession } from "@/lib/auth/session";
 import { formatDateTime } from "@/lib/format";
-import { opportunityDefinition } from "@/modules/intelligence/opportunities";
 import { splitSignalCopy } from "@/modules/intelligence/signals";
 import { overallScore, signalState } from "@/modules/intelligence/score";
 import {
   getLatestAssessmentDetail,
   getProjectAssessmentDetail,
 } from "@/server/services/assessments";
+import { ensureOpportunityCandidates } from "@/server/services/opportunities";
 import { getConnectionOrgProfile } from "@/server/services/connections";
 import { getProjectOverview } from "@/server/services/projects";
 
@@ -60,8 +60,9 @@ export default async function ProjectIntelligencePage({
     : null;
   const signals =
     detail?.judgments.filter((item) => item.kind === "dimension") ?? [];
-  const candidates =
-    detail?.judgments.filter((item) => item.kind === "opportunity") ?? [];
+  const candidates = detail
+    ? await ensureOpportunityCandidates(session.tenantId, detail.assessment.id)
+    : [];
   const complete = detail?.assessment.status === "COMPLETE";
   const strength = complete
     ? (detail.assessment.summary?.overallScore ?? overallScore(signals))
@@ -109,7 +110,7 @@ export default async function ProjectIntelligencePage({
             </MetaRow>
             <MetaRow label="Facts">{detail?.traces.length ?? 0}</MetaRow>
             <MetaRow label="Signals">{complete ? signals.length : 0}</MetaRow>
-            <MetaRow label="Candidates">
+            <MetaRow label="Opportunity Candidates">
               {complete ? candidates.length : 0}
             </MetaRow>
           </dl>
@@ -138,24 +139,17 @@ export default async function ProjectIntelligencePage({
 
       {complete && candidates.length > 0 ? (
         <OpportunityCandidates
-          reviewHref={`/projects/${id}/opportunities`}
-          items={candidates.map((candidate) => {
-            const definition = opportunityDefinition(candidate.key);
-            return {
-              id: candidate.id,
-              title: candidate.title,
-              strength: signalState(candidate.score),
-              process: definition?.process ?? "Agent workflow",
-              supportedBy: definition
-                ? definition.requiredSignals.map(
-                    (key) =>
-                      signals.find((item) => item.key === key)?.title ?? key,
-                  )
-                : [],
-              consumptionDrivers: definition?.consumptionDrivers ?? [],
-              valueDrivers: definition?.valueDrivers ?? [],
-            };
-          })}
+          items={candidates.map((candidate) => ({
+            id: candidate.id,
+            title: candidate.name,
+            description: candidate.description,
+            confidence: candidate.confidence,
+            status: candidate.status,
+            supportingSignals: candidate.supportingSignals,
+            consumptionDrivers: candidate.consumptionDrivers,
+            valueDrivers: candidate.valueDrivers,
+            reviewHref: `/projects/${id}/opportunities?candidate=${candidate.id}`,
+          }))}
         />
       ) : !complete ? (
         <p className="rounded-lg border border-border bg-surface px-4 py-8 text-center text-sm text-muted">
@@ -175,7 +169,7 @@ function MetaRow({
   children: ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-4 py-2 text-sm">
+    <div className="grid grid-cols-[8.5rem_minmax(0,1fr)] items-start gap-4 py-2 text-sm">
       <dt className="text-muted">{label}</dt>
       <dd className="min-w-0 break-words">{children}</dd>
     </div>

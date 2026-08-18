@@ -1,27 +1,32 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { buttonClassName } from "@/components/ui/button";
-import { StrengthBadge } from "@/components/ui/score-ring";
-import type { SignalStrength } from "@/modules/intelligence/types";
+import type { CandidateConfidence, CandidateSignalRef } from "@/lib/db/types";
 
 export type OpportunityCandidateItem = {
   id: string;
   title: string;
-  strength: SignalStrength;
-  process: string;
-  supportedBy: string[];
+  description: string;
+  confidence: CandidateConfidence;
+  status: string;
+  supportingSignals: CandidateSignalRef[];
   consumptionDrivers: string[];
   valueDrivers: string[];
+  reviewHref: string;
+};
+
+const confidenceLabel: Record<CandidateConfidence, string> = {
+  high: "High confidence",
+  medium: "Medium confidence",
+  low: "Low confidence",
 };
 
 export function OpportunityCandidates({
   items,
-  reviewHref,
 }: {
   items: OpportunityCandidateItem[];
-  reviewHref: string;
 }) {
   const [open, setOpen] = useState(true);
 
@@ -61,40 +66,45 @@ export function OpportunityCandidates({
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-sm font-semibold">{item.title}</h3>
-                    <StrengthBadge state={item.strength} />
+                    <span className="text-xs text-muted">
+                      {confidenceLabel[item.confidence]}
+                    </span>
                   </div>
-                  <p className="mt-1 text-xs text-muted">{item.process}</p>
+                  <p className="mt-1 text-sm text-muted">{item.description}</p>
                 </div>
-                <Link href={reviewHref} className={buttonClassName("secondary")}>
-                  Review
+                <Link
+                  href={item.reviewHref}
+                  className={buttonClassName("secondary")}
+                >
+                  Review Candidate
                 </Link>
               </div>
-              <dl className="mt-3 grid gap-8 text-sm md:grid-cols-3">
-                <Meta label="Supported by">{item.supportedBy.join(", ")}</Meta>
-                <Meta label="Consumption drivers">
-                  {item.consumptionDrivers.join(", ")}
-                </Meta>
-                <Meta label="Value drivers">{item.valueDrivers.join(", ")}</Meta>
-              </dl>
+              <div className="mt-3 grid gap-6 text-sm md:grid-cols-3">
+                <div>
+                  <p className="text-xs text-muted">Supported by</p>
+                  <ul className="mt-1 space-y-1">
+                    {item.supportingSignals.map((signal) => (
+                      <li key={signal.key}>
+                        {signal.strength === "weak" ? "⚠" : "✓"} {signal.title}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs text-muted">
+                    Potential consumption drivers
+                  </p>
+                  <p className="mt-1">{item.consumptionDrivers.join(", ")}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted">Potential value drivers</p>
+                  <p className="mt-1">{item.valueDrivers.join(", ")}</p>
+                </div>
+              </div>
             </article>
           ))}
         </div>
       ) : null}
     </section>
-  );
-}
-
-function Meta({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className="mt-0.5 break-words">{children || "—"}</dd>
-    </div>
   );
 }

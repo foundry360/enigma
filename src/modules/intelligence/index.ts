@@ -6,6 +6,8 @@ export {
 export type { ConsumptionPosture, ForecastConfidence } from "@/modules/intelligence/consumption";
 export {
   detectOpportunityCandidates,
+  draftOpportunityCandidates,
+  hydrateCandidateDrafts,
   opportunityCatalog,
   opportunityDefinition,
 } from "@/modules/intelligence/opportunities";

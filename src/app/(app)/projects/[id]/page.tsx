@@ -226,7 +226,7 @@ export default async function ProjectDetailsPage({
           }
         />
         <Metric
-          label="Runs"
+          label="Run History"
           count={assessments.length}
           hint={
             assessment
