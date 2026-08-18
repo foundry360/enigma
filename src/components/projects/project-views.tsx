@@ -8,6 +8,7 @@ import {
   ProjectFilter,
   type ProjectFilters,
 } from "@/components/projects/project-filter";
+import { LoadMoreButton, useLoadMore } from "@/components/ui/load-more";
 import { PriorityMark } from "@/components/ui/priority-mark";
 import { ProjectStatusMark } from "@/components/ui/status-dot";
 import { ViewToggle, type CollectionView } from "@/components/ui/view-toggle";
@@ -86,34 +87,43 @@ export function ProjectViews({
       project.organizationName,
     ].some((value) => value?.toLowerCase().includes(normalized));
   });
+  const loaded = useLoadMore(
+    visible,
+    `${query}|${JSON.stringify(filters)}`,
+  );
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-end gap-2">
-        <label className="sr-only" htmlFor="project-search">
-          Search projects
-        </label>
-        <input
-          id="project-search"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search projects"
-          className="h-8 w-64 rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none placeholder:text-placeholder focus:border-foreground"
-        />
-        <ViewToggle view={view} onChange={changeView} />
-        <ProjectFilter
-          filters={filters}
-          onChange={setFilters}
-          organizations={showOrganization ? organizations : []}
-        />
-        <CreateProjectButton>
-          <span aria-hidden="true">+</span>
-          New project
-        </CreateProjectButton>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="shrink-0 text-2xl font-semibold tracking-tight">
+          Projects
+        </h1>
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+          <label className="sr-only" htmlFor="project-search">
+            Search projects
+          </label>
+          <input
+            id="project-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search projects"
+            className="h-8 w-64 rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none placeholder:text-placeholder focus:border-foreground"
+          />
+          <ViewToggle view={view} onChange={changeView} />
+          <ProjectFilter
+            filters={filters}
+            onChange={setFilters}
+            organizations={showOrganization ? organizations : []}
+          />
+          <CreateProjectButton>
+            <span aria-hidden="true">+</span>
+            New project
+          </CreateProjectButton>
+        </div>
       </div>
       {projects.length === 0 ? (
-        <div className="rounded-md border border-dashed border-border bg-background px-4 py-8 text-center">
+        <div className="py-8 text-center">
           <p className="text-sm font-medium">No projects yet</p>
           <p className="mt-1 text-sm text-muted">
             Create a project for a customer organization.
@@ -123,12 +133,12 @@ export function ProjectViews({
           </div>
         </div>
       ) : visible.length === 0 ? (
-        <p className="rounded-md border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted">
+        <p className="py-8 text-center text-sm text-muted">
           No projects match that search or filter.
         </p>
       ) : view === "cards" ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {visible.map((project) => (
+          {loaded.items.map((project) => (
             <Link
               key={project.id}
               href={`/projects/${project.id}`}
@@ -155,26 +165,26 @@ export function ProjectViews({
           ))}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-md border border-border">
+        <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-surface-2 text-xs text-muted">
+            <thead className="border-b border-border text-xs text-muted">
               <tr>
-                <th className="px-3 py-2 font-medium">Project</th>
+                <th className="py-2 pr-3 font-medium">Project</th>
                 {showOrganization ? (
                   <th className="px-3 py-2 font-medium">Organization</th>
                 ) : null}
                 <th className="px-3 py-2 font-medium">Type</th>
                 <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Priority</th>
+                <th className="py-2 pl-3 font-medium">Priority</th>
               </tr>
             </thead>
             <tbody>
-              {visible.map((project) => (
+              {loaded.items.map((project) => (
                 <tr
                   key={project.id}
-                  className="border-t border-border bg-background hover:bg-surface-2"
+                  className="border-b border-border hover:bg-surface-2"
                 >
-                  <td className="px-3 py-2 font-medium">
+                  <td className="py-2.5 pr-3 font-medium">
                     <Link
                       href={`/projects/${project.id}`}
                       className="hover:underline"
@@ -187,14 +197,14 @@ export function ProjectViews({
                       {project.organizationName ?? "—"}
                     </td>
                   ) : null}
-                  <td className="px-3 py-2 text-muted">{project.projectType}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2.5 text-muted">{project.projectType}</td>
+                  <td className="px-3 py-2.5">
                     <span className="inline-flex items-center gap-1.5">
                       <ProjectStatusMark status={project.status} />
                       <span className="text-muted">{project.status}</span>
                     </span>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="py-2.5 pl-3">
                     {project.priority ? (
                       <span className="inline-flex items-center gap-1.5">
                         <PriorityMark priority={project.priority} />
@@ -210,6 +220,7 @@ export function ProjectViews({
           </table>
         </div>
       )}
+      <LoadMoreButton hasMore={loaded.hasMore} onLoadMore={loaded.loadMore} />
     </div>
   );
 }

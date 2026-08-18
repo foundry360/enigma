@@ -99,7 +99,10 @@ export async function getProjectOverview(tenantId: string, projectId: string) {
         order by c."platformType"
       `,
       sql<PlatformConnectionRow[]>`
-        select *
+        select
+          id, "tenantId", "organizationId", "platformType", status,
+          "externalOrgId", "externalOrgName", "instanceUrl",
+          "connectedAt", "createdAt", "updatedAt"
         from "PlatformConnection"
         where "tenantId" = ${scoped} and "organizationId" = ${project.organizationId}
         order by "updatedAt" desc
@@ -121,13 +124,16 @@ export async function getProjectOverview(tenantId: string, projectId: string) {
         scopedTypes.includes(connection.platformType)),
   );
   const assessment = assessments[0] ?? null;
-  const nextAction: "connect" | "discover" | "continue" | "review" = !connected
-    ? "connect"
-    : !assessment
-      ? "discover"
-      : assessment.status === "COMPLETE"
-        ? "review"
-        : "continue";
+  const nextAction: "connect" | "discover" | "continue" | "prioritize" =
+    !connected
+      ? "connect"
+      : !assessment ||
+          assessment.status === "DRAFT" ||
+          assessment.status === "FAILED"
+        ? "discover"
+        : assessment.status === "COMPLETE"
+          ? "prioritize"
+          : "continue";
 
   return {
     project,

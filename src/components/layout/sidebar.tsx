@@ -188,14 +188,8 @@ function projectNavContext(pathname: string) {
         exact: true,
       },
       {
-        href: `/projects/${projectId}/connections`,
-        label: "Connections",
-        icon: ConnectionsIcon,
-        exact: false,
-      },
-      {
         href: `/projects/${projectId}/intelligence`,
-        label: "Intelligence",
+        label: "Org Intelligence",
         icon: IntelligenceIcon,
         exact: false,
       },
@@ -231,6 +225,7 @@ function projectNavContext(pathname: string) {
       },
     ],
     settingsHref: `/projects/${projectId}/settings`,
+    connectionsHref: `/projects/${projectId}/connections`,
   };
 }
 
@@ -336,6 +331,12 @@ export function Sidebar() {
               />
             ))}
             <div className="mx-2 my-1 border-t border-sidebar-border" />
+            <NavLink
+              href={projectNav.connectionsHref}
+              label="Connections"
+              icon={ConnectionsIcon}
+              active={pathname.startsWith(projectNav.connectionsHref)}
+            />
             <NavLink
               href={projectNav.settingsHref}
               label="Project Settings"

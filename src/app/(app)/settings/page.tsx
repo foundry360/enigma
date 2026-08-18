@@ -3,6 +3,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { PageHeader } from "@/components/ui/page-header";
 import { SettingsRow } from "@/components/ui/settings-row";
 import { requireSession } from "@/lib/auth/session";
+import { isSalesforceConfigured } from "@/modules/connectors/salesforce";
 import { getProfileAvatarUrl } from "@/server/services/profile";
 import { getTenant, getUserProfile } from "@/server/services/users";
 
@@ -47,9 +48,12 @@ export default async function SettingsPage() {
           </p>
         </SettingsRow>
         <SettingsRow title="Salesforce">
-          <p className="text-sm">Not configured</p>
+          <p className="text-sm">
+            {isSalesforceConfigured() ? "Connected App configured" : "Not configured"}
+          </p>
           <p className="mt-1 text-xs text-muted">
-            OAuth uses a Connected App and a server-side callback.
+            OAuth uses a Connected App and a server-side callback. Tokens never
+            reach the browser.
           </p>
         </SettingsRow>
       </div>

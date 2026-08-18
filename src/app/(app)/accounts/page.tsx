@@ -1,5 +1,4 @@
 import { OrganizationViews } from "@/components/accounts/organization-views";
-import { PageFrame } from "@/components/ui/page-frame";
 import { requireSession } from "@/lib/auth/session";
 import { listAccounts } from "@/server/services/accounts";
 
@@ -21,12 +20,5 @@ export default async function AccountsPage() {
     updatedAt: account.updatedAt,
   }));
 
-  return (
-    <PageFrame
-      title="Organizations"
-      description="All customer companies you assess and run projects for."
-    >
-      <OrganizationViews organizations={organizations} />
-    </PageFrame>
-  );
+  return <OrganizationViews organizations={organizations} />;
 }

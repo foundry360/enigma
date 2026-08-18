@@ -15,6 +15,7 @@ import {
   StatusDot,
 } from "@/components/ui/status-dot";
 import { OrganizationIcon } from "@/components/ui/entity-icons";
+import { LoadMoreButton, useLoadMore } from "@/components/ui/load-more";
 import { ViewToggle, type CollectionView } from "@/components/ui/view-toggle";
 import { formatLastActivity } from "@/lib/format";
 
@@ -36,45 +37,26 @@ export type OrganizationListItem = {
   updatedAt: Date | string;
 };
 
+const customerDot: Record<string, string> = {
+  Active: "#3ECF8E",
+  Inactive: "#F16A50",
+  Prospect: "#F5C542",
+};
+
 function CustomerStatusMark({ status }: { status: string | null }) {
   if (!status) {
     return null;
   }
 
-  const icon =
-    status === "Active" ? (
-      <path d="m8 12 2.5 2.5L16 9" />
-    ) : status === "Inactive" ? (
-      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-    ) : (
-      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-    );
+  const color = customerDot[status] ?? "#173e76";
 
   return (
-    <span
-      title={status}
-      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
-        status === "Active"
-          ? "border-connected text-connected"
-          : status === "Inactive"
-            ? "border-red-500/70 text-red-500"
-            : "border-muted text-muted"
-      }`}
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+    <span title={status} className="inline-flex shrink-0 items-center">
+      <span
+        className="inline-block h-2 w-2 rounded-full"
+        style={{ backgroundColor: color }}
         aria-hidden="true"
-      >
-        {icon}
-      </svg>
+      />
       <span className="sr-only">{status}</span>
     </span>
   );
@@ -159,36 +141,48 @@ export function OrganizationViews({
       organization.assessmentStatus,
     ].some((value) => value?.toLowerCase().includes(normalized));
   });
+  const loaded = useLoadMore(
+    visible,
+    `${query}|${JSON.stringify(filters)}`,
+  );
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-end gap-2">
-        <label className="sr-only" htmlFor="organization-search">
-          Search organizations
-        </label>
-        <input
-          id="organization-search"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search organizations"
-          className="h-8 w-64 rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none placeholder:text-placeholder focus:border-foreground"
-        />
-        <ViewToggle view={view} onChange={changeView} />
-        <OrganizationFilter filters={filters} onChange={setFilters} />
-        <CreateOrganizationButton />
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Organizations</h1>
+          <p className="mt-1 text-sm text-muted">
+            All customer companies you assess and run projects for.
+          </p>
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+          <label className="sr-only" htmlFor="organization-search">
+            Search organizations
+          </label>
+          <input
+            id="organization-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search organizations"
+            className="h-8 w-64 rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none placeholder:text-placeholder focus:border-foreground"
+          />
+          <ViewToggle view={view} onChange={changeView} />
+          <OrganizationFilter filters={filters} onChange={setFilters} />
+          <CreateOrganizationButton />
+        </div>
       </div>
       {organizations.length === 0 ? (
-        <p className="rounded-md border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted">
+        <p className="py-8 text-center text-sm text-muted">
           No organizations yet. Create the customer you want to assess.
         </p>
       ) : visible.length === 0 ? (
-        <p className="rounded-md border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted">
+        <p className="py-8 text-center text-sm text-muted">
           No organizations match that search or filter.
         </p>
       ) : view === "cards" ? (
         <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(340px,1fr))]">
-          {visible.map((organization) => (
+          {loaded.items.map((organization) => (
             <button
               key={organization.id}
               type="button"
@@ -233,28 +227,28 @@ export function OrganizationViews({
           ))}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-md border border-border">
+        <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-surface-2 text-xs text-muted">
+            <thead className="border-b border-border text-xs text-muted">
               <tr>
-                <th className="px-3 py-2 font-medium">Organization</th>
+                <th className="py-2 pr-3 font-medium">Organization</th>
                 <th className="px-3 py-2 font-medium">Type</th>
                 <th className="px-3 py-2 font-medium">Employees</th>
                 <th className="px-3 py-2 font-medium">Contact</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">Environments</th>
                 <th className="px-3 py-2 font-medium">Projects</th>
-                <th className="px-3 py-2 font-medium">Last activity</th>
+                <th className="py-2 pl-3 font-medium">Last activity</th>
               </tr>
             </thead>
             <tbody>
-              {visible.map((organization) => (
+              {loaded.items.map((organization) => (
                 <tr
                   key={organization.id}
-                  className="cursor-pointer border-t border-border bg-background hover:bg-surface-2"
+                  className="cursor-pointer border-b border-border hover:bg-surface-2"
                   onClick={() => openOrganization(organization.id)}
                 >
-                  <td className="px-3 py-2 font-medium">
+                  <td className="py-2.5 pr-3 font-medium">
                     <span className="inline-flex min-w-0 items-center gap-2 hover:underline">
                       <OrganizationIcon />
                       <span className="truncate">{organization.name}</span>
@@ -263,16 +257,16 @@ export function OrganizationViews({
                       {organization.industry ?? "—"}
                     </p>
                   </td>
-                  <td className="px-3 py-2 text-muted">
+                  <td className="px-3 py-2.5 text-muted">
                     {organization.organizationType ?? "—"}
                   </td>
-                  <td className="px-3 py-2 text-muted">
+                  <td className="px-3 py-2.5 text-muted">
                     {organization.employeeRange ?? "—"}
                   </td>
-                  <td className="px-3 py-2 text-muted">
+                  <td className="px-3 py-2.5 text-muted">
                     {organization.primaryContact ?? "—"}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2.5">
                     {organization.customerStatus ? (
                       <span className="inline-flex items-center gap-1.5">
                         <CustomerStatusMark
@@ -286,13 +280,13 @@ export function OrganizationViews({
                       "—"
                     )}
                   </td>
-                  <td className="px-3 py-2 text-muted">
+                  <td className="px-3 py-2.5 text-muted">
                     {organization.environmentCount}
                   </td>
-                  <td className="px-3 py-2 text-muted">
+                  <td className="px-3 py-2.5 text-muted">
                     {organization.projectCount}
                   </td>
-                  <td className="px-3 py-2 text-muted">
+                  <td className="py-2.5 pl-3 text-muted">
                     {formatLastActivity(organization.updatedAt)}
                   </td>
                 </tr>
@@ -301,6 +295,7 @@ export function OrganizationViews({
           </table>
         </div>
       )}
+      <LoadMoreButton hasMore={loaded.hasMore} onLoadMore={loaded.loadMore} />
     </div>
   );
 }

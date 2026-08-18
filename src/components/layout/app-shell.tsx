@@ -71,7 +71,7 @@ export function AppShell({
           />
           {signed ? <Sidebar /> : null}
           <div className="app-main">
-            <main className="w-full px-12 py-4 sm:px-16 lg:px-24">{children}</main>
+            <main className="w-full px-4 py-4 lg:px-6">{children}</main>
           </div>
         </div>
       </CreateProjectProvider>

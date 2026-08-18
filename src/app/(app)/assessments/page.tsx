@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { AssessmentViews } from "@/components/assessments/assessment-views";
-import { PageFrame } from "@/components/ui/page-frame";
 import { requireSession } from "@/lib/auth/session";
 import { getAccountSelection } from "@/server/services/accounts";
 import { listTenantAssessments } from "@/server/services/assessments";
@@ -22,22 +21,18 @@ export default async function AssessmentsPage() {
   );
 
   return (
-    <PageFrame
-      title="Assessments"
-      description={`Assessment runs for ${selected.name}.`}
-    >
-      <AssessmentViews
-        assessments={assessments.map((assessment) => ({
-          id: assessment.id,
-          href: assessment.projectId
-            ? `/projects/${assessment.projectId}/assessments`
-            : `/accounts/${assessment.organizationId}/assessments`,
-          title: assessment.projectName ?? "Assessment",
-          organizationName: assessment.organizationName,
-          status: assessment.status,
-          createdAt: assessment.createdAt,
-        }))}
-      />
-    </PageFrame>
+    <AssessmentViews
+      assessments={assessments.map((assessment) => ({
+        id: assessment.id,
+        href: assessment.projectId
+          ? `/projects/${assessment.projectId}/intelligence`
+          : `/accounts/${assessment.organizationId}/assessments`,
+        title: assessment.projectName ?? "Assessment",
+        organizationName: assessment.organizationName,
+        status: assessment.status,
+        score: assessment.summary?.overallScore ?? null,
+        createdAt: assessment.createdAt,
+      }))}
+    />
   );
 }

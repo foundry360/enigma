@@ -1,3 +1,5 @@
+import type { OrgProfile } from "@/modules/enterprise/types";
+
 export const userRoles = ["ADMIN", "AE", "RVP", "PARTNER", "CUSTOMER"] as const;
 
 export type UserRole = (typeof userRoles)[number];
@@ -96,6 +98,8 @@ export type PlatformConnectionRow = {
   status: "DISCONNECTED" | "CONNECTED" | "ERROR";
   externalOrgId: string | null;
   externalOrgName: string | null;
+  instanceUrl: string | null;
+  orgProfile: OrgProfile | null;
   connectedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -117,7 +121,41 @@ export type AssessmentRow = {
   tenantId: string;
   organizationId: string;
   projectId: string | null;
+  connectionId: string | null;
   status: "DRAFT" | "DISCOVERING" | "ANALYZING" | "COMPLETE" | "FAILED";
+  summary: {
+    overallScore: number;
+    toolCalls: number;
+    failedTools: number;
+    error?: string;
+  } | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type AssessmentTraceRow = {
+  id: string;
+  tenantId: string;
+  assessmentId: string;
+  tool: string;
+  apiName: string | null;
+  ok: boolean;
+  summary: unknown;
+  createdAt: Date;
+};
+
+export type AssessmentJudgmentRow = {
+  id: string;
+  tenantId: string;
+  assessmentId: string;
+  kind: "dimension" | "opportunity";
+  key: string;
+  title: string;
+  score: number;
+  evidence: { tool: string; citation: string }[];
+  reason: string;
+  risk: string;
+  recommendation: string;
+  sortOrder: number;
+  createdAt: Date;
 };

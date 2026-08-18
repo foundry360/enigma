@@ -15,17 +15,28 @@ export function PageFrame({
 }) {
   return (
     <section className="overflow-hidden rounded-lg border border-border bg-surface">
-      <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between lg:p-6">
-        <div className="min-w-0">
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+      <div className="p-5 lg:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="flex shrink-0 items-center gap-2 text-xl font-semibold tracking-tight">
             {icon}
-            <span className="truncate">{title}</span>
+            <span>{title}</span>
           </h1>
-          {description ? (
-            <p className="mt-2 max-w-2xl text-sm text-muted">{description}</p>
+          {!description && actions ? (
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+              {actions}
+            </div>
           ) : null}
         </div>
-        {actions ? <div className="shrink-0">{actions}</div> : null}
+        {description ? (
+          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="min-w-0 text-sm text-muted">{description}</p>
+            {actions ? (
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+                {actions}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       <div className="border-t border-border p-5 lg:p-6">{children}</div>
     </section>

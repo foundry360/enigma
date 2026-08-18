@@ -16,6 +16,8 @@ const activityLabels: Record<string, string> = {
   "organization.enable": "Organization enabled",
   "organization.delete": "Organization deleted",
   "project.create": "New transformation project created",
+  "connection.connect": "Salesforce connected",
+  "connection.disconnect": "Salesforce disconnected",
 };
 
 export const getOrganizationOverview = cache(async function getOrganizationOverview(

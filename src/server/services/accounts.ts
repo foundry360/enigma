@@ -265,7 +265,10 @@ export async function deleteAccount(input: {
 export async function listTenantConnections(tenantId: string) {
   const scoped = requireTenantId(tenantId);
   return sql<PlatformConnectionRow[]>`
-    select *
+    select
+      id, "tenantId", "organizationId", "platformType", status,
+      "externalOrgId", "externalOrgName", "instanceUrl",
+      "connectedAt", "createdAt", "updatedAt"
     from "PlatformConnection"
     where "tenantId" = ${scoped}
     order by "updatedAt" desc
@@ -275,7 +278,10 @@ export async function listTenantConnections(tenantId: string) {
 export async function listConnections(tenantId: string, organizationId: string) {
   const scoped = requireTenantId(tenantId);
   return sql<PlatformConnectionRow[]>`
-    select *
+    select
+      id, "tenantId", "organizationId", "platformType", status,
+      "externalOrgId", "externalOrgName", "instanceUrl",
+      "connectedAt", "createdAt", "updatedAt"
     from "PlatformConnection"
     where "tenantId" = ${scoped} and "organizationId" = ${organizationId}
     order by "updatedAt" desc

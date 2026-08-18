@@ -17,6 +17,15 @@ describe("projectProgress", () => {
     });
   });
 
+  it("stays in Discover for a draft or failed run", () => {
+    expect(
+      projectProgress({ connected: true, assessmentStatus: "DRAFT" }),
+    ).toMatchObject({
+      current: "Discover",
+      completed: 1,
+    });
+  });
+
   it("moves to Assess while discovery is in progress", () => {
     expect(
       projectProgress({ connected: true, assessmentStatus: "DISCOVERING" }),

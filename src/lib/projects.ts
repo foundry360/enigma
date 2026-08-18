@@ -60,11 +60,13 @@ export function projectProgress(input: {
   connected: boolean;
   assessmentStatus?: string | null;
 }) {
+  const status = input.assessmentStatus;
+  const notStarted = !status || status === "DRAFT" || status === "FAILED";
   const completed = !input.connected
     ? 0
-    : !input.assessmentStatus
+    : notStarted
       ? 1
-      : input.assessmentStatus === "COMPLETE"
+      : status === "COMPLETE"
         ? 3
         : 2;
   const current = projectPhases[Math.min(completed, projectPhases.length - 1)];

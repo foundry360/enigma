@@ -18,6 +18,7 @@ Required Connected App settings:
 - Callback URL: `{APP_URL}/api/connectors/salesforce/callback`
 - Selected OAuth scopes: `api`, `refresh_token`, `id`
 - Require secret for Web Server flow
+- Refresh Token Policy: expire if unused for 30 days (not immediately). Salesforce no longer offers “valid until revoked.” Enigma persists rotated refresh tokens.
 
 `api` can read records. Enigma must not. There is no metadata-only Salesforce scope; the adapter and MCP allowlist are the control.
 
@@ -52,7 +53,7 @@ Metadata-first. Org **shape**, not customer **rows**.
 
 | Need | API | Endpoint / type |
 | --- | --- | --- |
-| Org identity | REST | `/services/oauth2/userinfo` and Organization describe |
+| Org identity | REST | `/services/oauth2/userinfo` and allowlisted `Organization` query (`Name` from Company Information) |
 | Object inventory | REST | `/services/data/v61.0/sobjects/` |
 | Object/field/record-type shape | REST | `/sobjects/{name}/describe` |
 | Flows | Tooling | `FlowDefinition`, `Flow` |

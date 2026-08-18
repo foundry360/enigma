@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
+import { SalesforceConnections } from "@/components/accounts/salesforce-connections";
 import { PageFrame } from "@/components/ui/page-frame";
 import { requireSession } from "@/lib/auth/session";
-import { formatDate } from "@/lib/format";
+import { isSalesforceConfigured } from "@/modules/connectors/salesforce";
 import { getOrganizationOverview } from "@/server/services/organization-overview";
 
 export default async function OrganizationPlatformsPage({
@@ -21,34 +21,20 @@ export default async function OrganizationPlatformsPage({
   return (
     <PageFrame
       title="Platforms"
-      description="Platforms are technology systems used by this organization. Salesforce is one adapter, not the organization."
+      description="Connect a Salesforce org to inventory objects, fields, and automations. Enigma does not pull customer records."
     >
-      {overview.landscape.length === 0 ? (
-        <p className="text-sm text-muted">
-          No platforms connected. Connect your first platform to begin building
-          the organization&apos;s technology landscape.
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {overview.landscape.map((platform) => (
-            <li
-              key={platform.platformType}
-              className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2.5 text-sm"
-            >
-              <div>
-                <p className="font-medium">{platform.name}</p>
-                <p className="mt-0.5 text-xs text-muted">
-                  {platform.environments} environments
-                  {platform.lastSync
-                    ? ` · Last sync ${formatDate(platform.lastSync)}`
-                    : ""}
-                </p>
-              </div>
-              <Badge>{platform.status}</Badge>
-            </li>
-          ))}
-        </ul>
-      )}
+      <SalesforceConnections
+        organizationId={id}
+        configured={isSalesforceConfigured()}
+        connections={overview.connections.map((connection) => ({
+          id: connection.id,
+          platformType: connection.platformType,
+          status: connection.status,
+          externalOrgId: connection.externalOrgId,
+          externalOrgName: connection.externalOrgName,
+          updatedAt: connection.updatedAt,
+        }))}
+      />
     </PageFrame>
   );
 }

@@ -7,15 +7,22 @@ import { startProjectDiscovery } from "@/server/services/assessments";
 export async function startDiscoveryAction(formData: FormData) {
   const session = await requireSession();
   const projectId = String(formData.get("projectId") ?? "");
-  const assessment = await startProjectDiscovery({
+  const result = await startProjectDiscovery({
     tenantId: session.tenantId,
     userId: session.userId,
     projectId,
   });
 
-  if (!assessment) {
+  if ("error" in result && result.error === "not-found") {
     redirect("/dashboard");
   }
 
-  redirect(`/projects/${projectId}/assessments`);
+  if (
+    "error" in result &&
+    (result.error === "needs-connection" || result.error === "expired")
+  ) {
+    redirect(`/projects/${projectId}/connections?salesforce=expired`);
+  }
+
+  redirect(`/projects/${projectId}/intelligence`);
 }

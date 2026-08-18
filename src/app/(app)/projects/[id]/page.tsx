@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { startDiscoveryAction } from "@/app/actions/assessments";
+import { AssessmentRunForm } from "@/components/assessments/assessment-run-form";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonClassName } from "@/components/ui/button";
-import { ProjectIcon } from "@/components/ui/entity-icons";
+import { buttonClassName } from "@/components/ui/button";
 import { PriorityMark } from "@/components/ui/priority-mark";
 import { requireSession } from "@/lib/auth/session";
 import { formatDate, formatLastActivity } from "@/lib/format";
@@ -122,11 +121,16 @@ export default async function ProjectDetailsPage({
     owner,
     platforms,
     environments,
+    connections,
     assessment,
     assessments,
     activity,
     nextAction,
   } = overview;
+  const connectedOrg =
+    connections.find((connection) => connection.status === "CONNECTED") ??
+    connections[0] ??
+    null;
   const scopedPlatforms =
     platforms.length > 0
       ? platforms.map((platform) => platform.platformType)
@@ -152,8 +156,7 @@ export default async function ProjectDetailsPage({
     },
     discover: {
       title: `Start ${playbook}`,
-      detail:
-        "Discovery collects the evidence used for readiness and opportunities.",
+      detail: "Start a readiness assessment for the connected organization.",
       href: null,
     },
     continue: {
@@ -161,10 +164,10 @@ export default async function ProjectDetailsPage({
       detail: `${playbook} is in progress. Discovery and scoring are not finished.`,
       href: `/projects/${project.id}/assessments`,
     },
-    review: {
-      title: "Review assessment",
-      detail: `${playbook} is complete. Review findings before modeling value.`,
-      href: `/projects/${project.id}/assessments`,
+    prioritize: {
+      title: "Prioritize opportunities",
+      detail: `${playbook} is complete. Rank the opportunities before modeling value.`,
+      href: `/projects/${project.id}/opportunities`,
     },
   }[nextAction];
 
@@ -172,9 +175,8 @@ export default async function ProjectDetailsPage({
     <div className="space-y-4">
       <section className="overflow-hidden rounded-lg border border-border bg-surface">
         <div className="p-5 lg:p-6">
-          <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight">
-            <ProjectIcon size={26} />
-            <span className="truncate">{project.name}</span>
+          <h1 className="truncate text-2xl font-semibold tracking-tight">
+            {project.name}
           </h1>
         </div>
         <div className="grid border-t border-border lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,1fr)] lg:divide-x lg:divide-border">
@@ -190,10 +192,12 @@ export default async function ProjectDetailsPage({
                   Start
                 </Link>
               ) : (
-                <form action={startDiscoveryAction}>
-                  <input type="hidden" name="projectId" value={project.id} />
-                  <Button type="submit">Start</Button>
-                </form>
+                <AssessmentRunForm
+                  projectId={project.id}
+                  label="Start"
+                  orgName={connectedOrg?.externalOrgName}
+                  orgId={connectedOrg?.externalOrgId}
+                />
               )}
             </div>
             <p className="text-sm font-medium">{next.title}</p>
@@ -346,7 +350,7 @@ export default async function ProjectDetailsPage({
                 aria-hidden="true"
                 className="absolute bottom-2 left-[5px] top-2 w-px bg-border"
               />
-              {activity.map((event, index) => (
+              {activity.slice(0, 6).map((event, index) => (
                 <li key={event.id} className="relative flex gap-3">
                   <span
                     aria-hidden="true"

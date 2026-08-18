@@ -2,18 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
-const statusFilters = [
-  "DRAFT",
-  "DISCOVERING",
-  "ANALYZING",
-  "COMPLETE",
-  "FAILED",
-] as const;
+const statusFilters = ["COMPLETE", "FAILED"] as const;
 
 const statusLabels: Record<string, string> = {
-  DRAFT: "Draft",
-  DISCOVERING: "Discovering",
-  ANALYZING: "Analyzing",
   COMPLETE: "Complete",
   FAILED: "Failed",
 };

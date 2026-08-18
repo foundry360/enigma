@@ -85,50 +85,23 @@ export function ConnectionStatusMark({
   );
 }
 
+const projectDot: Record<string, string> = {
+  Planning: "#173e76",
+  Active: "#3ECF8E",
+  "On hold": "#F5C542",
+  Complete: "#3ECF8E",
+};
+
 export function ProjectStatusMark({ status }: { status: string }) {
-  const tone =
-    status === "Active" || status === "Complete"
-      ? "connected"
-      : status === "On hold"
-        ? "idle"
-        : "muted";
-  const icon =
-    status === "Active" || status === "Complete" ? (
-      <path d="m8 12 2.5 2.5L16 9" />
-    ) : status === "On hold" ? (
-      <>
-        <path d="M10 8v8" />
-        <path d="M14 8v8" />
-      </>
-    ) : (
-      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-    );
+  const color = projectDot[status] ?? "#173e76";
 
   return (
-    <span
-      title={status}
-      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
-        tone === "connected"
-          ? "border-connected text-connected"
-          : tone === "idle"
-            ? "border-amber-400 text-amber-400"
-            : "border-muted text-muted"
-      }`}
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+    <span title={status} className="inline-flex shrink-0 items-center">
+      <span
+        className="inline-block h-2 w-2 rounded-full"
+        style={{ backgroundColor: color }}
         aria-hidden="true"
-      >
-        {icon}
-      </svg>
+      />
       <span className="sr-only">{status}</span>
     </span>
   );
@@ -149,60 +122,25 @@ export function assessmentLabel(status: string) {
   );
 }
 
+const assessmentDot: Record<string, string> = {
+  COMPLETE: "#3ECF8E",
+  DISCOVERING: "#F5C542",
+  ANALYZING: "#F5C542",
+  DRAFT: "#F5C542",
+  FAILED: "#F16A50",
+};
+
 export function AssessmentStatusMark({ status }: { status: string }) {
   const label = assessmentLabel(status);
-  const tone =
-    status === "COMPLETE"
-      ? "connected"
-      : status === "FAILED"
-        ? "disconnected"
-        : status === "DISCOVERING" || status === "ANALYZING"
-          ? "idle"
-          : "muted";
-  const icon =
-    status === "COMPLETE" ? (
-      <path d="m8 12 2.5 2.5L16 9" />
-    ) : status === "FAILED" ? (
-      <>
-        <path d="M9 9 15 15" />
-        <path d="M15 9 9 15" />
-      </>
-    ) : status === "DISCOVERING" || status === "ANALYZING" ? (
-      <>
-        <path d="M10 8v8" />
-        <path d="M14 8v8" />
-      </>
-    ) : (
-      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-    );
+  const color = assessmentDot[status] ?? "#F5C542";
 
   return (
-    <span
-      title={label}
-      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
-        tone === "connected"
-          ? "border-connected text-connected"
-          : tone === "disconnected"
-            ? "border-red-500/70 text-red-500"
-            : tone === "idle"
-              ? "border-amber-400 text-amber-400"
-              : "border-muted text-muted"
-      }`}
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+    <span title={label} className="inline-flex shrink-0 items-center">
+      <span
+        className="inline-block h-2 w-2 rounded-full"
+        style={{ backgroundColor: color }}
         aria-hidden="true"
-      >
-        {icon}
-      </svg>
+      />
       <span className="sr-only">{label}</span>
     </span>
   );
