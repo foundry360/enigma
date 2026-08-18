@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { buttonClassName } from "@/components/ui/button";
 import type { CandidateConfidence, CandidateSignalRef } from "@/lib/db/types";
+import { strengthColors } from "@/components/ui/score-ring";
 
 export type OpportunityCandidateItem = {
   id: string;
@@ -49,7 +50,7 @@ export function OpportunityCandidates({
           >
             ▸
           </span>
-          <span className="text-sm font-semibold uppercase">
+          <span className="text-sm font-semibold">
             Opportunity candidates
           </span>
         </span>
@@ -85,14 +86,20 @@ export function OpportunityCandidates({
                   <ul className="mt-1 space-y-1">
                     {item.supportingSignals.map((signal) => (
                       <li key={signal.key}>
-                        {signal.strength === "weak" ? "⚠" : "✓"} {signal.title}
+                        <span
+                          style={{ color: strengthColors[signal.strength] }}
+                          aria-hidden="true"
+                        >
+                          {signal.strength === "weak" ? "⚠" : "✓"}
+                        </span>{" "}
+                        {signal.title}
                       </li>
                     ))}
                   </ul>
                 </div>
                 <div>
                   <p className="text-xs text-muted">
-                    Potential consumption drivers
+                    Consumption drivers
                   </p>
                   <p className="mt-1">{item.consumptionDrivers.join(", ")}</p>
                 </div>

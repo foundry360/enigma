@@ -68,16 +68,16 @@ export const opportunityCatalog: OpportunityDefinition[] = [
     ],
     watchSignals: ["writeback_control", "automation_collision", "access_surface"],
     consumptionDrivers: [
-      "Customer interactions",
-      "Agent sessions",
-      "Automated resolutions",
-      "Knowledge retrieval",
+      "Customer conversations the agent would answer or continue",
+      "Agent sessions opened against existing service work",
+      "Service requests resolved without a person taking the work",
+      "Knowledge retrieval used to ground each answer",
     ],
     valueDrivers: [
-      "Handle time",
-      "Resolution rate",
-      "Escalation reduction",
-      "Response time",
+      "Less time spent handling each service request",
+      "A higher share of work resolved on the first pass",
+      "Fewer cases escalated to a specialist or supervisor",
+      "Faster first response on inbound service work",
     ],
     constraints: [
       "Existing automation may collide with agent writes",
@@ -105,8 +105,15 @@ export const opportunityCatalog: OpportunityDefinition[] = [
     recommendedCapability: "Grounded Q&A",
     requiredSignals: ["grounded_answers", "access_surface"],
     watchSignals: ["writeback_control", "addressable_work"],
-    consumptionDrivers: ["Retrieval turns", "Agent sessions"],
-    valueDrivers: ["Handle time", "Human touches", "Productivity"],
+    consumptionDrivers: [
+      "Retrieval turns against approved content",
+      "Agent sessions used to look up a trusted answer",
+    ],
+    valueDrivers: [
+      "Less time spent searching for a trusted answer",
+      "Fewer human touches to repeat the same explanation",
+      "More time back to the people who currently look this up by hand",
+    ],
     constraints: [
       "Stale or thin articles will show up as confident wrong answers",
       "Write-back should wait until retrieval is trusted",
@@ -131,8 +138,16 @@ export const opportunityCatalog: OpportunityDefinition[] = [
     recommendedCapability: "Guided workflow",
     requiredSignals: ["operating_path", "writeback_control"],
     watchSignals: ["automation_collision", "addressable_work"],
-    consumptionDrivers: ["Actions", "Workflow runs", "Records processed"],
-    valueDrivers: ["Automation volume", "Handle time", "Human touches"],
+    consumptionDrivers: [
+      "Actions the agent takes on a record",
+      "Workflow runs that complete a step in the path",
+      "Records processed through the guided path",
+    ],
+    valueDrivers: [
+      "More of the repeatable path completed without a person",
+      "Less time spent moving work to the next step",
+      "Fewer human touches to keep the process moving",
+    ],
     constraints: [
       "Dense automation can turn the agent into a shadow process",
       "Assignment and SLAs may still be informal",

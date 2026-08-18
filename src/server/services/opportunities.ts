@@ -6,7 +6,10 @@ import type {
   ProjectOpportunityRow,
 } from "@/lib/db/types";
 import { toUtcDate } from "@/lib/format";
-import { hydrateCandidateDrafts } from "@/modules/intelligence/opportunities";
+import {
+  hydrateCandidateDrafts,
+  opportunityDefinition,
+} from "@/modules/intelligence/opportunities";
 import { requireTenantId } from "@/lib/tenants/scope";
 import { writeAuditLog } from "@/server/services/audit";
 import { getAssessmentDetail } from "@/server/services/assessments";
@@ -20,6 +23,21 @@ function withUtc<T extends { createdAt: Date; updatedAt?: Date }>(row: T): T {
     ...row,
     createdAt: toUtcDate(row.createdAt),
     ...(row.updatedAt ? { updatedAt: toUtcDate(row.updatedAt) } : {}),
+  };
+}
+
+function withCatalogCopy(row: OpportunityCandidateRow): OpportunityCandidateRow {
+  const definition = opportunityDefinition(row.key);
+  if (!definition) {
+    return row;
+  }
+
+  return {
+    ...row,
+    consumptionDrivers: definition.consumptionDrivers,
+    valueDrivers: definition.valueDrivers,
+    constraints: definition.constraints,
+    dependencies: definition.dependencies,
   };
 }
 
@@ -113,7 +131,7 @@ export async function listCandidatesForAssessment(
     where "tenantId" = ${scoped} and "assessmentId" = ${assessmentId}
     order by "createdAt"
   `;
-  return rows.map(withUtc);
+  return rows.map(withUtc).map(withCatalogCopy);
 }
 
 export async function listProjectCandidates(tenantId: string, projectId: string) {
@@ -124,7 +142,7 @@ export async function listProjectCandidates(tenantId: string, projectId: string)
     where "tenantId" = ${scoped} and "projectId" = ${projectId}
     order by "updatedAt" desc
   `;
-  return rows.map(withUtc);
+  return rows.map(withUtc).map(withCatalogCopy);
 }
 
 export async function getOpportunityCandidate(
@@ -138,7 +156,7 @@ export async function getOpportunityCandidate(
     where "tenantId" = ${scoped} and id = ${candidateId}
     limit 1
   `;
-  return row ? withUtc(row) : null;
+  return row ? withCatalogCopy(withUtc(row)) : null;
 }
 
 export async function setCandidateLifecycle(input: {
@@ -158,14 +176,34 @@ export async function setCandidateLifecycle(input: {
 
   const scoped = requireTenantId(input.tenantId);
   const promoted = input.status === "promoted";
+  const existing = await getOpportunityByCandidate(input.tenantId, candidate.id);
+
+  if (existing && !promoted) {
+    await sql`
+      delete from "ProjectOpportunity"
+      where "tenantId" = ${scoped} and id = ${existing.id}
+    `;
+    await writeAuditLog({
+      tenantId: input.tenantId,
+      userId: input.userId,
+      action: "opportunity.delete",
+      entity: "ProjectOpportunity",
+      entityId: existing.id,
+      metadata: {
+        projectId: candidate.projectId,
+        candidateId: candidate.id,
+        reason: input.status,
+      },
+    });
+  }
 
   await sql`
     update "OpportunityCandidate"
     set
       status = ${input.status},
       "rejectionReason" = ${input.rejectionReason ?? candidate.rejectionReason},
-      "promotedAt" = case when ${promoted} then now() else "promotedAt" end,
-      "promotedBy" = case when ${promoted} then ${input.userId} else "promotedBy" end,
+      "promotedAt" = case when ${promoted} then now() else null end,
+      "promotedBy" = case when ${promoted} then ${input.userId} else null end,
       "updatedAt" = now()
     where "tenantId" = ${scoped} and id = ${candidate.id}
   `;
@@ -184,7 +222,6 @@ export async function setCandidateLifecycle(input: {
     return { candidate: next ?? candidate };
   }
 
-  const existing = await getOpportunityByCandidate(input.tenantId, candidate.id);
   if (existing) {
     return { candidate, opportunity: existing };
   }

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
+import { intelligenceHref } from "@/lib/intelligence/routes";
 import {
   setOpportunityCandidateStatus,
   startProjectDiscovery,
@@ -55,5 +56,7 @@ export async function setCandidateStatusAction(formData: FormData) {
     return;
   }
 
-  redirect(`/projects/${result.assessment.projectId}/opportunities`);
+  redirect(
+    intelligenceHref(result.assessment.projectId, "opportunities"),
+  );
 }

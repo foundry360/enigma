@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import { AssessmentRunForm } from "@/components/assessments/assessment-run-form";
-import { OpportunityCandidates } from "@/components/intelligence/opportunity-candidates";
+import { IntelligencePane } from "@/components/intelligence/intelligence-pane";
 import { ReadinessCategories } from "@/components/intelligence/readiness-categories";
-import { ScoreRing } from "@/components/ui/score-ring";
+import { ScoreRing, strengthColors } from "@/components/ui/score-ring";
 import { requireSession } from "@/lib/auth/session";
 import { formatDateTime } from "@/lib/format";
 import { splitSignalCopy } from "@/modules/intelligence/signals";
@@ -72,25 +71,21 @@ export default async function ProjectIntelligencePage({
   ];
 
   return (
-    <div className="space-y-4">
+    <IntelligencePane scroll>
       <section className="overflow-hidden rounded-lg border border-border bg-surface">
-        <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between lg:p-6">
-          <h1 className="truncate text-2xl font-semibold tracking-tight">
-            Intelligence
-          </h1>
-          <AssessmentRunForm
-            projectId={id}
-            label={complete ? "Run again" : "Run intelligence"}
-            orgName={org?.name}
-            orgId={org?.orgId}
-          />
-        </div>
-        <div className="grid gap-6 border-t border-border p-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:p-6">
-          <div className="flex min-h-56 items-center justify-center gap-5 rounded-md border border-border bg-background px-4">
+        <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:p-6">
+          <div className="flex items-center justify-center gap-5 rounded-md border border-border bg-background px-4 py-6">
             <ScoreRing score={strength} size="xl" showBadge={false} />
             <div className="min-w-0">
-              <p className="text-sm font-semibold">Signal strength</p>
-              <p className="mt-1 text-sm text-muted">
+              <p className="text-sm font-semibold">Signal Strength</p>
+              <p
+                className={`mt-1 text-sm ${strength == null ? "text-muted" : ""}`}
+                style={
+                  strength == null
+                    ? undefined
+                    : { color: strengthColors[signalState(strength)] }
+                }
+              >
                 {strength == null ? "—" : stateLabel[signalState(strength)]}
               </p>
             </div>
@@ -110,7 +105,7 @@ export default async function ProjectIntelligencePage({
             </MetaRow>
             <MetaRow label="Facts">{detail?.traces.length ?? 0}</MetaRow>
             <MetaRow label="Signals">{complete ? signals.length : 0}</MetaRow>
-            <MetaRow label="Opportunity Candidates">
+            <MetaRow label="Opportunities">
               {complete ? candidates.length : 0}
             </MetaRow>
           </dl>
@@ -135,29 +130,13 @@ export default async function ProjectIntelligencePage({
             };
           })}
         />
-      ) : null}
-
-      {complete && candidates.length > 0 ? (
-        <OpportunityCandidates
-          items={candidates.map((candidate) => ({
-            id: candidate.id,
-            title: candidate.name,
-            description: candidate.description,
-            confidence: candidate.confidence,
-            status: candidate.status,
-            supportingSignals: candidate.supportingSignals,
-            consumptionDrivers: candidate.consumptionDrivers,
-            valueDrivers: candidate.valueDrivers,
-            reviewHref: `/projects/${id}/opportunities?candidate=${candidate.id}`,
-          }))}
-        />
       ) : !complete ? (
         <p className="rounded-lg border border-border bg-surface px-4 py-8 text-center text-sm text-muted">
           Run intelligence to see what Enigma can determine from the connected
           environment.
         </p>
       ) : null}
-    </div>
+    </IntelligencePane>
   );
 }
 

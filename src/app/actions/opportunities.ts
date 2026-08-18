@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
 import type { CandidateStatus } from "@/lib/db/types";
+import { intelligenceHref } from "@/lib/intelligence/routes";
 import { setCandidateLifecycle } from "@/server/services/opportunities";
 
 export async function updateCandidateAction(formData: FormData) {
@@ -34,8 +35,14 @@ export async function updateCandidateAction(formData: FormData) {
   }
 
   if (result.opportunity) {
-    redirect(`/projects/${projectId}/opportunities?opportunity=${result.opportunity.id}`);
+    redirect(
+      intelligenceHref(projectId, "opportunities", {
+        opportunity: result.opportunity.id,
+      }),
+    );
   }
 
-  redirect(`/projects/${projectId}/opportunities?candidate=${candidateId}`);
+  redirect(
+    intelligenceHref(projectId, "opportunities", { candidate: candidateId }),
+  );
 }

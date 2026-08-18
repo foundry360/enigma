@@ -51,7 +51,7 @@ export function OpportunityBoard({
   return (
     <div className="grid gap-4 xl:grid-cols-[30%_minmax(0,1fr)]">
       <section className="rounded-lg border border-border bg-surface p-5">
-        <h2 className="mb-3 text-sm font-semibold uppercase">Candidates</h2>
+        <h2 className="mb-3 text-sm font-semibold">Candidates</h2>
         <div className="space-y-1">
           {items.map((item, index) => {
             const active = item.id === selected.id;
@@ -65,7 +65,7 @@ export function OpportunityBoard({
                 onClick={() => setSelectedId(item.id)}
                 aria-pressed={active}
                 className={`w-full rounded-md px-3 py-2.5 text-left transition-colors ${
-                  active ? "bg-surface-2" : "hover:bg-surface-2/60"
+                  active ? "bg-surface-selected" : "hover:bg-surface-2/60"
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">

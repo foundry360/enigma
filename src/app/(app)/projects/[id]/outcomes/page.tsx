@@ -1,4 +1,5 @@
-import { ProjectPlaceholderPage } from "@/components/projects/project-placeholder-page";
+import { redirect } from "next/navigation";
+import { intelligenceHref } from "@/lib/intelligence/routes";
 
 export default async function ProjectOutcomesPage({
   params,
@@ -6,12 +7,5 @@ export default async function ProjectOutcomesPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-
-  return (
-    <ProjectPlaceholderPage
-      projectId={id}
-      title="Outcomes"
-      description="Realized consumption versus forecast will land here after the model exists."
-    />
-  );
+  redirect(intelligenceHref(id, "outcomes"));
 }

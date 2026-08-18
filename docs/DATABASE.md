@@ -4,7 +4,7 @@ Provider: Supabase Postgres only (project `ppceqvoyexpkguzeseen`, `us-east-2`). 
 
 - `DATABASE_URL` uses the transaction pooler (`:6543`, `pgbouncer=true`).
 - `DIRECT_URL` uses session mode on the pooler (`:5432`) for migrations.
-- Enigma tables have RLS enabled and grants revoked from `anon` / `authenticated`. The Next.js app talks to Postgres as the database owner, not through PostgREST. Do not query tenant tables with the anon key.
+- Enigma tables have RLS enabled and grants revoked from `anon` / `authenticated`. Bookkeeping tables in `public` (`schema_migrations`, leftover `_prisma_migrations`) are locked the same way. The Next.js app talks to Postgres as the database owner, not through PostgREST. Do not query tenant tables with the anon key.
 - `User.id` is the Supabase Auth user id. Passwords live in `auth.users`, not in Enigma tables.
 
 ## Sprint 1 entities

@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { RiskBadge, ScoreRing, riskColors } from "@/components/ui/score-ring";
+import {
+  RiskBadge,
+  ScoreRing,
+  riskColors,
+  strengthColors,
+} from "@/components/ui/score-ring";
 import { titleCase } from "@/lib/format";
 import { readinessRisk, signalState } from "@/modules/intelligence/score";
 
@@ -41,7 +46,7 @@ export function ReadinessCategories({
   return (
     <div className="grid gap-4 xl:grid-cols-[30%_minmax(0,1fr)]">
       <section className="rounded-lg border border-border bg-surface p-5">
-        <h2 className="mb-3 text-sm font-semibold uppercase">{title}</h2>
+        <h2 className="mb-3 text-sm font-semibold">{title}</h2>
         <div className="space-y-1">
           {items.map((item) => {
             const active = item.id === selected.id;
@@ -56,18 +61,29 @@ export function ReadinessCategories({
                 aria-pressed={active}
                 className={`w-full rounded-md px-3 py-2.5 text-left transition-colors ${
                   active
-                    ? "bg-surface-2"
+                    ? "bg-surface-selected"
                     : "hover:bg-surface-2/60"
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold">
+                  <p className="text-[13px] font-normal">
                     {titleCase(item.title)}
                   </p>
                   <p className="text-xs text-muted">
-                    {tone === "signal"
-                      ? `${stateLabel[signalState(item.score)]} · ${item.evidence.length}`
-                      : item.score}
+                    {tone === "signal" ? (
+                      <>
+                        <span
+                          style={{
+                            color: strengthColors[signalState(item.score)],
+                          }}
+                        >
+                          {stateLabel[signalState(item.score)]}
+                        </span>
+                        {` · ${item.evidence.length}`}
+                      </>
+                    ) : (
+                      item.score
+                    )}
                   </p>
                 </div>
                 <div
@@ -90,7 +106,7 @@ export function ReadinessCategories({
 
       <section className="rounded-lg border border-border bg-surface p-5">
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase">
+          <h2 className="text-sm font-semibold">
             {titleCase(selected.title)}
           </h2>
           {tone === "signal" ? (

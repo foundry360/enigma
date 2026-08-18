@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { CreateOrganizationProvider } from "@/components/accounts/create-organization-modal";
 import { AppHeader } from "@/components/layout/app-header";
@@ -43,6 +43,19 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const signed = isWorkspaceSigned(pathname, selectedAccountId);
+  const fillViewport = pathname.includes("/intelligence");
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const previousRoot = root.style.overflow;
+    const previousBody = document.body.style.overflow;
+    root.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = previousRoot;
+      document.body.style.overflow = previousBody;
+    };
+  }, []);
 
   return (
     <CreateOrganizationProvider>
@@ -54,7 +67,7 @@ export function AppShell({
         connections={connections}
       >
         <div
-          className={`min-h-full bg-background${signed ? "" : " workspace-unsigned"}`}
+          className={`h-dvh overflow-hidden bg-background${signed ? "" : " workspace-unsigned"}`}
         >
           <SyncSelectedOrganization
             projects={projects}
@@ -71,7 +84,15 @@ export function AppShell({
           />
           {signed ? <Sidebar /> : null}
           <div className="app-main">
-            <main className="w-full px-4 py-4 lg:px-6">{children}</main>
+            <main className="flex h-full min-h-0 w-full flex-col overflow-hidden px-4 py-4 lg:px-6">
+              <div
+                className={`flex min-h-0 flex-1 flex-col ${
+                  fillViewport ? "overflow-hidden" : "overflow-y-auto"
+                }`}
+              >
+                {children}
+              </div>
+            </main>
           </div>
         </div>
       </CreateProjectProvider>

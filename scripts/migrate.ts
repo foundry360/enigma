@@ -17,6 +17,8 @@ async function main() {
       applied_at timestamptz not null default now()
     )
   `;
+  await sql`alter table schema_migrations enable row level security`;
+  await sql`revoke all on table schema_migrations from anon, authenticated, public`;
 
   const dir = path.join(process.cwd(), "sql/migrations");
   const files = (await readdir(dir))

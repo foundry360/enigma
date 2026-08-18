@@ -1,5 +1,4 @@
 import { AvatarUpload } from "@/components/profile/avatar-upload";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { PageHeader } from "@/components/ui/page-header";
 import { SettingsRow } from "@/components/ui/settings-row";
 import { requireSession } from "@/lib/auth/session";
@@ -30,9 +29,6 @@ export default async function SettingsPage() {
         <SettingsRow title="Partner org">
           <p className="text-sm font-medium">{tenant?.name}</p>
           <p className="mt-0.5 font-mono text-xs text-muted">{tenant?.slug}</p>
-        </SettingsRow>
-        <SettingsRow title="Appearance" description="Saved in this browser.">
-          <ThemeToggle />
         </SettingsRow>
         <SettingsRow title="Authentication">
           <p className="text-sm">Supabase Auth</p>

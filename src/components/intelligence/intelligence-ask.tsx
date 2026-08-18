@@ -1,0 +1,172 @@
+"use client";
+
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { Send, Sparkles } from "lucide-react";
+import { askIntelligenceAction } from "@/app/actions/intelligence";
+import {
+  readAskChat,
+  writeAskChat,
+  type AskMessage,
+} from "@/components/intelligence/ask-store";
+
+export function IntelligenceAsk({
+  projectId,
+  assessmentId,
+  ready,
+  suggestions,
+}: {
+  projectId: string;
+  assessmentId: string | null;
+  ready: boolean;
+  suggestions: string[];
+}) {
+  const [messages, setMessages] = useState<AskMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [pending, startTransition] = useTransition();
+  const scroller = useRef<HTMLDivElement>(null);
+  const restored = useRef(false);
+
+  useLayoutEffect(() => {
+    const stored = readAskChat(projectId, assessmentId);
+    setMessages(stored.messages);
+    setInput(stored.input);
+    restored.current = true;
+  }, [projectId, assessmentId]);
+
+  useEffect(() => {
+    if (!restored.current) {
+      return;
+    }
+
+    writeAskChat(projectId, assessmentId, { messages, input });
+  }, [projectId, assessmentId, messages, input]);
+
+  useEffect(() => {
+    scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
+  }, [messages, pending]);
+
+  function send(question: string) {
+    const text = question.trim();
+    if (!text || !assessmentId || !ready || pending) {
+      return;
+    }
+
+    const history = messages.slice(-8);
+    setInput("");
+    setMessages((current) => [...current, { role: "user", content: text }]);
+
+    startTransition(async () => {
+      const result = await askIntelligenceAction({
+        projectId,
+        assessmentId,
+        question: text,
+        history,
+      });
+
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content:
+            result.answer ??
+            result.error ??
+            "I could not explain this run. Try a signal or candidate name.",
+        },
+      ]);
+    });
+  }
+
+  return (
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-ask">
+      <div className="border-b border-border px-5 py-4">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <Sparkles className="size-4 shrink-0" aria-hidden="true" />
+          Ask Enigma
+        </h2>
+      </div>
+
+      <div ref={scroller} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-ask-thread px-5 py-4">
+        {!ready ? (
+          <p className="text-sm text-muted">
+            Run intelligence to ask about what Enigma found in the connected
+            environment.
+          </p>
+        ) : messages.length === 0 ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted">
+              Ask about a business signal, a candidate, or why something did or
+              did not appear.
+            </p>
+            {suggestions.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                {suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    className="rounded-md border border-border px-3 py-2 text-left text-sm hover:bg-surface-2"
+                    onClick={() => send(suggestion)}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          messages.map((message, index) => (
+            <div
+              key={`${message.role}-${index}`}
+              className={
+                message.role === "user"
+                  ? "ml-6 rounded-md bg-accent px-3 py-2 text-sm text-accent-fg"
+                  : "mr-2 text-sm whitespace-pre-wrap"
+              }
+            >
+              {message.content}
+            </div>
+          ))
+        )}
+        {pending ? (
+          <p className="text-xs text-muted">Reading this run…</p>
+        ) : null}
+      </div>
+
+      <form
+        className="border-t border-border p-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          send(input);
+        }}
+      >
+        <label className="sr-only" htmlFor="intelligence-ask">
+          Ask about this intelligence run
+        </label>
+        <div className="relative">
+          <textarea
+            id="intelligence-ask"
+            rows={3}
+            value={input}
+            disabled={!ready || pending}
+            placeholder={ready ? "What can I help you with..." : "Run intelligence first"}
+            className="w-full resize-none rounded-md border border-border bg-background px-2.5 py-2 pr-12 text-sm text-foreground outline-none placeholder:text-placeholder focus:border-foreground disabled:opacity-60"
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                send(input);
+              }
+            }}
+          />
+          <button
+            type="submit"
+            disabled={!ready || pending || !input.trim()}
+            aria-label="Send"
+            className="absolute right-2 bottom-2 inline-flex size-8 items-center justify-center rounded-md text-muted hover:text-foreground disabled:opacity-60"
+          >
+            <Send className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      </form>
+    </aside>
+  );
+}

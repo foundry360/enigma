@@ -223,3 +223,32 @@ export type ProjectOpportunityRow = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type BusinessCaseScenario =
+  | "conservative"
+  | "expected"
+  | "aggressive";
+
+export type BusinessCaseRow = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  scenario: BusinessCaseScenario;
+  monthsAccelerated: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type BusinessCaseLineRow = {
+  id: string;
+  tenantId: string;
+  businessCaseId: string;
+  opportunityId: string;
+  annualVolume: number | null;
+  unitPrice: number | null;
+  hoursSavedPerUnit: number | null;
+  hourlyCost: number | null;
+  implementationCost: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+};

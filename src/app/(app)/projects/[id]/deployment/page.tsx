@@ -1,4 +1,5 @@
-import { ProjectPlaceholderPage } from "@/components/projects/project-placeholder-page";
+import { redirect } from "next/navigation";
+import { intelligenceHref } from "@/lib/intelligence/routes";
 
 export default async function ProjectDeploymentPage({
   params,
@@ -6,12 +7,5 @@ export default async function ProjectDeploymentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-
-  return (
-    <ProjectPlaceholderPage
-      projectId={id}
-      title="Deployment"
-      description="Roadmap and rollout tracking are not implemented yet."
-    />
-  );
+  redirect(intelligenceHref(id, "deployment"));
 }

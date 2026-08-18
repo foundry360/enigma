@@ -113,6 +113,26 @@ export function formatTimeAgo(value: Date | string | null | undefined) {
   return years === 1 ? "1 year ago" : `${years} years ago`;
 }
 
+export function formatCurrency(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+export function formatMultiple(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  return `${value.toFixed(1)}x`;
+}
+
 export function formatLastActivity(value: Date | string | null) {
   if (!value) {
     return "No activity yet";

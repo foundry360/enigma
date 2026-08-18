@@ -1,4 +1,5 @@
-import { ProjectPlaceholderPage } from "@/components/projects/project-placeholder-page";
+import { redirect } from "next/navigation";
+import { intelligenceHref } from "@/lib/intelligence/routes";
 
 export default async function ProjectBusinessCasePage({
   params,
@@ -6,12 +7,5 @@ export default async function ProjectBusinessCasePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-
-  return (
-    <ProjectPlaceholderPage
-      projectId={id}
-      title="Business Case"
-      description="Consumption scenarios, ROC, and ROA are not built yet."
-    />
-  );
+  redirect(intelligenceHref(id, "business-case"));
 }

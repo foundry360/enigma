@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { logout } from "@/app/actions/auth";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Avatar } from "@/components/ui/avatar";
 
 export function ProfileMenu({
@@ -65,6 +66,10 @@ export function ProfileMenu({
           <div className="px-2.5 py-2">
             <p className="truncate text-sm font-medium">{userName}</p>
             <p className="truncate text-xs text-muted">{tenantName}</p>
+          </div>
+          <div className="my-1 border-t border-border" />
+          <div className="px-1.5 py-1.5">
+            <ThemeToggle />
           </div>
           <div className="my-1 border-t border-border" />
           <Link

@@ -167,7 +167,7 @@ export default async function ProjectDetailsPage({
     prioritize: {
       title: "Prioritize opportunities",
       detail: "Review opportunity candidates from the latest intelligence run.",
-      href: `/projects/${project.id}/opportunities`,
+      href: `/projects/${project.id}/intelligence/opportunities`,
     },
   }[nextAction];
 

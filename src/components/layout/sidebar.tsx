@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home } from "lucide-react";
+import { Activity, Home } from "lucide-react";
 import { clearSelectedOrganizationAction } from "@/app/actions/accounts";
 import { ProjectIcon } from "@/components/ui/entity-icons";
 import {
@@ -79,50 +79,7 @@ function ConnectionsIcon() {
 
 function IntelligenceIcon() {
   return (
-    <Icon>
-      <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
-      <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
-      <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" />
-    </Icon>
-  );
-}
-
-function OpportunitiesIcon() {
-  return (
-    <Icon>
-      <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
-      <path d="M9 18h6" />
-      <path d="M10 22h4" />
-    </Icon>
-  );
-}
-
-function BusinessCaseIcon() {
-  return (
-    <Icon>
-      <rect width="20" height="14" x="2" y="7" rx="2" />
-      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-    </Icon>
-  );
-}
-
-function DeploymentIcon() {
-  return (
-    <Icon>
-      <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
-      <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
-      <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
-      <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
-    </Icon>
-  );
-}
-
-function OutcomesIcon() {
-  return (
-    <Icon>
-      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-      <polyline points="16 7 22 7 22 13" />
-    </Icon>
+    <Activity size={18} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
   );
 }
 
@@ -197,30 +154,6 @@ function projectNavContext(pathname: string) {
         href: `/projects/${projectId}/assessments`,
         label: "Run History",
         icon: AssessmentsIcon,
-        exact: false,
-      },
-      {
-        href: `/projects/${projectId}/opportunities`,
-        label: "Opportunities",
-        icon: OpportunitiesIcon,
-        exact: false,
-      },
-      {
-        href: `/projects/${projectId}/business-case`,
-        label: "Business Case",
-        icon: BusinessCaseIcon,
-        exact: false,
-      },
-      {
-        href: `/projects/${projectId}/deployment`,
-        label: "Deployment",
-        icon: DeploymentIcon,
-        exact: false,
-      },
-      {
-        href: `/projects/${projectId}/outcomes`,
-        label: "Outcomes",
-        icon: OutcomesIcon,
         exact: false,
       },
     ],
