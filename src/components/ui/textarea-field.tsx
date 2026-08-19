@@ -24,7 +24,7 @@ export function TextAreaField({
     <div
       className={
         horizontal
-          ? "grid grid-cols-[9.5rem_minmax(0,1fr)] items-start gap-x-3"
+          ? "grid grid-cols-[14rem_minmax(0,1fr)] items-start gap-x-3"
           : undefined
       }
     >
@@ -32,7 +32,7 @@ export function TextAreaField({
         htmlFor={inputId}
         className={
           horizontal
-            ? "pt-2 text-sm font-medium text-foreground"
+            ? "whitespace-nowrap pt-2 text-sm font-medium text-foreground"
             : "mb-1.5 block text-sm font-medium text-foreground"
         }
       >

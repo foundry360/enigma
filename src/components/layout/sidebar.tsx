@@ -182,9 +182,17 @@ export function Sidebar() {
   const projectNav = projectNavContext(pathname);
   const organizationNav = organizationNavContext(pathname);
   const menuId = useId();
+  const sidebarRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [preference, setPreference] = useState<SidebarPreference>("expanded");
+
+  useEffect(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && sidebarRef.current?.contains(active)) {
+      active.blur();
+    }
+  }, [pathname]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
@@ -226,7 +234,10 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="app-sidebar fixed bottom-0 left-0 top-12 hidden border-r border-sidebar-border bg-sidebar px-2 py-3 text-sidebar-fg md:flex md:flex-col">
+    <aside
+      ref={sidebarRef}
+      className="app-sidebar fixed bottom-0 left-0 top-12 hidden border-r border-sidebar-border bg-sidebar px-2 py-3 text-sidebar-fg md:flex md:flex-col"
+    >
       <nav className="flex flex-1 flex-col gap-[6.5px]">
         {nav.map((item) => (
           <NavLink

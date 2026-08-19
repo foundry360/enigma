@@ -26,7 +26,10 @@ import { SelectField } from "@/components/ui/select-field";
 import { TextAreaField } from "@/components/ui/textarea-field";
 import { ProjectAdditionalFields } from "@/components/projects/project-additional-fields";
 import { ProjectEconomicsFields } from "@/components/projects/project-economics-fields";
-import { ProjectSection } from "@/components/projects/project-section";
+import {
+  ProjectSection,
+  ProjectSections,
+} from "@/components/projects/project-section";
 import { platformLabel } from "@/lib/platforms";
 import {
   DEFAULT_PROJECT_STATUS,
@@ -232,7 +235,7 @@ function CreateProjectModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-modal p-5 shadow-sm [&_input]:bg-modal [&_select]:bg-modal [&_textarea]:bg-modal"
+        className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg border border-border bg-modal p-5 shadow-sm [&_input]:bg-modal [&_select]:bg-modal [&_textarea]:bg-modal"
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
@@ -252,10 +255,11 @@ function CreateProjectModal({
           </button>
         </div>
         <form action={action} className="space-y-4">
-          <ProjectSection title="Project" defaultOpen>
+          <ProjectSections>
+          <ProjectSection title="Project">
             <Field
               layout="horizontal"
-              label="Project name"
+              label="Project Name"
               name="name"
               placeholder="Customer Service AI Transformation"
               required
@@ -278,7 +282,7 @@ function CreateProjectModal({
             </SelectField>
             <SelectField
               layout="horizontal"
-              label="Project type"
+              label="Project Type"
               name="projectType"
               defaultValue=""
               error={state?.errors?.projectType}
@@ -299,7 +303,7 @@ function CreateProjectModal({
               error={state?.errors?.objective}
             />
             <MultiSelectField
-              label="Desired outcomes"
+              label="Desired Outcomes"
               name="outcomes"
               options={primaryOutcomes}
               error={state?.errors?.outcomes}
@@ -310,7 +314,7 @@ function CreateProjectModal({
             {showOtherOutcome ? (
               <Field
                 layout="horizontal"
-                label="Other outcome"
+                label="Other Outcome"
                 name="outcomeOther"
                 placeholder="Describe the outcome"
                 error={state?.errors?.outcomeOther}
@@ -318,7 +322,7 @@ function CreateProjectModal({
             ) : null}
             <SelectField
               layout="horizontal"
-              label="Platform in scope"
+              label="Platform In Scope"
               name="platforms"
               defaultValue=""
               error={state?.errors?.platforms}
@@ -331,11 +335,11 @@ function CreateProjectModal({
               ))}
             </SelectField>
           </ProjectSection>
-          <ProjectEconomicsFields errors={state?.errors} />
+          <ProjectEconomicsFields assumptions={false} errors={state?.errors} />
           <ProjectSection title="Ownership">
             <SelectField
               layout="horizontal"
-              label="Project owner"
+              label="Project Owner"
               name="ownerId"
               defaultValue={currentUserId}
               error={state?.errors?.ownerId}
@@ -376,13 +380,14 @@ function CreateProjectModal({
             </SelectField>
             <Field
               layout="horizontal"
-              label="Target date"
+              label="Target Date"
               name="targetDate"
               type="date"
               error={state?.errors?.targetDate}
             />
           </ProjectSection>
           <ProjectAdditionalFields errors={state?.errors} />
+          </ProjectSections>
 
           {state?.message ? (
             <p className="text-sm text-accent">{state.message}</p>

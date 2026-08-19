@@ -46,7 +46,7 @@ export type LineAssumptions = {
 
 export type LineResult = {
   impacted: number;
-  consumption: number;
+  consumption: number | null;
   value: number;
   implementation: number;
 };
@@ -79,7 +79,6 @@ export type CaseInputs = {
 export function isLineComplete(line: LineAssumptions) {
   return (
     isPresent(line.annualVolume) &&
-    isPresent(line.unitPrice) &&
     isPresent(line.hoursSavedPerUnit) &&
     isPresent(line.hourlyCost)
   );
@@ -98,7 +97,9 @@ export function calculateLine(
 
   return {
     impacted,
-    consumption: impacted * (line.unitPrice as number),
+    consumption: isPresent(line.unitPrice)
+      ? impacted * line.unitPrice
+      : null,
     value:
       impacted *
       (line.hoursSavedPerUnit as number) *
@@ -143,7 +144,10 @@ export function rollUpCase(input: CaseInputs): CaseRollup {
   }
 
   const impacted = results.reduce((sum, line) => sum + line.impacted, 0);
-  const consumption = results.reduce((sum, line) => sum + line.consumption, 0);
+  const consumptionKnown = results.every((line) => line.consumption != null);
+  const consumption = consumptionKnown
+    ? results.reduce((sum, line) => sum + (line.consumption as number), 0)
+    : null;
   const value = results.reduce((sum, line) => sum + line.value, 0);
   const implementationReady = input.lines
     .filter(isLineComplete)
@@ -154,7 +158,7 @@ export function rollUpCase(input: CaseInputs): CaseRollup {
       : implementationReady
         ? results.reduce((sum, line) => sum + line.implementation, 0)
         : null;
-  const netAnnual = value - consumption;
+  const netAnnual = consumption == null ? value : value - consumption;
   const daysAccelerated =
     isPresent(input.baselineDays) &&
     isPresent(input.enigmaDays) &&
@@ -170,9 +174,13 @@ export function rollUpCase(input: CaseInputs): CaseRollup {
     implementation,
     operating: consumption,
     year1:
-      implementation == null ? null : implementation + consumption,
+      implementation == null || consumption == null
+        ? null
+        : implementation + consumption,
     threeYearCost:
-      implementation == null ? null : implementation + 3 * consumption,
+      implementation == null || consumption == null
+        ? null
+        : implementation + 3 * consumption,
     netAnnual,
     roi:
       implementation == null || implementation === 0
@@ -182,7 +190,8 @@ export function rollUpCase(input: CaseInputs): CaseRollup {
       implementation == null || netAnnual <= 0
         ? null
         : implementation / (netAnnual / 12),
-    roc: consumption === 0 ? null : value / consumption,
+    roc:
+      consumption == null || consumption === 0 ? null : value / consumption,
     roa:
       daysAccelerated == null
         ? null
@@ -201,7 +210,9 @@ export function caseGaps(input: {
   const gaps: string[] = [];
 
   if (!input.lines.some(isLineComplete)) {
-    gaps.push("Volume, unit price, hours saved, and hourly cost are required on at least one opportunity.");
+    gaps.push(
+      "Work per year, time on one today, and hourly labor cost are required on at least one opportunity.",
+    );
   }
 
   if (!isPresent(input.adoption)) {
@@ -249,7 +260,9 @@ export function fallbackRecommendation(input: {
 
   const roc = input.rollup.roc;
   const net = input.rollup.netAnnual ?? 0;
-  if (net <= 0 || roc == null || roc < 1) {
+  const hasConsumption =
+    input.rollup.consumption != null && input.rollup.consumption > 0;
+  if (net <= 0 || (hasConsumption && (roc == null || roc < 1))) {
     return "defer";
   }
 
@@ -258,7 +271,7 @@ export function fallbackRecommendation(input: {
     input.gaps.length > 0 ||
     input.rollup.implementation == null ||
     input.rollup.implementation === 0 ||
-    roc < 2
+    (hasConsumption && roc != null && roc < 2)
   ) {
     return "proceed_with_conditions";
   }

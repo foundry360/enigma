@@ -23,8 +23,8 @@ const briefing = {
     },
   ],
   assumptions: [
-    { label: "Annual volume", value: "1000", source: "Enigma Assumption" },
-    { label: "Unit price", value: "2", source: "Enigma Assumption" },
+    { label: "Annual volume", value: "1000", source: "Customer Provided" },
+    { label: "Unit price", value: "2", source: "Customer Provided" },
   ],
   rollup: {
     ...emptyRollup(),

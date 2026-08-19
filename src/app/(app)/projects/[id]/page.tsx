@@ -255,13 +255,9 @@ export default async function ProjectDetailsPage({
             </MetaRow>
             <MetaRow label="Owner">{owner?.name ?? "Unassigned"}</MetaRow>
             <MetaRow label="Status">
-              <Badge
-                tone={
-                  progress.completed >= 2 ? "connected" : "neutral"
-                }
-              >
+              <span className="inline-flex items-center rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-fg">
                 {progress.current}
-              </Badge>
+              </span>
             </MetaRow>
           </div>
           <div className="md:pl-6">

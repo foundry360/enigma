@@ -135,13 +135,8 @@ export function proposeCaseTiming(input: {
 
 export function assumptionSource(
   actual: number | null,
-  proposed: number,
-): "Enigma Assumption" | "Customer Provided" {
-  return actual != null && actual === proposed
-    ? "Enigma Assumption"
-    : actual == null
-      ? "Enigma Assumption"
-      : "Customer Provided";
+): "Customer Provided" | null {
+  return actual != null ? "Customer Provided" : null;
 }
 
 function strengthOf(

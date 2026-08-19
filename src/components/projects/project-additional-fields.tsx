@@ -20,7 +20,7 @@ export function ProjectAdditionalFields({
   errors?: Record<string, string[] | undefined>;
 }) {
   return (
-    <ProjectSection title="Additional details">
+    <ProjectSection title="Additional Details">
       <TextAreaField
         layout="horizontal"
         label="Description"
@@ -31,7 +31,7 @@ export function ProjectAdditionalFields({
       />
       <Field
         layout="horizontal"
-        label="Business unit"
+        label="Business Unit"
         name="businessUnit"
         defaultValue={defaults?.businessUnit ?? ""}
         error={errors?.businessUnit}
@@ -45,21 +45,21 @@ export function ProjectAdditionalFields({
       />
       <Field
         layout="horizontal"
-        label="Executive sponsor"
+        label="Executive Sponsor"
         name="executiveSponsor"
         defaultValue={defaults?.executiveSponsor ?? ""}
         error={errors?.executiveSponsor}
       />
       <Field
         layout="horizontal"
-        label="Customer lead"
+        label="Customer Lead"
         name="customerLead"
         defaultValue={defaults?.customerLead ?? ""}
         error={errors?.customerLead}
       />
       <TextAreaField
         layout="horizontal"
-        label="Success metrics"
+        label="Success Metrics"
         name="successMetrics"
         defaultValue={defaults?.successMetrics ?? ""}
         rows={2}

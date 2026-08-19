@@ -30,9 +30,11 @@ function percentValue(value: number | null | undefined) {
 export function ProjectEconomicsFields({
   defaults,
   errors,
+  assumptions = true,
 }: {
   defaults?: ProjectEconomicsValues;
   errors?: Record<string, string[] | undefined>;
+  assumptions?: boolean;
 }) {
   return (
     <>
@@ -69,7 +71,7 @@ export function ProjectEconomicsFields({
         />
         <Field
           layout="horizontal"
-          label="Change management"
+          label="Change Management"
           name="changeManagementCost"
           type="number"
           min={0}
@@ -98,102 +100,124 @@ export function ProjectEconomicsFields({
           error={errors?.otherCost}
         />
       </ProjectSection>
-      <ProjectSection title="Assumptions">
+      {assumptions ? (
+      <ProjectSection
+        title="Assumptions"
+        description="Start with what you know. We’ll calculate the rest."
+      >
         <Field
           layout="horizontal"
-          label="Annual volume"
+          label="Work Per Year"
+          hint="How many cases, chats, tickets, or other interactions occur in a typical year?"
           name="annualVolume"
           type="number"
           min={0}
           step="1"
+          placeholder="e.g. 12000"
           defaultValue={numberValue(defaults?.annualVolume)}
           error={errors?.annualVolume}
         />
         <Field
           layout="horizontal"
-          label="Cost per unit"
+          label="Work Item Cost"
+          hint="What do you pay each time this happens? We’ll use this to forecast consumption."
           name="unitPrice"
           type="number"
           min={0}
           step="any"
+          placeholder="e.g. 1.25"
           defaultValue={numberValue(defaults?.unitPrice)}
-          hint="Working unit cost. Not official Salesforce pricing."
           error={errors?.unitPrice}
         />
         <Field
           layout="horizontal"
-          label="Hours saved / unit"
+          label="Hours On Work Item"
+          hint="How long does it typically take to handle one work item manually? Enter hours (15 minutes = 0.25)."
           name="hoursSavedPerUnit"
           type="number"
           min={0}
           step="any"
+          placeholder="e.g. 0.5"
           defaultValue={numberValue(defaults?.hoursSavedPerUnit)}
           error={errors?.hoursSavedPerUnit}
         />
         <Field
           layout="horizontal"
-          label="Hourly labor cost"
+          label="Labor Cost / Hour"
+          hint="What is the approximate hourly cost of the people who handle this work? A ballpark estimate is fine."
           name="hourlyCost"
           type="number"
           min={0}
           step="any"
+          placeholder="e.g. 85"
           defaultValue={numberValue(defaults?.hourlyCost)}
           error={errors?.hourlyCost}
         />
         <Field
           layout="horizontal"
-          label="Conservative adoption %"
+          label="Conservative Share %"
+          hint="What percentage of this work could an agent realistically handle, even if it isn't fully automated?"
           name="conservativeAdoption"
           type="number"
           min={0}
           max={100}
           step="1"
+          placeholder="e.g. 10"
           defaultValue={percentValue(defaults?.conservativeAdoption)}
           error={errors?.conservativeAdoption}
         />
         <Field
           layout="horizontal"
-          label="Expected adoption %"
+          label="Expected Share %"
+          hint="Based on your experience, what percentage would you realistically expect an agent to handle?"
           name="expectedAdoption"
           type="number"
           min={0}
           max={100}
           step="1"
+          placeholder="e.g. 20"
           defaultValue={percentValue(defaults?.expectedAdoption)}
           error={errors?.expectedAdoption}
         />
         <Field
           layout="horizontal"
-          label="Aggressive adoption %"
+          label="Aggressive Share %"
+          hint="If things go well, what percentage of this work could an agent realistically handle?"
           name="aggressiveAdoption"
           type="number"
           min={0}
           max={100}
           step="1"
+          placeholder="e.g. 30"
           defaultValue={percentValue(defaults?.aggressiveAdoption)}
           error={errors?.aggressiveAdoption}
         />
         <Field
           layout="horizontal"
-          label="Baseline days"
+          label="Days Without Enigma"
+          hint="If your team handled the implementation themselves, how long would it take to go live?"
           name="baselineDays"
           type="number"
           min={0}
           step="1"
+          placeholder="e.g. 180"
           defaultValue={numberValue(defaults?.baselineDays)}
           error={errors?.baselineDays}
         />
         <Field
           layout="horizontal"
-          label="Enigma-assisted days"
+          label="Days With Enigma"
+          hint="How quickly could you go live with our help?"
           name="enigmaDays"
           type="number"
           min={0}
           step="1"
+          placeholder="e.g. 60"
           defaultValue={numberValue(defaults?.enigmaDays)}
           error={errors?.enigmaDays}
         />
       </ProjectSection>
+      ) : null}
     </>
   );
 }

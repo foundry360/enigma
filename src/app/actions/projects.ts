@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
+import { intelligenceHref } from "@/lib/intelligence/routes";
 import { createProjectSchema, type AuthFormState } from "@/lib/validations/auth";
 import { getAccount } from "@/server/services/accounts";
+import { ensureBusinessCase } from "@/server/services/business-case";
 import {
   createProject,
   deleteProject,
@@ -170,7 +172,10 @@ export async function updateProjectAction(
     return { message: "Project not found." };
   }
 
+  await ensureBusinessCase(session.tenantId, project.id);
   revalidatePath("/", "layout");
+  revalidatePath(intelligenceHref(project.id, "business-case"));
+  revalidatePath(intelligenceHref(project.id));
   if (String(formData.get("fromModal") ?? "") === "1") {
     return { ok: true };
   }

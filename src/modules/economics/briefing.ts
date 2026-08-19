@@ -69,7 +69,8 @@ export function toBusinessCaseBriefing(input: {
       {
         label: "Adoption",
         value: input.adoption == null ? "Insufficient data" : String(input.adoption),
-        source: "Enigma Assumption",
+        source:
+          input.adoption == null ? "Needed" : "Customer Provided",
       },
       ...input.opportunities.flatMap((item) => [
         {
@@ -78,13 +79,15 @@ export function toBusinessCaseBriefing(input: {
             item.annualVolume == null
               ? "Insufficient data"
               : String(item.annualVolume),
-          source: "Enigma Assumption",
+          source:
+            item.annualVolume == null ? "Needed" : "Customer Provided",
         },
         {
-          label: `${item.name} unit price`,
+          label: `${item.name} work item cost`,
           value:
-            item.unitPrice == null ? "Insufficient data" : String(item.unitPrice),
-          source: "Enigma Assumption",
+            item.unitPrice == null ? "Not provided" : String(item.unitPrice),
+          source:
+            item.unitPrice == null ? "Optional" : "Customer Provided",
         },
       ]),
     ],
@@ -131,7 +134,7 @@ export function fallbackNarratives(briefing: BusinessCaseBriefing) {
   const names = briefing.opportunities.map((item) => item.name).join(", ");
   const recommendation = briefing.rollup.complete
     ? `${recommendationLabel[briefing.recommendationState]}. The calculated model uses inherited intelligence from ${names || "the promoted opportunities"} and the customer assumptions that are present. Missing inputs stay blank.`
-    : "Do Not Proceed until volume, unit price, hours saved, and hourly cost are present on at least one opportunity. Enigma will not invent those numbers.";
+    : "Do Not Proceed until work per year, time on one today, and hourly labor cost are present on at least one opportunity. Enigma will not invent those numbers.";
 
   const intelligence = briefing.opportunities
     .map((item) => {

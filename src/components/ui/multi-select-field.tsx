@@ -54,8 +54,8 @@ export function MultiSelectField({
         : `${selected.length} selected`;
 
   return (
-    <div className="grid grid-cols-[9.5rem_minmax(0,1fr)] items-start gap-x-3">
-      <label htmlFor={inputId} className="pt-2 text-sm font-medium">
+    <div className="grid grid-cols-[14rem_minmax(0,1fr)] items-start gap-x-3">
+      <label htmlFor={inputId} className="whitespace-nowrap pt-2 text-sm font-medium">
         {label}
       </label>
       <div ref={rootRef} className="relative">

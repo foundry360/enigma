@@ -44,7 +44,7 @@ export function consumptionPosture(input: {
 }): ConsumptionPosture {
   const known = postures[input.key] ?? {
     driver: "Agent conversations",
-    unitHint: "Volume is usage, not licenses. Set unit price as a customer assumption.",
+    unitHint: "Volume is usage, not licenses. A consumption price is optional.",
   };
 
   return {

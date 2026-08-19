@@ -41,7 +41,7 @@ export function EditProjectModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-10 max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-modal p-5 shadow-sm [&_input]:bg-modal [&_select]:bg-modal [&_textarea]:bg-modal"
+        className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg border border-border bg-modal p-5 shadow-sm [&_input]:bg-modal [&_select]:bg-modal [&_textarea]:bg-modal"
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>

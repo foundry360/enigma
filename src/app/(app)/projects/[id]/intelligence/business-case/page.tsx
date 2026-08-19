@@ -28,7 +28,6 @@ export default async function IntelligenceBusinessCasePage({
       {detail ? (
         <BusinessCasePanel
           projectId={id}
-          projectName={overview.project.name}
           projectInvestment={{
             discovery: overview.project.discoveryCost,
             implementation: overview.project.implementationCost,

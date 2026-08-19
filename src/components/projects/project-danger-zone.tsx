@@ -33,7 +33,7 @@ export function ProjectDangerZone({
               <input type="hidden" name="projectId" value={projectId} />
               <div className="min-w-0 flex-1">
                 <Field
-                  label="Confirm name"
+                  label="Confirm Name"
                   name="confirmName"
                   placeholder={name}
                   value={confirmName}

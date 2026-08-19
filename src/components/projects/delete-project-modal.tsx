@@ -57,7 +57,7 @@ export function DeleteProjectModal({
           <input type="hidden" name="projectId" value={projectId} />
           <input type="hidden" name="returnTo" value={pathname} />
           <Field
-            label="Project name"
+            label="Project Name"
             name="confirmName"
             placeholder={name}
             value={confirmName}

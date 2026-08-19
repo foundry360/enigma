@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { EnvironmentConnectionButton } from "@/components/accounts/environment-connection-button";
 import { CreateProjectButton } from "@/components/projects/create-project-modal";
 import { Badge } from "@/components/ui/badge";
 import { buttonClassName } from "@/components/ui/button";
-import { connectionLabel } from "@/components/ui/status-dot";
 import { requireSession } from "@/lib/auth/session";
 import { formatDate, formatLastActivity } from "@/lib/format";
 import { platformLabel } from "@/lib/platforms";
@@ -228,7 +228,7 @@ export default async function OrganizationOverviewPage({
 
         <Card
           title="Projects"
-          action={<span className="text-xs text-muted">{projects.length}</span>}
+          action={<Badge>{projects.length}</Badge>}
         >
           {projects.length === 0 ? (
             <div className="flex min-h-40 flex-col items-center justify-center text-center">
@@ -267,12 +267,12 @@ export default async function OrganizationOverviewPage({
                 instance such as production or sandbox, not the organization
                 itself.
               </Empty>
-              <Link
-                href={`/accounts/${id}/platforms`}
-                className={buttonClassName("secondary", "mt-3")}
+              <a
+                href={`/api/connectors/salesforce/start?organizationId=${id}&returnTo=/accounts/${id}`}
+                className={buttonClassName("primary", "mt-3")}
               >
-                Platforms
-              </Link>
+                Connect
+              </a>
             </div>
           ) : (
             <ul className="space-y-2">
@@ -304,15 +304,11 @@ export default async function OrganizationOverviewPage({
                       </p>
                     </div>
                   </div>
-                  <Badge
-                    tone={
-                      connection.status === "CONNECTED"
-                        ? "connected"
-                        : "neutral"
-                    }
-                  >
-                    {connectionLabel(connection.status)}
-                  </Badge>
+                  <EnvironmentConnectionButton
+                    organizationId={id}
+                    connectionId={connection.id}
+                    connected={connection.status === "CONNECTED"}
+                  />
                 </li>
               ))}
             </ul>

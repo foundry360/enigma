@@ -30,12 +30,54 @@ describe("business case arithmetic", () => {
     expect(JSON.stringify(defaultAdoption)).not.toMatch(/\$\d/);
   });
 
-  it("treats a line as incomplete until volume, price, hours, and rate exist", () => {
+  it("treats a line as incomplete until volume, time today, and labor rate exist", () => {
     expect(isLineComplete(completeLine)).toBe(true);
-    expect(isLineComplete({ ...completeLine, unitPrice: null })).toBe(false);
+    expect(isLineComplete({ ...completeLine, unitPrice: null })).toBe(true);
+    expect(isLineComplete({ ...completeLine, hoursSavedPerUnit: null })).toBe(
+      false,
+    );
     expect(calculateLine({ ...completeLine, hourlyCost: null }, 0.15)).toBe(
       null,
     );
+  });
+
+  it("calculates value without a consumption price and leaves consumption blank", () => {
+    expect(calculateLine({ ...completeLine, unitPrice: null }, 0.15)).toEqual({
+      impacted: 150,
+      consumption: null,
+      value: 3000,
+      implementation: 15000,
+    });
+
+    const rolled = rollUpCase({
+      lines: [{ ...completeLine, unitPrice: null }],
+      adoption: 0.15,
+      baselineDays: 180,
+      enigmaDays: 60,
+    });
+    expect(rolled.complete).toBe(true);
+    expect(rolled.consumption).toBeNull();
+    expect(rolled.value).toBe(3000);
+    expect(rolled.netAnnual).toBe(3000);
+    expect(rolled.roc).toBeNull();
+    expect(rolled.roa).toBe((3000 / 12) * (120 / 30));
+    expect(
+      caseGaps({
+        lines: [{ ...completeLine, unitPrice: null }],
+        adoption: 0.15,
+        baselineDays: 180,
+        enigmaDays: 60,
+        implementationCost: 36000,
+      }),
+    ).toEqual([]);
+    expect(
+      fallbackRecommendation({
+        rollup: { ...rolled, implementation: 36000, roi: 3000 / 36000 },
+        gaps: [],
+        hasWeakSignals: false,
+        confidence: "high",
+      }),
+    ).toBe("proceed");
   });
 
   it("applies adoption to volume and leaves implementation unscaled", () => {

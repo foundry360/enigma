@@ -10,7 +10,10 @@ import { SelectField } from "@/components/ui/select-field";
 import { TextAreaField } from "@/components/ui/textarea-field";
 import { ProjectAdditionalFields } from "@/components/projects/project-additional-fields";
 import { ProjectEconomicsFields } from "@/components/projects/project-economics-fields";
-import { ProjectSection } from "@/components/projects/project-section";
+import {
+  ProjectSection,
+  ProjectSections,
+} from "@/components/projects/project-section";
 import { dateInputValue } from "@/lib/format";
 import { platformLabel } from "@/lib/platforms";
 import {
@@ -96,10 +99,11 @@ export function EditProjectForm({
       <input type="hidden" name="organizationId" value={project.organizationId} />
       {fromModal ? <input type="hidden" name="fromModal" value="1" /> : null}
 
-      <ProjectSection title="Project" defaultOpen>
+      <ProjectSections>
+      <ProjectSection title="Project">
         <Field
           layout="horizontal"
-          label="Project name"
+          label="Project Name"
           name="name"
           defaultValue={project.name}
           required
@@ -107,7 +111,7 @@ export function EditProjectForm({
         />
         <SelectField
           layout="horizontal"
-          label="Project type"
+          label="Project Type"
           name="projectType"
           defaultValue={project.projectType}
           error={state?.errors?.projectType}
@@ -128,7 +132,7 @@ export function EditProjectForm({
           error={state?.errors?.objective}
         />
         <MultiSelectField
-          label="Desired outcomes"
+          label="Desired Outcomes"
           name="outcomes"
           options={primaryOutcomes}
           defaultSelected={outcomes}
@@ -138,7 +142,7 @@ export function EditProjectForm({
         {showOtherOutcome ? (
           <Field
             layout="horizontal"
-            label="Other outcome"
+            label="Other Outcome"
             name="outcomeOther"
             defaultValue={project.outcomeOther ?? ""}
             error={state?.errors?.outcomeOther}
@@ -146,7 +150,7 @@ export function EditProjectForm({
         ) : null}
         <SelectField
           layout="horizontal"
-          label="Platform in scope"
+          label="Platform In Scope"
           name="platforms"
           defaultValue={selectedPlatform}
           error={state?.errors?.platforms}
@@ -164,7 +168,7 @@ export function EditProjectForm({
       <ProjectSection title="Ownership">
         <SelectField
           layout="horizontal"
-          label="Project owner"
+          label="Project Owner"
           name="ownerId"
           defaultValue={project.ownerId ?? ""}
           error={state?.errors?.ownerId}
@@ -205,7 +209,7 @@ export function EditProjectForm({
         </SelectField>
         <Field
           layout="horizontal"
-          label="Target date"
+          label="Target Date"
           name="targetDate"
           type="date"
           defaultValue={dateInputValue(project.targetDate)}
@@ -217,6 +221,7 @@ export function EditProjectForm({
         defaults={project}
         errors={state?.errors}
       />
+      </ProjectSections>
 
       {state?.message ? (
         <p className="text-sm text-accent">{state.message}</p>

@@ -71,8 +71,8 @@ describe("business case decipher", () => {
     expect(risky.baselineDays).toBeGreaterThan(ready.baselineDays);
   });
 
-  it("keeps a customer override distinct from an Enigma proposal", () => {
-    expect(assumptionSource(20000, 20000)).toBe("Enigma Assumption");
-    expect(assumptionSource(12000, 20000)).toBe("Customer Provided");
+  it("labels entered numbers as customer provided and leaves blanks unlabeled", () => {
+    expect(assumptionSource(12000)).toBe("Customer Provided");
+    expect(assumptionSource(null)).toBeNull();
   });
 });

@@ -372,50 +372,38 @@ async function seedDecipheredAssumptions(
 ) {
   const scoped = requireTenantId(tenantId);
   const project = await getProject(tenantId, detail.businessCase.projectId);
-  const neverDeciphered =
-    detail.businessCase.baselineDays == null &&
-    detail.businessCase.enigmaDays == null;
   let changed = false;
 
+  const nextConservative =
+    project?.conservativeAdoption ??
+    detail.businessCase.conservativeAdoption ??
+    null;
+  const nextExpected =
+    project?.expectedAdoption ?? detail.businessCase.expectedAdoption ?? null;
+  const nextAggressive =
+    project?.aggressiveAdoption ??
+    detail.businessCase.aggressiveAdoption ??
+    null;
+  const nextBaseline =
+    project?.baselineDays ?? detail.businessCase.baselineDays ?? null;
+  const nextEnigmaDays =
+    project?.enigmaDays ?? detail.businessCase.enigmaDays ?? null;
+
   if (
-    neverDeciphered ||
-    detail.businessCase.baselineDays == null ||
-    detail.businessCase.enigmaDays == null
+    nextConservative !== detail.businessCase.conservativeAdoption ||
+    nextExpected !== detail.businessCase.expectedAdoption ||
+    nextAggressive !== detail.businessCase.aggressiveAdoption ||
+    nextBaseline !== detail.businessCase.baselineDays ||
+    nextEnigmaDays !== detail.businessCase.enigmaDays
   ) {
     await sql`
       update "BusinessCase"
       set
-        "conservativeAdoption" = ${
-          detail.businessCase.conservativeAdoption ??
-          project?.conservativeAdoption ??
-          (neverDeciphered
-            ? detail.proposedCase.conservativeAdoption
-            : detail.businessCase.conservativeAdoption)
-        },
-        "expectedAdoption" = ${
-          detail.businessCase.expectedAdoption ??
-          project?.expectedAdoption ??
-          (neverDeciphered
-            ? detail.proposedCase.expectedAdoption
-            : detail.businessCase.expectedAdoption)
-        },
-        "aggressiveAdoption" = ${
-          detail.businessCase.aggressiveAdoption ??
-          project?.aggressiveAdoption ??
-          (neverDeciphered
-            ? detail.proposedCase.aggressiveAdoption
-            : detail.businessCase.aggressiveAdoption)
-        },
-        "baselineDays" = ${
-          detail.businessCase.baselineDays ??
-          project?.baselineDays ??
-          detail.proposedCase.baselineDays
-        },
-        "enigmaDays" = ${
-          detail.businessCase.enigmaDays ??
-          project?.enigmaDays ??
-          detail.proposedCase.enigmaDays
-        },
+        "conservativeAdoption" = ${nextConservative},
+        "expectedAdoption" = ${nextExpected},
+        "aggressiveAdoption" = ${nextAggressive},
+        "baselineDays" = ${nextBaseline},
+        "enigmaDays" = ${nextEnigmaDays},
         "updatedAt" = now()
       where "tenantId" = ${scoped} and id = ${detail.businessCase.id}
     `;
@@ -423,11 +411,17 @@ async function seedDecipheredAssumptions(
   }
 
   for (const line of detail.lines) {
+    const annualVolume = project?.annualVolume ?? line.annualVolume ?? null;
+    const unitPrice = project?.unitPrice ?? line.unitPrice ?? null;
+    const hoursSavedPerUnit =
+      project?.hoursSavedPerUnit ?? line.hoursSavedPerUnit ?? null;
+    const hourlyCost = project?.hourlyCost ?? line.hourlyCost ?? null;
+
     if (
-      line.annualVolume != null &&
-      line.unitPrice != null &&
-      line.hoursSavedPerUnit != null &&
-      line.hourlyCost != null
+      annualVolume === line.annualVolume &&
+      unitPrice === line.unitPrice &&
+      hoursSavedPerUnit === line.hoursSavedPerUnit &&
+      hourlyCost === line.hourlyCost
     ) {
       continue;
     }
@@ -435,20 +429,10 @@ async function seedDecipheredAssumptions(
     await sql`
       update "BusinessCaseLine"
       set
-        "annualVolume" = ${
-          line.annualVolume ?? project?.annualVolume ?? line.proposed.annualVolume
-        },
-        "unitPrice" = ${
-          line.unitPrice ?? project?.unitPrice ?? line.proposed.unitPrice
-        },
-        "hoursSavedPerUnit" = ${
-          line.hoursSavedPerUnit ??
-          project?.hoursSavedPerUnit ??
-          line.proposed.hoursSavedPerUnit
-        },
-        "hourlyCost" = ${
-          line.hourlyCost ?? project?.hourlyCost ?? line.proposed.hourlyCost
-        },
+        "annualVolume" = ${annualVolume},
+        "unitPrice" = ${unitPrice},
+        "hoursSavedPerUnit" = ${hoursSavedPerUnit},
+        "hourlyCost" = ${hourlyCost},
         "updatedAt" = now()
       where "tenantId" = ${scoped} and id = ${line.id}
     `;
