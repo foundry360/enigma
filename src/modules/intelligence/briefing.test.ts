@@ -58,25 +58,43 @@ describe("intelligence briefing", () => {
   });
 
   it("explains a single candidate without inventing prices", () => {
-    const answer = answerFromBriefing("Why is there only one candidate?", briefing);
+    const answer = answerFromBriefing(
+      "Why am I only seeing one opportunity?",
+      briefing,
+    );
 
-    expect(answer).toContain("Service agent is the only candidate");
-    expect(answer).toContain("Write-back control (weak)");
+    expect(answer).toMatch(/only seeing Service agent/i);
+    expect(answer).toMatch(/Write-back control/i);
+    expect(answer).toMatch(/Guided workflow/i);
+    expect(answer).toContain("\n\n");
+    expect(answer).not.toMatch(/Evidence:/);
+    expect(answer).not.toMatch(/Addressable work \(strong\)/);
     expect(answer.toLowerCase()).not.toContain("list price");
+  });
+
+  it("describes an opportunity in paragraphs instead of fragments", () => {
+    const answer = answerFromBriefing("Why is Service agent a candidate?", briefing);
+
+    expect(answer).toMatch(/high-confidence|medium-confidence/i);
+    expect(answer).toContain("\n\n");
+    expect(answer).toMatch(/Addressable work is strong/i);
+    expect(answer).not.toMatch(/Evidence:/);
+    expect(answer).not.toMatch(/It is supported by/);
+    expect(answer).not.toMatch(/It needs /);
   });
 
   it("refuses official prices and ROI", () => {
     const answer = answerFromBriefing("What is the ROI and license price?", briefing);
 
-    expect(answer).toMatch(/does not contain official prices/i);
+    expect(answer).toMatch(/official Salesforce prices/i);
     expect(answer).toMatch(/Business Case/i);
   });
 
   it("suggests asks from the strongest signal and first candidate", () => {
     expect(suggestedAsks(briefing)).toEqual([
       "Why is Addressable work strong?",
-      "Why is there only one candidate?",
-      "What should I watch before promoting Service agent?",
+      "Why am I only seeing one opportunity?",
+      "Why is Service agent a candidate, and what evidence supports it?",
     ]);
   });
 

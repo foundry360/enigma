@@ -1,3 +1,5 @@
+import { formatCurrency } from "@/lib/format";
+
 export const scenarios = ["conservative", "expected", "aggressive"] as const;
 
 export type Scenario = (typeof scenarios)[number];
@@ -277,6 +279,107 @@ export function fallbackRecommendation(input: {
   }
 
   return "proceed";
+}
+
+function money(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "blank";
+  }
+
+  return formatCurrency(value);
+}
+
+export function explainRecommendation(input: {
+  state: RecommendationState;
+  rollup: CaseRollup;
+  gaps: string[];
+  hasWeakSignals: boolean;
+  confidence: "high" | "medium" | "low" | null;
+  weakSignals?: string[];
+}): string {
+  const label = recommendationLabel[input.state];
+  const gaps = input.gaps.length
+    ? `Open gaps: ${input.gaps.join(" ")}`
+    : "No listed input gaps.";
+  const confidence = input.confidence
+    ? `Inherited confidence is ${input.confidence}.`
+    : "Confidence is not rolled up yet.";
+  const weakNames = uniqueNames(input.weakSignals);
+  const signals = input.hasWeakSignals
+    ? weakNames.length > 0
+      ? `${weakNames.join(" and ")} ${weakNames.length === 1 ? "is" : "are"} still weak.`
+      : "At least one supporting signal is still weak."
+    : "No supporting signals are weak.";
+
+  if (input.state === "do_not_proceed") {
+    return `${label} because the case is not complete enough to calculate. ${gaps} Fill work per year, hours on one today, and labor cost on at least one opportunity. Enigma will not invent those numbers.`;
+  }
+
+  if (input.state === "validate") {
+    const why =
+      input.confidence === "low"
+        ? "inherited confidence is low"
+        : "more than two gaps remain";
+    return `${label} because ${why}. ${confidence} ${gaps} ${signals} Validate those inputs before treating the totals as a decision.`;
+  }
+
+  if (input.state === "defer") {
+    const why =
+      (input.rollup.netAnnual ?? 0) <= 0
+        ? "annual net is not positive"
+        : "return on consumption is below 1";
+    return `${label} because ${why}. Consumption ${money(input.rollup.consumption)}. Value ${money(input.rollup.value)}. Net ${money(input.rollup.netAnnual)}. ROC ${input.rollup.roc ?? "blank"}. ${gaps}`;
+  }
+
+  if (input.state === "proceed_with_conditions") {
+    const reasons = conditionReasons(input, weakNames);
+    const change =
+      weakNames.length > 0
+        ? `It moves toward Proceed if ${weakNames.join(" and ")} strengthen and the cited risks close.`
+        : "It moves toward Proceed if the remaining condition is closed.";
+    return `${label} because ${reasons.join("; ")}. ${confidence} ${gaps} ROC ${input.rollup.roc ?? "blank"}. ${change}`;
+  }
+
+  return `${label} because the case is complete, net is positive, ROC is at least 2, and the inherited signals do not force a hold. ${confidence} ${signals} ${gaps}`;
+}
+
+function conditionReasons(
+  input: {
+    rollup: CaseRollup;
+    gaps: string[];
+    hasWeakSignals: boolean;
+  },
+  weakNames: string[],
+) {
+  const reasons: string[] = [];
+  const roc = input.rollup.roc;
+  const hasConsumption =
+    input.rollup.consumption != null && input.rollup.consumption > 0;
+
+  if (input.hasWeakSignals) {
+    reasons.push(
+      weakNames.length > 0
+        ? `${weakNames.join(" and ")} ${weakNames.length === 1 ? "is" : "are"} still weak`
+        : "at least one supporting signal is still weak",
+    );
+  }
+  if (input.gaps.length > 0) {
+    reasons.push(`gaps remain (${input.gaps.join(" ")})`);
+  }
+  if (input.rollup.implementation == null || input.rollup.implementation === 0) {
+    reasons.push("investment is missing or zero");
+  }
+  if (hasConsumption && roc != null && roc < 2) {
+    reasons.push(`ROC is ${roc}, which is below 2`);
+  }
+  if (reasons.length === 0) {
+    reasons.push("a condition remains on the case");
+  }
+  return reasons;
+}
+
+function uniqueNames(values: string[] | undefined) {
+  return [...new Set((values ?? []).map((value) => value.trim()).filter(Boolean))];
 }
 
 export function adoptionForScenario(

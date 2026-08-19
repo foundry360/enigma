@@ -171,7 +171,7 @@ export type AssessmentJudgmentRow = {
   key: string;
   title: string;
   score: number;
-  evidence: { tool: string; citation: string }[];
+  evidence: { tool: string; citation: string; expansion?: string }[];
   reason: string;
   risk: string;
   recommendation: string;
@@ -208,7 +208,7 @@ export type OpportunityCandidateRow = {
   businessProcess: string;
   recommendedCapability: string;
   supportingSignals: CandidateSignalRef[];
-  evidence: { tool: string; citation: string }[];
+  evidence: { tool: string; citation: string; expansion?: string }[];
   finding: string;
   confidence: CandidateConfidence;
   consumptionDrivers: string[];

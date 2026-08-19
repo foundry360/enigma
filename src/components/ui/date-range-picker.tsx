@@ -24,10 +24,8 @@ function parseDayKey(key: string) {
 }
 
 function formatShort(key: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(parseDayKey(key));
+  const [year, month, day] = key.split("-");
+  return `${day}/${month}/${year}`;
 }
 
 function monthLabel(year: number, month: number) {

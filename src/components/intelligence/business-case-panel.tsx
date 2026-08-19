@@ -9,6 +9,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
+import { useRouter } from "next/navigation";
 import {
   CircleDollarSign,
   Clock,
@@ -36,8 +37,10 @@ import {
   formatMultiple,
   formatPercent,
 } from "@/lib/format";
+import { intelligenceHref } from "@/lib/intelligence/routes";
 import {
   fallbackNarratives,
+  splitCitedCopy,
   toBusinessCaseBriefing,
 } from "@/modules/economics/briefing";
 import type { BusinessCaseDetail } from "@/modules/economics/case-view";
@@ -45,6 +48,7 @@ import {
   adoptionForScenario,
   defaultAdoption,
   normalizeAdoption,
+  recommendationLabel,
   scenarios,
   sumProjectInvestment,
   summarizeCase,
@@ -68,6 +72,7 @@ export function BusinessCasePanel({
   projectInvestment: ProjectInvestment;
   detail: BusinessCaseDetail;
 }) {
+  const router = useRouter();
   const [detail, setDetail] = useState(initial);
   const [draft, setDraft] = useState(() => toDraft(initial));
   const [pending, setPending] = useState(false);
@@ -111,6 +116,7 @@ export function BusinessCasePanel({
   const dirty =
     JSON.stringify(draft) !== JSON.stringify(toDraft(detail)) ||
     Math.abs(liveAdoption - scenarioRates[draft.scenario]) > 0.0005;
+
   const primary = detail.lines[0];
   const confidence = detail.lines.some((line) => line.confidence === "high")
     ? "high"
@@ -164,6 +170,7 @@ export function BusinessCasePanel({
           confidence: line.confidence,
           finding: line.finding,
           signals: line.supportingSignals.map((signal) => ({
+            key: signal.key,
             title: signal.title,
             strength: signal.strength,
           })),
@@ -185,9 +192,15 @@ export function BusinessCasePanel({
   );
 
   const narratives = fallbackNarratives(briefing);
+  const storedNarrative = detail.businessCase.recommendationNarrative;
+  const shortStored = (storedNarrative?.length ?? 0) < 280;
+  const genericNarrative =
+    /calculated model uses inherited intelligence|It moves toward Proceed if/i.test(
+      storedNarrative ?? "",
+    );
   const recommendationNarrative =
-    !dirty && detail.businessCase.recommendationNarrative
-      ? detail.businessCase.recommendationNarrative
+    !dirty && storedNarrative && !genericNarrative && !shortStored
+      ? storedNarrative
       : narratives.recommendationNarrative;
   const volume = draft.lines.reduce(
     (sum, line) => sum + (line.annualVolume ?? 0),
@@ -269,34 +282,42 @@ export function BusinessCasePanel({
   const shownInvestment = (value: number | null) =>
     value != null ? formatCompactCurrency(value) : "—";
 
-  async function persist(refreshRecommendation = true) {
-    setPending(true);
-    setError(null);
-    const nextDraft = persistDraft();
-    const result = await saveBusinessCaseAction({
-      projectId,
-      draft: nextDraft,
-      refreshRecommendation,
-    });
-    setPending(false);
-    if (!result || "error" in result) {
-      setError(
-        result?.error === "locked"
-          ? "This approved case is locked."
-          : "The business case could not be saved.",
+  function evidenceNodes(line: (typeof detail.lines)[number]) {
+    return line.evidence.map((entry) => entry.citation);
+  }
+
+  async function persist(refreshRecommendation = false) {
+    if (dirty) {
+      setPending(true);
+      setError(null);
+      const nextDraft = persistDraft();
+      const result = await saveBusinessCaseAction({
+        projectId,
+        draft: nextDraft,
+        refreshRecommendation,
+      });
+      setPending(false);
+      if (!result || "error" in result) {
+        setError(
+          result?.error === "locked"
+            ? "This approved case is locked."
+            : "The business case could not be saved.",
+        );
+        return null;
+      }
+      setDetail(result.detail);
+      setDraft(toDraft(result.detail));
+      setLiveAdoption(
+        adoptionForScenario(result.detail.businessCase.scenario, {
+          conservative: result.detail.businessCase.conservativeAdoption,
+          expected: result.detail.businessCase.expectedAdoption,
+          aggressive: result.detail.businessCase.aggressiveAdoption,
+        }) ?? liveAdoption,
       );
-      return null;
     }
-    setDetail(result.detail);
-    setDraft(toDraft(result.detail));
-    setLiveAdoption(
-      adoptionForScenario(result.detail.businessCase.scenario, {
-        conservative: result.detail.businessCase.conservativeAdoption,
-        expected: result.detail.businessCase.expectedAdoption,
-        aggressive: result.detail.businessCase.aggressiveAdoption,
-      }) ?? liveAdoption,
-    );
-    return result.detail;
+
+    router.push(intelligenceHref(projectId, "deployment"));
+    return detail;
   }
 
   return (
@@ -306,8 +327,8 @@ export function BusinessCasePanel({
           <Button
             type="button"
             variant="secondary"
-            disabled={pending || !dirty}
-            onClick={() => persist(true)}
+            disabled={pending}
+            onClick={() => persist()}
           >
             Save
           </Button>
@@ -480,18 +501,33 @@ export function BusinessCasePanel({
       </div>
 
       <Card>
-        <h2 className="text-lg font-semibold">Recommendation</h2>
+        <h2 className="text-lg font-semibold">How to Proceed</h2>
         <div className="mt-3 space-y-3">
           <FoldCard
-            title="Recommendation"
+            title="Enigma Recommendation"
             open={showingRecommendation}
             onToggle={() => setShowingRecommendation((open) => !open)}
           >
-            <p className="text-sm leading-relaxed">
-              {live.rollup.complete
-                ? recommendationNarrative
-                : "Enigma could not complete a proposal from this run yet. It will not invent a Salesforce price to fill the gap."}
-            </p>
+            <div className="space-y-2.5 text-sm leading-relaxed">
+              {live.rollup.complete ? (
+                <>
+                  <p className="font-medium">
+                    {recommendationLabel[live.recommendationState]}
+                  </p>
+                  {recommendationNarrative
+                    .split(/\n{2,}/)
+                    .filter(Boolean)
+                    .map((paragraph, index) => (
+                      <CitedParagraph key={index} text={paragraph} />
+                    ))}
+                </>
+              ) : (
+                <p>
+                  Enigma could not complete a proposal from this run yet. It will
+                  not invent a Salesforce price to fill the gap.
+                </p>
+              )}
+            </div>
           </FoldCard>
           <FoldCard
             title="Supporting Evidence"
@@ -506,7 +542,7 @@ export function BusinessCasePanel({
                   process={line.businessProcess}
                   capability={line.recommendedCapability}
                   signals={line.supportingSignals}
-                  evidence={line.evidence.map((entry) => entry.citation)}
+                  evidence={evidenceNodes(line)}
                   reasoning={line.finding}
                   consumptionDrivers={line.consumptionDrivers}
                   valueDrivers={line.valueDrivers}
@@ -848,6 +884,22 @@ function workUnitLabel(key: string | undefined) {
     return "Paths";
   }
   return "Units";
+}
+
+function CitedParagraph({ text }: { text: string }) {
+  return (
+    <p>
+      {splitCitedCopy(text).map((part, index) =>
+        part.cited ? (
+          <span key={index} className="text-accent">
+            ({part.text})
+          </span>
+        ) : (
+          part.text
+        ),
+      )}
+    </p>
+  );
 }
 
 function toDraft(detail: BusinessCaseDetail): BusinessCaseDraft {

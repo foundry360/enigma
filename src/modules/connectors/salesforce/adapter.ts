@@ -154,7 +154,7 @@ export async function listSalesforceAutomations(input: {
   instanceUrl: string;
   accessToken: string;
 }): Promise<AutomationSummary[]> {
-  const [flows, apex] = await Promise.all([
+  const [definitions, versions, triggers] = await Promise.all([
     salesforceRequest<
       ToolingRecords<{
         DeveloperName?: string;
@@ -168,34 +168,110 @@ export async function listSalesforceAutomations(input: {
     }),
     salesforceRequest<
       ToolingRecords<{
-        Name?: string;
-        NamespacePrefix?: string | null;
-        LengthWithoutComments?: number;
+        Id?: string;
+        MasterLabel?: string;
         Status?: string;
+        ProcessType?: string;
+        TriggerType?: string;
       }>
     >({
       instanceUrl: input.instanceUrl,
       accessToken: input.accessToken,
-      path: salesforcePath("tooling", toolingQueries.apexClasses),
+      path: salesforcePath("tooling", toolingQueries.activeFlows),
+    }),
+    salesforceRequest<
+      ToolingRecords<{
+        Name?: string;
+        TableEnumOrId?: string | null;
+        Status?: string;
+        NamespacePrefix?: string | null;
+        UsageBeforeInsert?: boolean;
+        UsageAfterInsert?: boolean;
+        UsageBeforeUpdate?: boolean;
+        UsageAfterUpdate?: boolean;
+        UsageBeforeDelete?: boolean;
+        UsageAfterDelete?: boolean;
+      }>
+    >({
+      instanceUrl: input.instanceUrl,
+      accessToken: input.accessToken,
+      path: salesforcePath("tooling", toolingQueries.apexTriggers),
     }),
   ]);
 
+  const versionById = new Map(
+    (versions.records ?? []).map((version) => [version.Id, version]),
+  );
+
   return [
-    ...(flows.records ?? []).map((flow) => ({
-      kind: "flow" as const,
-      name: flow.DeveloperName ?? flow.MasterLabel ?? "Flow",
-      namespace: null,
-      status: flow.ActiveVersionId ? "Active" : "Inactive",
-      size: null,
-    })),
-    ...(apex.records ?? []).map((item) => ({
-      kind: "apex" as const,
-      name: item.Name ?? "ApexClass",
+    ...(definitions.records ?? []).map((definition) => {
+      const version = definition.ActiveVersionId
+        ? versionById.get(definition.ActiveVersionId)
+        : undefined;
+      return {
+        kind: "flow" as const,
+        name: definition.DeveloperName ?? definition.MasterLabel ?? "Flow",
+        namespace: null,
+        status: definition.ActiveVersionId ? "Active" : "Inactive",
+        size: null,
+        objectApiName: null,
+        triggerType: humanizeFlowTrigger(
+          version?.TriggerType,
+          version?.ProcessType,
+        ),
+      };
+    }),
+    ...(triggers.records ?? []).map((item) => ({
+      kind: "apex_trigger" as const,
+      name: item.Name ?? "ApexTrigger",
       namespace: item.NamespacePrefix ?? null,
       status: item.Status ?? null,
-      size: item.LengthWithoutComments ?? null,
+      size: null,
+      objectApiName: item.TableEnumOrId ?? null,
+      triggerType: humanizeApexTrigger(item),
     })),
   ];
+}
+
+function humanizeFlowTrigger(triggerType?: string, processType?: string) {
+  const labels: Record<string, string> = {
+    RecordAfterSave: "after save",
+    RecordBeforeSave: "before save",
+    RecordBeforeDelete: "before delete",
+    Scheduled: "scheduled",
+    PlatformEvent: "platform event",
+    Capability: "capability",
+  };
+  if (triggerType && labels[triggerType]) {
+    return labels[triggerType];
+  }
+  if (triggerType) {
+    return triggerType.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+  }
+  if (processType && processType !== "AutoLaunchedFlow" && processType !== "Flow") {
+    return processType.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+  }
+  return null;
+}
+
+function humanizeApexTrigger(item: {
+  UsageBeforeInsert?: boolean;
+  UsageAfterInsert?: boolean;
+  UsageBeforeUpdate?: boolean;
+  UsageAfterUpdate?: boolean;
+  UsageBeforeDelete?: boolean;
+  UsageAfterDelete?: boolean;
+}) {
+  const events = [
+    item.UsageBeforeInsert ? "before insert" : null,
+    item.UsageAfterInsert ? "after insert" : null,
+    item.UsageBeforeUpdate ? "before update" : null,
+    item.UsageAfterUpdate ? "after update" : null,
+    item.UsageBeforeDelete ? "before delete" : null,
+    item.UsageAfterDelete ? "after delete" : null,
+  ].filter((event): event is string => Boolean(event));
+
+  return events.length > 0 ? events.join(", ") : null;
 }
 
 export async function listSalesforceValidationRules(input: {

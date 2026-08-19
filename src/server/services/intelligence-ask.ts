@@ -1,13 +1,21 @@
 import "server-only";
 
+import { formatAskAnswer, looksLikeAskDump } from "@/modules/intelligence/ask-format";
+import { buildIntelligenceBriefing } from "@/modules/intelligence/briefing";
+import { opportunityDefinition } from "@/modules/intelligence/opportunities";
 import {
-  answerFromBriefing,
-  briefingToPrompt,
-  buildIntelligenceBriefing,
-  isPriceAsk,
-} from "@/modules/intelligence/briefing";
+  answerProjectAsk,
+  hasScriptedProjectAnswer,
+  projectAskPrompt,
+  resolveAskQuestion,
+} from "@/modules/intelligence/project-ask";
 import { getProjectAssessmentDetail } from "@/server/services/assessments";
+import {
+  buildCaseBriefing,
+  getBusinessCaseDetail,
+} from "@/server/services/business-case";
 import { getConnectionOrgProfile } from "@/server/services/connections";
+import { completeChat } from "@/server/services/inference";
 import { ensureOpportunityCandidates } from "@/server/services/opportunities";
 
 export type AskMessage = {
@@ -24,7 +32,7 @@ export async function askIntelligence(input: {
 }) {
   const question = input.question.trim().slice(0, 2000);
   if (!question) {
-    return { error: "Ask about a signal, a candidate, or this run." };
+    return { error: "Ask about this project's signals, opportunities, case, or next step." };
   }
 
   const detail = await getProjectAssessmentDetail(
@@ -41,7 +49,7 @@ export async function askIntelligence(input: {
     return { error: "This run is not complete yet." };
   }
 
-  const [candidates, org] = await Promise.all([
+  const [candidates, org, businessCase] = await Promise.all([
     ensureOpportunityCandidates(input.tenantId, detail.assessment.id),
     detail.assessment.connectionId
       ? getConnectionOrgProfile(
@@ -49,28 +57,55 @@ export async function askIntelligence(input: {
           detail.assessment.connectionId,
         )
       : Promise.resolve(null),
+    getBusinessCaseDetail(input.tenantId, input.projectId),
   ]);
 
-  const briefing = buildIntelligenceBriefing({
+  const intelligence = buildIntelligenceBriefing({
     environment: org?.name ?? "Connected environment",
     status: detail.assessment.status,
     factCount: detail.traces.length,
     signals: detail.judgments.filter((item) => item.kind === "dimension"),
-    candidates,
+    candidates: candidates.map((candidate) => {
+      const definition = opportunityDefinition(candidate.key);
+      return {
+        name: candidate.name,
+        description: candidate.description,
+        finding: candidate.finding,
+        confidence: candidate.confidence,
+        status: candidate.status,
+        supportingSignals: candidate.supportingSignals,
+        evidence: candidate.evidence,
+        consumptionDrivers: candidate.consumptionDrivers,
+        valueDrivers: candidate.valueDrivers,
+        constraints: candidate.constraints,
+        dependencies: candidate.dependencies,
+        risk: definition?.risk ?? "",
+        recommendation: definition?.recommendation ?? "",
+      };
+    }),
   });
 
-  const grounded = answerFromBriefing(question, briefing);
-  if (isPriceAsk(question)) {
-    return { answer: grounded };
+  const briefing = {
+    intelligence,
+    businessCase: businessCase ? buildCaseBriefing(businessCase) : null,
+  };
+
+  const history = sanitizeHistory(input.history);
+  const resolved = resolveAskQuestion(question, history);
+  const grounded = answerProjectAsk(question, briefing, history);
+  if (hasScriptedProjectAnswer(question, briefing, history)) {
+    return { answer: formatAskAnswer(grounded) };
   }
 
   const modeled = await explainWithModel(
-    question,
-    briefingToPrompt(briefing),
-    sanitizeHistory(input.history),
+    resolved,
+    projectAskPrompt(briefing, resolved),
+    history,
   );
+  const answer =
+    modeled && !looksLikeAskDump(modeled) ? modeled : grounded;
 
-  return { answer: modeled ?? grounded };
+  return { answer: formatAskAnswer(answer) };
 }
 
 function sanitizeHistory(history: AskMessage[] | undefined): AskMessage[] {
@@ -80,10 +115,10 @@ function sanitizeHistory(history: AskMessage[] | undefined): AskMessage[] {
         (message.role === "user" || message.role === "assistant") &&
         typeof message.content === "string",
     )
-    .slice(-8)
+    .slice(-4)
     .map((message) => ({
       role: message.role,
-      content: message.content.trim().slice(0, 4000),
+      content: message.content.trim().slice(0, 800),
     }))
     .filter((message) => message.content.length > 0);
 }
@@ -93,54 +128,19 @@ async function explainWithModel(
   briefing: string,
   history: AskMessage[],
 ) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return null;
-  }
-
-  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
-
-  try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
+  return completeChat({
+    maxTokens: 700,
+    timeoutMs: 30_000,
+    messages: [
+      {
+        role: "system",
+        content: briefing,
       },
-      body: JSON.stringify({
-        model,
-        temperature: 0.2,
-        messages: [
-          {
-            role: "system",
-            content: [
-              "You explain a completed Enigma Intelligence run.",
-              "Use only the briefing. Do not invent scores, volumes, prices, licenses, or ROI.",
-              "If the briefing does not contain the answer, say so.",
-              "Cite evidence citations when they exist.",
-              "Consumption drivers are hypotheses, not forecasts.",
-              "Do not mention tokens, OAuth, or raw platform payloads.",
-              "",
-              briefing,
-            ].join("\n"),
-          },
-          ...history,
-          { role: "user", content: question },
-        ],
-      }),
-      signal: AbortSignal.timeout(20_000),
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const payload = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const content = payload.choices?.[0]?.message?.content?.trim();
-    return content || null;
-  } catch {
-    return null;
-  }
+      ...history,
+      {
+        role: "user",
+        content: `Answer me in 2-4 short paragraphs. Do not paste labeled evidence lists or signal(strength) dumps. ${question}`,
+      },
+    ],
+  });
 }

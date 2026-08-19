@@ -11,6 +11,10 @@ export {
   opportunityCatalog,
   opportunityDefinition,
 } from "@/modules/intelligence/opportunities";
+export {
+  expandEvidenceCitations,
+  summarizeEvidenceLayers,
+} from "@/modules/intelligence/evidence-expand";
 export { normalizeSignals } from "@/modules/intelligence/signals";
 export {
   overallFinding,

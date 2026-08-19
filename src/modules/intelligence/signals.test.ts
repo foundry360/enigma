@@ -47,8 +47,27 @@ describe("business signals", () => {
       },
       knowledge: { enabled: true, articleObjects: ["Knowledge__kav"], dataCategories: [] },
       security: { profileCount: 10, permissionSetCount: 4 },
+      automations: [
+        {
+          kind: "flow",
+          name: "Case_Route",
+          namespace: null,
+          status: "Active",
+          size: null,
+          triggerType: "after save",
+        },
+      ],
       validationRules: [{ name: "Require_Origin", objectApiName: "Case", active: true }],
     });
+
+    const collision = context.signals.find((item) => item.key === "automation_collision");
+    expect(collision?.evidence.some((entry) => /Case_Route/.test(entry.citation))).toBe(
+      true,
+    );
+    const writeback = context.signals.find((item) => item.key === "writeback_control");
+    expect(writeback?.evidence.some((entry) => /Require_Origin on Case/.test(entry.citation))).toBe(
+      true,
+    );
 
     expect(context.workKinds).toEqual(["service", "customer"]);
     expect(context.signals).toHaveLength(6);

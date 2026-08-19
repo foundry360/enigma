@@ -57,7 +57,7 @@ Metadata-first. Org **shape**, not customer **rows**.
 | Object inventory | REST | `/services/data/v61.0/sobjects/` |
 | Object/field/record-type shape | REST | `/sobjects/{name}/describe` |
 | Flows | Tooling | `FlowDefinition`, `Flow` |
-| Apex | Tooling | `ApexClass` (names, namespaces, size — not source unless required) |
+| Apex | Tooling | `ApexTrigger` (name, object, status, events — not source) |
 | Validation rules | Tooling | `ValidationRule` |
 | Custom objects | Metadata or Tooling | `CustomObject` |
 | Service/sales signals | REST describe + limits | Case, Lead, Opportunity, KnowledgeArticle **presence** |

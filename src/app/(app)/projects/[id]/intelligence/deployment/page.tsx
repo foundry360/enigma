@@ -2,6 +2,12 @@ import { notFound } from "next/navigation";
 import { DeploymentPanel } from "@/components/intelligence/deployment-panel";
 import { IntelligencePane } from "@/components/intelligence/intelligence-pane";
 import { requireSession } from "@/lib/auth/session";
+import { platformLabel } from "@/lib/platforms";
+import {
+  isRecommendationState,
+  recommendationLabel,
+  sumProjectInvestment,
+} from "@/modules/economics/model";
 import { ensureBusinessCase } from "@/server/services/business-case";
 import { getProjectOverview } from "@/server/services/projects";
 
@@ -20,13 +26,71 @@ export default async function IntelligenceDeploymentPage({
 
   const detail = await ensureBusinessCase(session.tenantId, id);
   const approved = detail?.businessCase.status === "approved";
-  const ready = Boolean(
-    detail && detail.rollup.complete && detail.gaps.length === 0,
-  );
+  const state = detail?.recommendationState;
+  const recommendation =
+    detail?.businessCase.recommendationNarrative ??
+    (state && isRecommendationState(state)
+      ? recommendationLabel[state]
+      : "Save the business case to shape this path.");
 
   return (
-    <IntelligencePane>
-      <DeploymentPanel projectId={id} approved={approved} ready={ready} />
+    <IntelligencePane scroll>
+      <DeploymentPanel
+        projectId={id}
+        approved={Boolean(approved)}
+        canApprove={Boolean(detail?.rollup.complete)}
+        platforms={overview.platforms.map((platform) =>
+          platformLabel(platform.platformType),
+        )}
+        baselineDays={
+          detail?.businessCase.baselineDays ??
+          overview.project.baselineDays ??
+          null
+        }
+        enigmaDays={
+          detail?.businessCase.enigmaDays ?? overview.project.enigmaDays ?? null
+        }
+        recommendation={recommendation}
+        gaps={detail?.gaps ?? []}
+        impacted={detail?.rollup.impacted ?? null}
+        consumption={detail?.rollup.consumption ?? null}
+        value={detail?.rollup.value ?? null}
+        investment={sumProjectInvestment({
+          discovery: overview.project.discoveryCost,
+          implementation: overview.project.implementationCost,
+          knowledge: overview.project.knowledgeCost,
+          change: overview.project.changeManagementCost,
+          services: overview.project.servicesCost,
+          other: overview.project.otherCost,
+        })}
+        streams={(detail?.lines ?? []).map((line) => ({
+          name: line.opportunityName,
+          description: line.finding,
+          branches: [
+            {
+              heading: "What Must Be In Place",
+              items: line.dependencies,
+            },
+            {
+              heading: "Watch Outs",
+              items: line.constraints,
+            },
+            {
+              heading: "How Consumption Shows Up",
+              items: line.consumptionDrivers,
+            },
+            {
+              heading: "Where Value Comes From",
+              items: line.valueDrivers,
+            },
+          ]
+            .map((branch) => ({
+              ...branch,
+              items: branch.items.filter(Boolean),
+            }))
+            .filter((branch) => branch.items.length > 0),
+        }))}
+      />
     </IntelligencePane>
   );
 }

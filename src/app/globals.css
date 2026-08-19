@@ -130,6 +130,23 @@ html.dark *::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
+@keyframes ask-wave {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  40% {
+    transform: translateY(-0.2em);
+    opacity: 1;
+  }
+}
+
+.ask-wave-letter {
+  display: inline-block;
+  animation: ask-wave 1.15s ease-in-out infinite;
+}
+
 .enigma-slider {
   --slider-progress: 0%;
   appearance: none;

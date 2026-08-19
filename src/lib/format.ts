@@ -54,9 +54,11 @@ function parseTimestamp(value: string) {
 }
 
 export function formatDate(value: Date | string) {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-  }).format(toUtcDate(value));
+  const date = toUtcDate(value);
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const year = String(date.getUTCFullYear());
+  return `${day}/${month}/${year}`;
 }
 
 export function formatDateTime(value: Date | string | null | undefined) {
@@ -64,10 +66,15 @@ export function formatDateTime(value: Date | string | null | undefined) {
     return "—";
   }
 
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(toUtcDate(value));
+  const date = toUtcDate(value);
+  const time = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
+  }).format(date);
+
+  return `${formatDate(date)} ${time}`;
 }
 
 export function formatTimeAgo(value: Date | string | null | undefined) {
@@ -121,24 +128,12 @@ export function formatCurrency(value: number | null | undefined) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
+    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
 }
 
 export function formatCompactCurrency(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-
-  const abs = Math.abs(value);
-  if (abs >= 1_000_000) {
-    const millions = value / 1_000_000;
-    return `$${millions.toFixed(millions >= 10 ? 0 : 2).replace(/\.00$/, "")}M`;
-  }
-  if (abs >= 1000) {
-    return `$${Math.round(value / 1000)}K`;
-  }
-
   return formatCurrency(value);
 }
 

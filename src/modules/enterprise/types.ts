@@ -56,11 +56,13 @@ export type ObjectDescribe = {
 };
 
 export type AutomationSummary = {
-  kind: "flow" | "apex";
+  kind: "flow" | "apex" | "apex_trigger";
   name: string;
   namespace: string | null;
   status: string | null;
   size: number | null;
+  objectApiName?: string | null;
+  triggerType?: string | null;
 };
 
 export type ValidationRuleSummary = {

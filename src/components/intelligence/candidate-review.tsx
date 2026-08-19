@@ -27,7 +27,10 @@ export function CandidateReview({
         capability={candidate.recommendedCapability}
         signals={candidate.supportingSignals}
         signalHref={`/projects/${projectId}/intelligence?assessment=${candidate.assessmentId}`}
-        evidence={candidate.evidence.map((entry) => entry.citation)}
+        evidence={candidate.evidence.map((entry) => ({
+          citation: entry.citation,
+          expansion: entry.expansion,
+        }))}
         reasoning={candidate.finding}
         consumptionDrivers={candidate.consumptionDrivers}
         valueDrivers={candidate.valueDrivers}

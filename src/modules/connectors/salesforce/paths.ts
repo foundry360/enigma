@@ -20,8 +20,10 @@ export const toolingQueries = {
   permissionSetCount: "SELECT COUNT() FROM PermissionSet",
   flowDefinitions:
     "SELECT Id, DeveloperName, MasterLabel, ActiveVersionId FROM FlowDefinition",
-  apexClasses:
-    "SELECT Id, Name, NamespacePrefix, LengthWithoutComments, Status FROM ApexClass",
+  activeFlows:
+    "SELECT Id, MasterLabel, Status, ProcessType, TriggerType FROM Flow WHERE Status = 'Active'",
+  apexTriggers:
+    "SELECT Name, TableEnumOrId, Status, NamespacePrefix, UsageBeforeInsert, UsageAfterInsert, UsageBeforeUpdate, UsageAfterUpdate, UsageBeforeDelete, UsageAfterDelete FROM ApexTrigger",
   validationRules:
     "SELECT Id, ValidationName, Active, EntityDefinition.QualifiedApiName FROM ValidationRule",
 } as const;

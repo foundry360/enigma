@@ -5,11 +5,14 @@ import { IntelligenceAsk } from "@/components/intelligence/intelligence-ask";
 import { IntelligenceHeaderActions } from "@/components/intelligence/intelligence-header-actions";
 import { IntelligenceTabs } from "@/components/intelligence/intelligence-tabs";
 import { requireSession } from "@/lib/auth/session";
-import {
-  buildIntelligenceBriefing,
-  suggestedAsks,
-} from "@/modules/intelligence/briefing";
+import { buildIntelligenceBriefing } from "@/modules/intelligence/briefing";
+import { opportunityDefinition } from "@/modules/intelligence/opportunities";
+import { suggestedProjectAsks } from "@/modules/intelligence/project-ask";
 import { getLatestAssessmentDetail } from "@/server/services/assessments";
+import {
+  buildCaseBriefing,
+  getBusinessCaseDetail,
+} from "@/server/services/business-case";
 import { getConnectionOrgProfile } from "@/server/services/connections";
 import { ensureOpportunityCandidates } from "@/server/services/opportunities";
 import { getProjectOverview } from "@/server/services/projects";
@@ -45,15 +48,38 @@ export default async function IntelligenceLayout({
   const candidates = detail
     ? await ensureOpportunityCandidates(session.tenantId, detail.assessment.id)
     : [];
+  const businessCase = complete
+    ? await getBusinessCaseDetail(session.tenantId, id)
+    : null;
   const briefing =
     complete && detail
-      ? buildIntelligenceBriefing({
-          environment: org?.name ?? "Connected environment",
-          status: detail.assessment.status,
-          factCount: detail.traces.length,
-          signals,
-          candidates,
-        })
+      ? {
+          intelligence: buildIntelligenceBriefing({
+            environment: org?.name ?? "Connected environment",
+            status: detail.assessment.status,
+            factCount: detail.traces.length,
+            signals,
+            candidates: candidates.map((candidate) => {
+              const definition = opportunityDefinition(candidate.key);
+              return {
+                name: candidate.name,
+                description: candidate.description,
+                finding: candidate.finding,
+                confidence: candidate.confidence,
+                status: candidate.status,
+                supportingSignals: candidate.supportingSignals,
+                evidence: candidate.evidence,
+                consumptionDrivers: candidate.consumptionDrivers,
+                valueDrivers: candidate.valueDrivers,
+                constraints: candidate.constraints,
+                dependencies: candidate.dependencies,
+                risk: definition?.risk ?? "",
+                recommendation: definition?.recommendation ?? "",
+              };
+            }),
+          }),
+          businessCase: businessCase ? buildCaseBriefing(businessCase) : null,
+        }
       : null;
 
   return (
@@ -87,7 +113,7 @@ export default async function IntelligenceLayout({
         projectId={id}
         assessmentId={detail?.assessment.id ?? null}
         ready={Boolean(complete)}
-        suggestions={briefing ? suggestedAsks(briefing) : []}
+        suggestions={briefing ? suggestedProjectAsks(briefing) : []}
       />
     </div>
   );

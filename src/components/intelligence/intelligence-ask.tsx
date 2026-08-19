@@ -8,6 +8,7 @@ import {
   writeAskChat,
   type AskMessage,
 } from "@/components/intelligence/ask-store";
+import { AskThinking } from "@/components/intelligence/ask-thinking";
 
 export function IntelligenceAsk({
   projectId,
@@ -70,7 +71,7 @@ export function IntelligenceAsk({
           content:
             result.answer ??
             result.error ??
-            "I could not explain this run. Try a signal or candidate name.",
+            "I could not explain this project. Try a signal, opportunity, calculation, or next step.",
         },
       ]);
     });
@@ -94,8 +95,8 @@ export function IntelligenceAsk({
         ) : messages.length === 0 ? (
           <div className="space-y-3">
             <p className="text-sm text-muted">
-              Ask about a business signal, a candidate, or why something did or
-              did not appear.
+              Ask me to decipher a recommendation, a calculation, an
+              opportunity, the evidence, or what a gap blocks next.
             </p>
             {suggestions.length > 0 ? (
               <div className="flex flex-col gap-2">
@@ -113,22 +114,20 @@ export function IntelligenceAsk({
             ) : null}
           </div>
         ) : (
-          messages.map((message, index) => (
-            <div
-              key={`${message.role}-${index}`}
-              className={
-                message.role === "user"
-                  ? "ml-6 rounded-md bg-accent px-3 py-2 text-sm text-accent-fg"
-                  : "mr-2 text-sm whitespace-pre-wrap"
-              }
-            >
-              {message.content}
-            </div>
-          ))
+          messages.map((message, index) =>
+            message.role === "user" ? (
+              <div
+                key={`${message.role}-${index}`}
+                className="ml-6 rounded-md bg-accent px-3 py-2 text-sm text-accent-fg"
+              >
+                {message.content}
+              </div>
+            ) : (
+              <AskAnswer key={`${message.role}-${index}`} content={message.content} />
+            ),
+          )
         )}
-        {pending ? (
-          <p className="text-xs text-muted">Reading this run…</p>
-        ) : null}
+        {pending ? <AskThinking /> : null}
       </div>
 
       <form
@@ -139,7 +138,7 @@ export function IntelligenceAsk({
         }}
       >
         <label className="sr-only" htmlFor="intelligence-ask">
-          Ask about this intelligence run
+          Ask Enigma about this project
         </label>
         <div className="relative">
           <textarea
@@ -170,3 +169,16 @@ export function IntelligenceAsk({
     </aside>
   );
 }
+
+function AskAnswer({ content }: { content: string }) {
+  const paragraphs = content.split(/\n{2,}/).filter(Boolean);
+
+  return (
+    <div className="mr-2 space-y-2.5 text-sm leading-relaxed">
+      {paragraphs.map((paragraph, index) => (
+        <p key={index}>{paragraph}</p>
+      ))}
+    </div>
+  );
+}
+

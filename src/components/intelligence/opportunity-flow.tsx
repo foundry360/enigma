@@ -2,9 +2,13 @@
 
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
-import { strengthColors } from "@/components/ui/score-ring";
 import type { CandidateSignalRef } from "@/lib/db/types";
-import { titleCase } from "@/lib/format";
+import { summarizeEvidenceLayers } from "@/modules/intelligence/evidence-expand";
+import {
+  summarizeBusinessContext,
+  summarizeImplication,
+  summarizeSupportingSignals,
+} from "@/modules/intelligence/opportunity-summaries";
 
 export function OpportunityFlow({
   area,
@@ -24,7 +28,7 @@ export function OpportunityFlow({
   capability: string;
   signals?: CandidateSignalRef[];
   signalHref?: string;
-  evidence: string[];
+  evidence: Array<string | { citation: string; label?: string; expansion?: string }>;
   reasoning?: string;
   consumptionDrivers: string[];
   valueDrivers: string[];
@@ -46,67 +50,27 @@ export function OpportunityFlow({
       <FlowStep title="Business context">
         <Tree>
           <TreeItem last>
-            <p className="text-sm">
-              {area}
-              <span className="mx-2 text-muted">→</span>
-              {process}
-              <span className="mx-2 text-muted">→</span>
-              {capability}
+            <p className={nestedCopy}>
+              {summarizeBusinessContext({ area, process, capability })}
             </p>
           </TreeItem>
         </Tree>
       </FlowStep>
       {signals ? (
         <FlowStep title="Supporting signals">
-          {signals.length > 0 ? (
-            <Tree>
-              {signals.map((signal, index) => {
-                const row = (
-                  <>
-                    <span
-                      style={{ color: strengthColors[signal.strength] }}
-                      aria-hidden="true"
-                    >
-                      {signal.strength === "weak" ? "⚠" : "✓"}
-                    </span>
-                    <span>{signal.title}</span>
-                    <span
-                      className="text-xs"
-                      style={{ color: strengthColors[signal.strength] }}
-                    >
-                      {titleCase(signal.strength)}
-                    </span>
-                  </>
-                );
-
-                return (
-                  <TreeItem
-                    key={signal.key}
-                    last={index === signals.length - 1}
-                  >
-                    {signalHref ? (
-                      <Link
-                        href={signalHref}
-                        className="inline-flex items-center gap-2 text-sm hover:underline"
-                      >
-                        {row}
-                      </Link>
-                    ) : (
-                      <span className="inline-flex items-center gap-2 text-sm">
-                        {row}
-                      </span>
-                    )}
-                  </TreeItem>
-                );
-              })}
-            </Tree>
-          ) : (
-            <Tree>
-              <TreeItem last>
-                <p className="text-sm text-muted">—</p>
-              </TreeItem>
-            </Tree>
-          )}
+          <Tree>
+            <TreeItem last>
+              {signalHref && signals.length > 0 ? (
+                <Link href={signalHref} className={`${nestedCopy} block hover:underline`}>
+                  {summarizeSupportingSignals(signals)}
+                </Link>
+              ) : (
+                <p className={nestedCopy}>
+                  {summarizeSupportingSignals(signals)}
+                </p>
+              )}
+            </TreeItem>
+          </Tree>
         </FlowStep>
       ) : null}
       <FlowStep title="Evidence">
@@ -124,12 +88,12 @@ export function OpportunityFlow({
                         key={item}
                         last={itemIndex === group.items.length - 1}
                       >
-                        <p className="text-sm">{item}</p>
+                        <p className={nestedCopy}>{item}</p>
                       </TreeItem>
                     ))}
                   </TreeBranch>
                 ) : (
-                  <p className="text-sm">{group.items[0]}</p>
+                  <p className={nestedCopy}>{group.items[0]}</p>
                 )}
               </TreeItem>
             ))}
@@ -146,7 +110,7 @@ export function OpportunityFlow({
         <FlowStep title="Reasoning">
           <Tree>
             <TreeItem last>
-              <p className="text-sm leading-relaxed">{reasoning}</p>
+              <p className={nestedCopy}>{reasoning}</p>
             </TreeItem>
           </Tree>
         </FlowStep>
@@ -159,20 +123,11 @@ export function OpportunityFlow({
               last={index === implicationBranches.length - 1}
             >
               <TreeBranch title={branch.title}>
-                {(branch.items.length > 0 ? branch.items : ["—"]).map(
-                  (item, itemIndex, items) => (
-                    <TreeItem
-                      key={item}
-                      last={itemIndex === items.length - 1}
-                    >
-                      <p
-                        className={`text-sm ${item === "—" ? "text-muted" : ""}`}
-                      >
-                        {item}
-                      </p>
-                    </TreeItem>
-                  ),
-                )}
+                <TreeItem last>
+                  <p className={nestedCopy}>
+                    {summarizeImplication(branch.title, branch.items)}
+                  </p>
+                </TreeItem>
               </TreeBranch>
             </TreeItem>
           ))}
@@ -182,14 +137,16 @@ export function OpportunityFlow({
   );
 }
 
-function FlowStep({
+export function FlowStep({
   title,
   children,
   last = false,
+  openByDefault = true,
 }: {
   title: string;
   children: ReactNode;
   last?: boolean;
+  openByDefault?: boolean;
 }) {
   return (
     <li className="relative">
@@ -199,7 +156,7 @@ function FlowStep({
           className="absolute bottom-[-2rem] left-2 top-2 w-px bg-foreground/15"
         />
       )}
-      <ToggleDetails openByDefault className="group/step">
+      <ToggleDetails openByDefault={openByDefault} className="group/step">
         <summary className={`${dotSummary} gap-3`}>
           <DotToggle tone="solid" />
           <h3 className="text-sm font-bold">{title}</h3>
@@ -234,6 +191,9 @@ function ToggleDetails({
   );
 }
 
+const nestedCopy =
+  "max-w-prose pl-6 text-sm leading-relaxed text-muted";
+
 const dotSummary =
   "relative z-10 flex cursor-pointer items-center list-none [&::-webkit-details-marker]:hidden [&::marker]:hidden";
 
@@ -262,11 +222,11 @@ function DotToggle({ tone }: { tone: "solid" | "outline" }) {
   );
 }
 
-function Tree({ children }: { children: ReactNode }) {
+export function Tree({ children }: { children: ReactNode }) {
   return <ul>{children}</ul>;
 }
 
-function TreeBranch({
+export function TreeBranch({
   title,
   children,
 }: {
@@ -284,7 +244,7 @@ function TreeBranch({
   );
 }
 
-function TreeItem({
+export function TreeItem({
   children,
   last = false,
 }: {
@@ -306,25 +266,15 @@ function TreeItem({
   );
 }
 
-function groupEvidence(citations: string[]) {
-  const groups: { label: string; items: string[] }[] = [];
+function groupEvidence(
+  evidence: Array<string | { citation: string; label?: string; expansion?: string }>,
+) {
+  const citations = evidence.map((entry) =>
+    typeof entry === "string" ? entry : entry.citation,
+  );
 
-  for (const citation of citations) {
-    const split = citation.indexOf(": ");
-    if (split === -1) {
-      groups.push({ label: "", items: [citation] });
-      continue;
-    }
-
-    const label = citation.slice(0, split);
-    const item = citation.slice(split + 2);
-    const existing = groups.find((group) => group.label === label);
-    if (existing) {
-      existing.items.push(item);
-    } else {
-      groups.push({ label, items: [item] });
-    }
-  }
-
-  return groups;
+  return summarizeEvidenceLayers({ citations }).map((layer) => ({
+    label: layer.label,
+    items: [layer.paragraph],
+  }));
 }

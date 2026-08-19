@@ -4,6 +4,7 @@ import {
   caseGaps,
   defaultAdoption,
   emptyRollup,
+  explainRecommendation,
   fallbackRecommendation,
   isLineComplete,
   isScenario,
@@ -256,5 +257,24 @@ describe("business case arithmetic", () => {
         confidence: null,
       }),
     ).toBe("do_not_proceed");
+    expect(
+      explainRecommendation({
+        state: "do_not_proceed",
+        rollup: emptyRollup(),
+        gaps: ["Work per year is required."],
+        hasWeakSignals: false,
+        confidence: null,
+      }),
+    ).toMatch(/Do Not Proceed/);
+    expect(
+      explainRecommendation({
+        state: "proceed_with_conditions",
+        rollup: { ...emptyRollup(), complete: true, roc: 176, implementation: 15000, consumption: 300, value: 3000, netAnnual: 2700 },
+        gaps: [],
+        hasWeakSignals: true,
+        weakSignals: ["Write-back control"],
+        confidence: "high",
+      }),
+    ).toMatch(/Write-back control is still weak/);
   });
 });

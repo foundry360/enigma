@@ -23,7 +23,7 @@ Never return access tokens, refresh tokens, client secrets, or raw Salesforce HT
 | `get_connection` | Org id, name, edition/type, connection status | Tokens |
 | `list_objects` | API names, label, custom/standard, queryable flag | Rows |
 | `describe_object` | Fields, types, record types, required flags | Field values |
-| `list_automations` | Flow and Apex **names**, namespace, status, size | Apex source (unless later allowed) |
+| `list_automations` | Flow and Apex **trigger** names, status, object, trigger type | Apex source (unless later allowed) |
 | `list_validation_rules` | Object, rule name, active | Rule formulas that embed customer data |
 | `security_summary` | Profile and permission-set counts; object-permission summaries | User names, emails, session data |
 | `knowledge_posture` | Knowledge article objects and data categories if present | Article bodies |

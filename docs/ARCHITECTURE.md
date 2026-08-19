@@ -32,6 +32,8 @@ Every intelligence output must include **score, evidence, reason, risk, and reco
 
 The model never receives Salesforce tokens, raw HTTP, or customer records.
 
+Ask Enigma uses Claude (Anthropic Messages API) for MVP conversation. Consumption, ROC, and ROA stay calculated. Official Salesforce prices are refused. Without `ANTHROPIC_API_KEY`, Ask stays on grounded fallback copy.
+
 ## What stays deterministic
 
 Use deterministic, tested code for:

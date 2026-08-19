@@ -1,11 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { formatTimeAgo, toUtcDate } from "@/lib/format";
+import {
+  formatCurrency,
+  formatDate,
+  formatTimeAgo,
+  toUtcDate,
+} from "@/lib/format";
 
 describe("toUtcDate", () => {
   it("treats naive postgres timestamps as UTC", () => {
     expect(toUtcDate("2026-08-18 03:00:30.185").toISOString()).toBe(
       "2026-08-18T03:00:30.185Z",
     );
+  });
+});
+
+describe("formatDate", () => {
+  it("prints calendar dates as dd/mm/yyyy", () => {
+    expect(formatDate("2026-08-19")).toBe("19/08/2026");
+  });
+});
+
+describe("formatCurrency", () => {
+  it("prints dollars with thousands separators", () => {
+    expect(formatCurrency(2700)).toBe("$2,700");
+    expect(formatCurrency(1_500_000)).toBe("$1,500,000");
   });
 });
 

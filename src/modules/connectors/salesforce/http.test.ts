@@ -32,7 +32,7 @@ describe("Salesforce path allowlist", () => {
       salesforcePath("tooling", "SELECT Id FROM Account"),
     ).toThrow();
     expect(() =>
-      salesforcePath("tooling", toolingQueries.apexClasses),
+      salesforcePath("tooling", toolingQueries.apexTriggers),
     ).not.toThrow();
     expect(() =>
       assertAllowedSalesforcePath(

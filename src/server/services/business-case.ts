@@ -25,6 +25,10 @@ import {
   proposeLineAssumptions,
 } from "@/modules/economics/propose";
 import { consumptionPosture } from "@/modules/intelligence/consumption";
+import {
+  expandEvidenceCitations,
+  isGroundedExpansion,
+} from "@/modules/intelligence/evidence-expand";
 import { opportunityDefinition } from "@/modules/intelligence/opportunities";
 import { requireTenantId } from "@/lib/tenants/scope";
 import { writeAuditLog } from "@/server/services/audit";
@@ -50,7 +54,7 @@ type LineJoinRow = BusinessCaseLineRow & {
   confidence: CandidateConfidence;
   finding: string;
   supportingSignals: CandidateSignalRef[];
-  evidence: { tool: string; citation: string }[];
+  evidence: { tool: string; citation: string; expansion?: string }[];
   consumptionDrivers: string[];
   valueDrivers: string[];
   constraints: string[];
@@ -268,6 +272,62 @@ export async function persistRecommendation(
   return loadBusinessCase(tenantId, detail.businessCase.id);
 }
 
+export async function persistEvidenceExpansions(
+  tenantId: string,
+  detail: BusinessCaseDetail,
+) {
+  const { expandCaseEvidence } = await import(
+    "@/server/services/business-case-ask"
+  );
+  const scoped = requireTenantId(tenantId);
+
+  for (const line of detail.lines) {
+    if (line.evidence.length === 0) {
+      continue;
+    }
+
+    const citations = line.evidence.map((entry) => entry.citation);
+    const fallback = expandEvidenceCitations({
+      citations,
+      signals: line.supportingSignals,
+    });
+    const modeled = await expandCaseEvidence({
+      name: line.opportunityName,
+      citations,
+      signals: line.supportingSignals,
+    });
+
+    const next = line.evidence.map((entry) => {
+      const modeledText = modeled?.[entry.citation];
+      const fallbackText = fallback.find((item) => item.citation === entry.citation)
+        ?.expansion;
+      const expansion =
+        modeledText && isGroundedExpansion(entry.citation, modeledText)
+          ? modeledText
+          : entry.expansion || fallbackText;
+
+      return {
+        tool: entry.tool,
+        citation: entry.citation,
+        ...(expansion ? { expansion } : {}),
+      };
+    });
+
+    await sql`
+      update "OpportunityCandidate" c
+      set
+        evidence = ${sql.json(JSON.parse(JSON.stringify(next)))},
+        "updatedAt" = now()
+      from "ProjectOpportunity" o
+      where o."candidateId" = c.id
+        and o.id = ${line.opportunityId}
+        and c."tenantId" = ${scoped}
+    `;
+  }
+
+  return loadBusinessCase(tenantId, detail.businessCase.id);
+}
+
 function asNumber(value: number | string | null | undefined) {
   if (value == null || value === "") {
     return null;
@@ -347,6 +407,7 @@ export function buildCaseBriefing(detail: BusinessCaseDetail) {
       confidence: line.confidence,
       finding: line.finding,
       signals: line.supportingSignals.map((signal) => ({
+        key: signal.key,
         title: signal.title,
         strength: signal.strength,
       })),
@@ -357,13 +418,39 @@ export function buildCaseBriefing(detail: BusinessCaseDetail) {
       dependencies: line.dependencies,
       annualVolume: line.annualVolume,
       unitPrice: line.unitPrice,
+      hoursSavedPerUnit: line.hoursSavedPerUnit,
+      hourlyCost: line.hourlyCost,
     })),
     scenario: detail.businessCase.scenario,
     adoption: caseAdoption(detail.businessCase),
+    baselineDays: detail.businessCase.baselineDays,
+    enigmaDays: detail.businessCase.enigmaDays,
+    implementation: detail.rollup.implementation,
     rollup: detail.rollup,
     gaps: detail.gaps,
     recommendationState: detail.recommendationState,
+    hasWeakSignals: detail.lines.some((line) =>
+      line.supportingSignals.some((signal) => signal.strength === "weak"),
+    ),
+    weakSignals: detail.lines.flatMap((line) =>
+      line.supportingSignals
+        .filter((signal) => signal.strength === "weak")
+        .map((signal) => signal.title),
+    ),
+    confidence: rollupConfidence(detail.lines.map((line) => line.confidence)),
   });
+}
+
+export async function getBusinessCaseDetail(
+  tenantId: string,
+  projectId: string,
+) {
+  const businessCase = await getBusinessCase(tenantId, projectId);
+  if (!businessCase) {
+    return null;
+  }
+
+  return loadBusinessCase(tenantId, businessCase.id);
 }
 
 async function seedDecipheredAssumptions(

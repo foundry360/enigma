@@ -17,7 +17,7 @@ export type BusinessCaseLineView = BusinessCaseLineRow & {
   confidence: CandidateConfidence;
   finding: string;
   supportingSignals: CandidateSignalRef[];
-  evidence: { tool: string; citation: string }[];
+  evidence: { tool: string; citation: string; expansion?: string }[];
   consumptionDrivers: string[];
   valueDrivers: string[];
   constraints: string[];

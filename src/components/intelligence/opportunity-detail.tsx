@@ -32,7 +32,10 @@ export function OpportunityDetail({
         signalHref={`/projects/${projectId}/intelligence?assessment=${opportunity.assessmentId}`}
         evidence={
           candidate && candidate.evidence.length > 0
-            ? candidate.evidence.map((entry) => entry.citation)
+            ? candidate.evidence.map((entry) => ({
+                citation: entry.citation,
+                expansion: entry.expansion,
+              }))
             : ["Referenced from the source candidate."]
         }
         reasoning={candidate?.finding}

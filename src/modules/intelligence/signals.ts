@@ -263,12 +263,7 @@ function automationCollision(
     count === 0 ? 45 : count < 8 ? 70 : count < 20 ? 40 : 25;
 
   return signal("automation_collision", score, {
-    evidence: [
-      cite(
-        "list_automations",
-        `${facts.automations.length} automations (${count} active).`,
-      ),
-    ],
+    evidence: citeAutomations(facts, count),
     meaning:
       count === 0
         ? "Work looks manual today, so an agent may become the first system of action."
@@ -341,20 +336,7 @@ function writebackControl(
         : 45;
 
   return signal("writeback_control", score, {
-    evidence: [
-      cite(
-        "list_validation_rules",
-        `${facts.validationRules.length} write rules (${context.writeRuleCount} active).`,
-      ),
-      ...(service
-        ? [
-            cite(
-              "describe_object",
-              `${service.label} has ${service.requiredCount} required fields.`,
-            ),
-          ]
-        : []),
-    ],
+    evidence: citeWriteRules(facts, context.writeRuleCount, service),
     meaning:
       score >= 45
         ? "Some write-path controls exist that an agent must respect."
@@ -381,6 +363,76 @@ function signal(
     strength: score >= 75 ? "strong" : score >= 45 ? "mixed" : "weak",
     ...rest,
   };
+}
+
+const evidenceNameLimit = 10;
+
+function citeAutomations(
+  facts: AssessmentFacts,
+  activeCount: number,
+): Evidence[] {
+  const active = facts.automations.filter(
+    (item) => !item.status || /active/i.test(item.status),
+  );
+  const named = active.slice(0, evidenceNameLimit).map(describeAutomation);
+  const extra = active.length - named.length;
+
+  return [
+    cite(
+      "list_automations",
+      `${facts.automations.length} automations (${activeCount} active).`,
+    ),
+    ...(named.length > 0
+      ? [cite("list_automations", `Active automations: ${named.join("; ")}.`)]
+      : []),
+    ...(extra > 0
+      ? [
+          cite(
+            "list_automations",
+            `${extra} more active automations were not listed.`,
+          ),
+        ]
+      : []),
+  ];
+}
+
+function citeWriteRules(
+  facts: AssessmentFacts,
+  activeCount: number,
+  service?: { label: string; requiredCount: number },
+): Evidence[] {
+  const named = facts.validationRules
+    .slice(0, evidenceNameLimit)
+    .map(
+      (rule) =>
+        `${rule.name} on ${rule.objectApiName}${rule.active ? "" : " (inactive)"}`,
+    );
+
+  return [
+    cite(
+      "list_validation_rules",
+      `${facts.validationRules.length} write rules (${activeCount} active).`,
+    ),
+    ...named.map((item) => cite("list_validation_rules", `${item}.`)),
+    ...(service
+      ? [
+          cite(
+            "describe_object",
+            `${service.label} has ${service.requiredCount} required fields.`,
+          ),
+        ]
+      : []),
+  ];
+}
+
+function describeAutomation(item: AssessmentFacts["automations"][number]) {
+  const kind =
+    item.kind === "apex_trigger" || item.kind === "apex"
+      ? "Apex trigger"
+      : "Flow";
+  const on = item.objectApiName ? ` on ${item.objectApiName}` : "";
+  const when = item.triggerType ? `, ${item.triggerType}` : "";
+  return `${kind} ${item.name}${on}${when}`;
 }
 
 function cite(tool: Evidence["tool"], citation: string): Evidence {
