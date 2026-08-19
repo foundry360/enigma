@@ -69,6 +69,21 @@ export type ProjectRow = {
   priority: string | null;
   successMetrics: string | null;
   notes: string | null;
+  implementationCost: number | null;
+  discoveryCost: number | null;
+  knowledgeCost: number | null;
+  changeManagementCost: number | null;
+  servicesCost: number | null;
+  otherCost: number | null;
+  annualVolume: number | null;
+  unitPrice: number | null;
+  hoursSavedPerUnit: number | null;
+  hourlyCost: number | null;
+  conservativeAdoption: number | null;
+  expectedAdoption: number | null;
+  aggressiveAdoption: number | null;
+  baselineDays: number | null;
+  enigmaDays: number | null;
   connectPlatformLater: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -229,12 +244,28 @@ export type BusinessCaseScenario =
   | "expected"
   | "aggressive";
 
+export type BusinessCaseStatus =
+  | "draft"
+  | "in_review"
+  | "approved"
+  | "rejected";
+
 export type BusinessCaseRow = {
   id: string;
   tenantId: string;
   projectId: string;
   scenario: BusinessCaseScenario;
   monthsAccelerated: number | null;
+  status: BusinessCaseStatus;
+  conservativeAdoption: number;
+  expectedAdoption: number;
+  aggressiveAdoption: number;
+  baselineDays: number | null;
+  enigmaDays: number | null;
+  predictedSnapshot: Record<string, unknown> | null;
+  recommendationState: string | null;
+  recommendationNarrative: string | null;
+  intelligenceNarrative: string | null;
   createdAt: Date;
   updatedAt: Date;
 };

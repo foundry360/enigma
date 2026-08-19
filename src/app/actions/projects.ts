@@ -9,6 +9,7 @@ import {
   createProject,
   deleteProject,
   getProject,
+  getProjectForEdit,
   setProjectEnvironment,
   updateProject,
 } from "@/server/services/projects";
@@ -21,6 +22,21 @@ function formList(formData: FormData, name: string) {
 function optionalText(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? "").trim();
   return value || undefined;
+}
+
+function optionalNumber(formData: FormData, name: string) {
+  const value = String(formData.get(name) ?? "").trim();
+  if (!value) {
+    return undefined;
+  }
+
+  const next = Number(value);
+  return Number.isFinite(next) ? next : undefined;
+}
+
+function optionalPercent(formData: FormData, name: string) {
+  const value = optionalNumber(formData, name);
+  return value == null ? undefined : value / 100;
 }
 
 export async function createProjectAction(
@@ -48,6 +64,21 @@ export async function createProjectAction(
     priority: optionalText(formData, "priority"),
     successMetrics: optionalText(formData, "successMetrics"),
     notes: optionalText(formData, "notes"),
+    implementationCost: optionalNumber(formData, "implementationCost"),
+    discoveryCost: optionalNumber(formData, "discoveryCost"),
+    knowledgeCost: optionalNumber(formData, "knowledgeCost"),
+    changeManagementCost: optionalNumber(formData, "changeManagementCost"),
+    servicesCost: optionalNumber(formData, "servicesCost"),
+    otherCost: optionalNumber(formData, "otherCost"),
+    annualVolume: optionalNumber(formData, "annualVolume"),
+    unitPrice: optionalNumber(formData, "unitPrice"),
+    hoursSavedPerUnit: optionalNumber(formData, "hoursSavedPerUnit"),
+    hourlyCost: optionalNumber(formData, "hourlyCost"),
+    conservativeAdoption: optionalPercent(formData, "conservativeAdoption"),
+    expectedAdoption: optionalPercent(formData, "expectedAdoption"),
+    aggressiveAdoption: optionalPercent(formData, "aggressiveAdoption"),
+    baselineDays: optionalNumber(formData, "baselineDays"),
+    enigmaDays: optionalNumber(formData, "enigmaDays"),
   });
 
   if (!parsed.success) {
@@ -101,6 +132,21 @@ export async function updateProjectAction(
     priority: optionalText(formData, "priority"),
     successMetrics: optionalText(formData, "successMetrics"),
     notes: optionalText(formData, "notes"),
+    implementationCost: optionalNumber(formData, "implementationCost"),
+    discoveryCost: optionalNumber(formData, "discoveryCost"),
+    knowledgeCost: optionalNumber(formData, "knowledgeCost"),
+    changeManagementCost: optionalNumber(formData, "changeManagementCost"),
+    servicesCost: optionalNumber(formData, "servicesCost"),
+    otherCost: optionalNumber(formData, "otherCost"),
+    annualVolume: optionalNumber(formData, "annualVolume"),
+    unitPrice: optionalNumber(formData, "unitPrice"),
+    hoursSavedPerUnit: optionalNumber(formData, "hoursSavedPerUnit"),
+    hourlyCost: optionalNumber(formData, "hourlyCost"),
+    conservativeAdoption: optionalPercent(formData, "conservativeAdoption"),
+    expectedAdoption: optionalPercent(formData, "expectedAdoption"),
+    aggressiveAdoption: optionalPercent(formData, "aggressiveAdoption"),
+    baselineDays: optionalNumber(formData, "baselineDays"),
+    enigmaDays: optionalNumber(formData, "enigmaDays"),
   });
 
   if (!parsed.success) {
@@ -125,7 +171,16 @@ export async function updateProjectAction(
   }
 
   revalidatePath("/", "layout");
+  if (String(formData.get("fromModal") ?? "") === "1") {
+    return { ok: true };
+  }
+
   redirect(`/projects/${project.id}/settings`);
+}
+
+export async function getProjectForEditAction(projectId: string) {
+  const session = await requireSession();
+  return getProjectForEdit(session.tenantId, projectId);
 }
 
 export async function setProjectEnvironmentAction(formData: FormData) {
@@ -160,7 +215,8 @@ export async function deleteProjectAction(formData: FormData) {
   }
 
   if (confirmName !== project.name) {
-    redirect(`/projects/${project.id}/settings`);
+    const returnTo = String(formData.get("returnTo") ?? "").trim();
+    redirect(returnTo || `/projects/${project.id}/settings`);
   }
 
   await deleteProject({

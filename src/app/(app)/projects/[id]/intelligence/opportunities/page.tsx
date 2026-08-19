@@ -7,7 +7,7 @@ import { IntelligencePane } from "@/components/intelligence/intelligence-pane";
 import { OpportunityDetail } from "@/components/intelligence/opportunity-detail";
 import { requireSession } from "@/lib/auth/session";
 import { intelligenceHref } from "@/lib/intelligence/routes";
-import { formatDateTime, titleCase } from "@/lib/format";
+import { titleCase } from "@/lib/format";
 import { getLatestAssessmentDetail } from "@/server/services/assessments";
 import {
   ensureOpportunityCandidates,
@@ -146,26 +146,15 @@ export default async function IntelligenceOpportunitiesPage({
           </div>
           <div className="min-h-0 overflow-y-auto">
             {detailOpportunity ? (
-              <div className="space-y-3">
-                <OpportunityDetail
-                  opportunity={detailOpportunity}
-                  candidate={sourceCandidate}
-                  projectId={id}
-                  runDate={latest?.assessment.createdAt ?? null}
-                />
-                <p className="text-xs text-muted">
-                  Promoted {formatDateTime(detailOpportunity.createdAt)}.
-                </p>
-              </div>
+              <OpportunityDetail
+                opportunity={detailOpportunity}
+                candidate={sourceCandidate}
+                projectId={id}
+              />
             ) : selectedCandidate ? (
               <CandidateReview
                 candidate={selectedCandidate}
                 projectId={id}
-                runDate={
-                  latest?.assessment.id === selectedCandidate.assessmentId
-                    ? latest.assessment.createdAt
-                    : selectedCandidate.createdAt
-                }
               />
             ) : (
               <p className="rounded-lg border border-border bg-surface px-4 py-8 text-center text-sm text-muted">

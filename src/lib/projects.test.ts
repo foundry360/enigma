@@ -43,4 +43,31 @@ describe("projectProgress", () => {
       completed: 3,
     });
   });
+
+  it("moves to Model when a business case exists", () => {
+    expect(
+      projectProgress({
+        connected: true,
+        assessmentStatus: "COMPLETE",
+        hasBusinessCase: true,
+      }),
+    ).toMatchObject({
+      current: "Model",
+      completed: 4,
+    });
+  });
+
+  it("moves to Recommend when the business case is approved", () => {
+    expect(
+      projectProgress({
+        connected: true,
+        assessmentStatus: "COMPLETE",
+        hasBusinessCase: true,
+        businessCaseStatus: "approved",
+      }),
+    ).toMatchObject({
+      current: "Recommend",
+      completed: 5,
+    });
+  });
 });

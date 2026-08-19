@@ -11,7 +11,7 @@ export const riskColors: Record<ReadinessRisk, string> = {
 };
 
 const riskBadge: Record<ReadinessRisk, string> = {
-  low: "border-transparent bg-[#3ECF8E] text-white",
+  low: "border-transparent bg-[#3ECF8E] text-[#2d3340]",
   medium: "border-transparent bg-[#F5C542] text-[#2d3340]",
   high: "border-transparent bg-[#F16A50] text-white",
 };
@@ -23,7 +23,7 @@ const riskLabel: Record<ReadinessRisk, string> = {
 };
 
 const strengthBadge: Record<SignalStrength, string> = {
-  strong: "border-transparent bg-[#3ECF8E] text-white",
+  strong: "border-transparent bg-[#3ECF8E] text-[#2d3340]",
   mixed: "border-transparent bg-[#F5C542] text-[#2d3340]",
   weak: "border-transparent bg-[#F16A50] text-white",
 };

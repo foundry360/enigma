@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import {
   RiskBadge,
   ScoreRing,
+  StrengthBadge,
   riskColors,
   strengthColors,
 } from "@/components/ui/score-ring";
@@ -19,6 +20,7 @@ export type CategoryItem = {
   risk: string;
   recommendation: string;
   consumption?: string;
+  description?: string;
 };
 
 const stateLabel = {
@@ -30,10 +32,12 @@ const stateLabel = {
 export function ReadinessCategories({
   items,
   title = "Categories",
+  description,
   tone = "readiness",
 }: {
   items: CategoryItem[];
   title?: string;
+  description?: string;
   tone?: "readiness" | "signal";
 }) {
   const [selectedId, setSelectedId] = useState(items[0]?.id ?? "");
@@ -46,8 +50,11 @@ export function ReadinessCategories({
   return (
     <div className="grid gap-4 xl:grid-cols-[30%_minmax(0,1fr)]">
       <section className="rounded-lg border border-border bg-surface p-5">
-        <h2 className="mb-3 text-sm font-semibold">{title}</h2>
-        <div className="space-y-1">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {description ? (
+          <p className="mt-1 text-xs text-muted">{description}</p>
+        ) : null}
+        <div className="mt-3 space-y-1">
           {items.map((item) => {
             const active = item.id === selected.id;
             const risk = readinessRisk(item.score);
@@ -105,14 +112,22 @@ export function ReadinessCategories({
       </section>
 
       <section className="rounded-lg border border-border bg-surface p-5">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">
-            {titleCase(selected.title)}
-          </h2>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-sm font-semibold">
+              {titleCase(selected.title)}
+            </h2>
+            {selected.description ? (
+              <p
+                className="mt-1 truncate text-xs text-muted"
+                title={selected.description}
+              >
+                {selected.description}
+              </p>
+            ) : null}
+          </div>
           {tone === "signal" ? (
-            <span className="text-xs text-muted">
-              {stateLabel[signalState(selected.score)]}
-            </span>
+            <StrengthBadge state={signalState(selected.score)} />
           ) : (
             <RiskBadge risk={readinessRisk(selected.score)} />
           )}

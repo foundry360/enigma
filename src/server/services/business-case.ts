@@ -1,19 +1,31 @@
+import "server-only";
+
 import { createId, sql } from "@/lib/db/sql";
 import type {
   BusinessCaseLineRow,
   BusinessCaseRow,
-  BusinessCaseScenario,
+  BusinessCaseStatus,
+  CandidateConfidence,
+  CandidateSignalRef,
 } from "@/lib/db/types";
 import { toUtcDate } from "@/lib/format";
+import { toBusinessCaseBriefing } from "@/modules/economics/briefing";
+import type { BusinessCaseDetail, BusinessCaseLineView } from "@/modules/economics/case-view";
 import {
-  consumptionPosture,
-} from "@/modules/intelligence/consumption";
-import {
+  adoptionForScenario,
+  defaultAdoption,
   isScenario,
-  rollUpCase,
-  type CaseRollup,
-  type LineAssumptions,
+  normalizeAdoption,
+  sumProjectInvestment,
+  summarizeCase,
+  type BusinessCaseDraft,
 } from "@/modules/economics/model";
+import {
+  proposeCaseTiming,
+  proposeLineAssumptions,
+} from "@/modules/economics/propose";
+import { consumptionPosture } from "@/modules/intelligence/consumption";
+import { opportunityDefinition } from "@/modules/intelligence/opportunities";
 import { requireTenantId } from "@/lib/tenants/scope";
 import { writeAuditLog } from "@/server/services/audit";
 import { getProject } from "@/server/services/projects";
@@ -27,25 +39,22 @@ function withUtc<T extends { createdAt: Date; updatedAt?: Date }>(row: T): T {
   };
 }
 
-export type BusinessCaseLineView = BusinessCaseLineRow & {
-  opportunityName: string;
-  businessArea: string;
-  recommendedCapability: string;
-  candidateKey: string;
-  unitHint: string;
-};
-
-export type BusinessCaseDetail = {
-  businessCase: BusinessCaseRow;
-  lines: BusinessCaseLineView[];
-  rollup: CaseRollup;
-};
+export type { BusinessCaseDetail, BusinessCaseLineView, BusinessCaseDraft };
 
 type LineJoinRow = BusinessCaseLineRow & {
   opportunityName: string;
   businessArea: string;
+  businessProcess: string;
   recommendedCapability: string;
   candidateKey: string;
+  confidence: CandidateConfidence;
+  finding: string;
+  supportingSignals: CandidateSignalRef[];
+  evidence: { tool: string; citation: string }[];
+  consumptionDrivers: string[];
+  valueDrivers: string[];
+  constraints: string[];
+  dependencies: string[];
 };
 
 export async function ensureBusinessCase(
@@ -68,20 +77,28 @@ export async function ensureBusinessCase(
   if (!businessCase) {
     const [created] = await sql<BusinessCaseRow[]>`
       insert into "BusinessCase" (
-        id, "tenantId", "projectId", scenario, "createdAt", "updatedAt"
+        id, "tenantId", "projectId", scenario, status,
+        "conservativeAdoption", "expectedAdoption", "aggressiveAdoption",
+        "createdAt", "updatedAt"
       )
       values (
         ${createId()},
         ${scoped},
         ${projectId},
         'expected',
+        'draft',
+        ${defaultAdoption.conservative},
+        ${defaultAdoption.expected},
+        ${defaultAdoption.aggressive},
         now(),
         now()
       )
       on conflict ("projectId") do nothing
       returning *
     `;
-    businessCase = created ? withUtc(created) : await getBusinessCase(tenantId, projectId);
+    businessCase = created
+      ? withCase(created)
+      : await getBusinessCase(tenantId, projectId);
   }
 
   if (!businessCase) {
@@ -106,39 +123,52 @@ export async function ensureBusinessCase(
     `;
   }
 
-  return loadBusinessCase(tenantId, businessCase.id);
+  const loaded = await loadBusinessCase(tenantId, businessCase.id);
+  return loaded ? seedDecipheredAssumptions(tenantId, loaded) : null;
 }
 
 export async function saveBusinessCase(input: {
   tenantId: string;
   userId: string;
   projectId: string;
-  scenario: BusinessCaseScenario;
-  monthsAccelerated: number | null;
-  lines: Array<{ opportunityId: string } & LineAssumptions>;
+  draft: BusinessCaseDraft;
+  refreshRecommendation?: boolean;
 }) {
   const detail = await ensureBusinessCase(input.tenantId, input.projectId);
   if (!detail) {
     return { error: "not-found" as const };
   }
 
-  if (!isScenario(input.scenario)) {
+  if (detail.businessCase.status === "approved") {
+    return { error: "locked" as const };
+  }
+
+  if (!isScenario(input.draft.scenario)) {
     return { error: "invalid" as const };
   }
 
   const scoped = requireTenantId(input.tenantId);
   const allowed = new Set(detail.lines.map((line) => line.opportunityId));
+  const adoption = normalizeAdoption({
+    conservative: input.draft.conservativeAdoption,
+    expected: input.draft.expectedAdoption,
+    aggressive: input.draft.aggressiveAdoption,
+  });
 
   await sql`
     update "BusinessCase"
     set
-      scenario = ${input.scenario},
-      "monthsAccelerated" = ${input.monthsAccelerated},
+      scenario = ${input.draft.scenario},
+      "conservativeAdoption" = ${adoption.conservative},
+      "expectedAdoption" = ${adoption.expected},
+      "aggressiveAdoption" = ${adoption.aggressive},
+      "baselineDays" = ${input.draft.baselineDays},
+      "enigmaDays" = ${input.draft.enigmaDays},
       "updatedAt" = now()
     where "tenantId" = ${scoped} and id = ${detail.businessCase.id}
   `;
 
-  for (const line of input.lines) {
+  for (const line of input.draft.lines) {
     if (!allowed.has(line.opportunityId)) {
       continue;
     }
@@ -150,7 +180,6 @@ export async function saveBusinessCase(input: {
         "unitPrice" = ${line.unitPrice},
         "hoursSavedPerUnit" = ${line.hoursSavedPerUnit},
         "hourlyCost" = ${line.hourlyCost},
-        "implementationCost" = ${line.implementationCost},
         "updatedAt" = now()
       where "tenantId" = ${scoped}
         and "businessCaseId" = ${detail.businessCase.id}
@@ -164,10 +193,79 @@ export async function saveBusinessCase(input: {
     action: "businessCase.update",
     entity: "BusinessCase",
     entityId: detail.businessCase.id,
-    metadata: { projectId: input.projectId, scenario: input.scenario },
+    metadata: { projectId: input.projectId, scenario: input.draft.scenario },
+  });
+
+  let next = await loadBusinessCase(input.tenantId, detail.businessCase.id);
+  if (input.refreshRecommendation && next) {
+    next = await persistRecommendation(input.tenantId, next);
+  }
+
+  return next;
+}
+
+export async function approveBusinessCase(input: {
+  tenantId: string;
+  userId: string;
+  projectId: string;
+}) {
+  const detail = await ensureBusinessCase(input.tenantId, input.projectId);
+  if (!detail) {
+    return { error: "not-found" as const };
+  }
+
+  if (!detail.rollup.complete || detail.gaps.length > 0) {
+    return { error: "incomplete" as const };
+  }
+
+  const scoped = requireTenantId(input.tenantId);
+  await sql`
+    update "BusinessCase"
+    set
+      status = 'approved',
+      "predictedSnapshot" = ${sql.json({
+        rollup: detail.rollup,
+        recommendationState: detail.recommendationState,
+        recommendationNarrative: detail.businessCase.recommendationNarrative,
+        intelligenceNarrative: detail.businessCase.intelligenceNarrative,
+      })},
+      "updatedAt" = now()
+    where "tenantId" = ${scoped} and id = ${detail.businessCase.id}
+  `;
+
+  await writeAuditLog({
+    tenantId: input.tenantId,
+    userId: input.userId,
+    action: "businessCase.approve",
+    entity: "BusinessCase",
+    entityId: detail.businessCase.id,
+    metadata: { projectId: input.projectId },
   });
 
   return loadBusinessCase(input.tenantId, detail.businessCase.id);
+}
+
+export async function persistRecommendation(
+  tenantId: string,
+  detail: BusinessCaseDetail,
+) {
+  const { explainBusinessCase } = await import(
+    "@/server/services/business-case-ask"
+  );
+  const explained = await explainBusinessCase(buildCaseBriefing(detail));
+  const scoped = requireTenantId(tenantId);
+
+  await sql`
+    update "BusinessCase"
+    set
+      "recommendationState" = ${explained.recommendationState},
+      "recommendationNarrative" = ${explained.recommendationNarrative},
+      "intelligenceNarrative" = ${explained.intelligenceNarrative},
+      "updatedAt" = now()
+    where "tenantId" = ${scoped} and id = ${detail.businessCase.id}
+  `;
+
+  return loadBusinessCase(tenantId, detail.businessCase.id);
 }
 
 function asNumber(value: number | string | null | undefined) {
@@ -179,6 +277,48 @@ function asNumber(value: number | string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function projectInvestmentTotal(
+  project: {
+    discoveryCost: number | string | null;
+    implementationCost: number | string | null;
+    knowledgeCost: number | string | null;
+    changeManagementCost: number | string | null;
+    servicesCost: number | string | null;
+    otherCost: number | string | null;
+  } | null,
+) {
+  if (!project) {
+    return null;
+  }
+
+  return sumProjectInvestment({
+    discovery: asNumber(project.discoveryCost),
+    implementation: asNumber(project.implementationCost),
+    knowledge: asNumber(project.knowledgeCost),
+    change: asNumber(project.changeManagementCost),
+    services: asNumber(project.servicesCost),
+    other: asNumber(project.otherCost),
+  });
+}
+
+function withCase(row: BusinessCaseRow): BusinessCaseRow {
+  const rates = normalizeAdoption({
+    conservative:
+      asNumber(row.conservativeAdoption) ?? defaultAdoption.conservative,
+    expected: asNumber(row.expectedAdoption) ?? defaultAdoption.expected,
+    aggressive: asNumber(row.aggressiveAdoption) ?? defaultAdoption.aggressive,
+  });
+  return {
+    ...withUtc(row),
+    conservativeAdoption: rates.conservative,
+    expectedAdoption: rates.expected,
+    aggressiveAdoption: rates.aggressive,
+    baselineDays: asNumber(row.baselineDays),
+    enigmaDays: asNumber(row.enigmaDays),
+    status: (row.status ?? "draft") as BusinessCaseStatus,
+  };
+}
+
 export async function getBusinessCase(tenantId: string, projectId: string) {
   const scoped = requireTenantId(tenantId);
   const [row] = await sql<BusinessCaseRow[]>`
@@ -187,7 +327,166 @@ export async function getBusinessCase(tenantId: string, projectId: string) {
     where "tenantId" = ${scoped} and "projectId" = ${projectId}
     limit 1
   `;
-  return row ? withUtc(row) : null;
+  return row ? withCase(row) : null;
+}
+
+export function caseAdoption(businessCase: BusinessCaseRow) {
+  return adoptionForScenario(businessCase.scenario, {
+    conservative: businessCase.conservativeAdoption,
+    expected: businessCase.expectedAdoption,
+    aggressive: businessCase.aggressiveAdoption,
+  });
+}
+
+export function buildCaseBriefing(detail: BusinessCaseDetail) {
+  return toBusinessCaseBriefing({
+    opportunities: detail.lines.map((line) => ({
+      name: line.opportunityName,
+      process: line.businessProcess,
+      capability: line.recommendedCapability,
+      confidence: line.confidence,
+      finding: line.finding,
+      signals: line.supportingSignals.map((signal) => ({
+        title: signal.title,
+        strength: signal.strength,
+      })),
+      evidence: line.evidence.map((entry) => entry.citation),
+      consumptionDrivers: line.consumptionDrivers,
+      valueDrivers: line.valueDrivers,
+      constraints: line.constraints,
+      dependencies: line.dependencies,
+      annualVolume: line.annualVolume,
+      unitPrice: line.unitPrice,
+    })),
+    scenario: detail.businessCase.scenario,
+    adoption: caseAdoption(detail.businessCase),
+    rollup: detail.rollup,
+    gaps: detail.gaps,
+    recommendationState: detail.recommendationState,
+  });
+}
+
+async function seedDecipheredAssumptions(
+  tenantId: string,
+  detail: BusinessCaseDetail,
+) {
+  const scoped = requireTenantId(tenantId);
+  const project = await getProject(tenantId, detail.businessCase.projectId);
+  const neverDeciphered =
+    detail.businessCase.baselineDays == null &&
+    detail.businessCase.enigmaDays == null;
+  let changed = false;
+
+  if (
+    neverDeciphered ||
+    detail.businessCase.baselineDays == null ||
+    detail.businessCase.enigmaDays == null
+  ) {
+    await sql`
+      update "BusinessCase"
+      set
+        "conservativeAdoption" = ${
+          detail.businessCase.conservativeAdoption ??
+          project?.conservativeAdoption ??
+          (neverDeciphered
+            ? detail.proposedCase.conservativeAdoption
+            : detail.businessCase.conservativeAdoption)
+        },
+        "expectedAdoption" = ${
+          detail.businessCase.expectedAdoption ??
+          project?.expectedAdoption ??
+          (neverDeciphered
+            ? detail.proposedCase.expectedAdoption
+            : detail.businessCase.expectedAdoption)
+        },
+        "aggressiveAdoption" = ${
+          detail.businessCase.aggressiveAdoption ??
+          project?.aggressiveAdoption ??
+          (neverDeciphered
+            ? detail.proposedCase.aggressiveAdoption
+            : detail.businessCase.aggressiveAdoption)
+        },
+        "baselineDays" = ${
+          detail.businessCase.baselineDays ??
+          project?.baselineDays ??
+          detail.proposedCase.baselineDays
+        },
+        "enigmaDays" = ${
+          detail.businessCase.enigmaDays ??
+          project?.enigmaDays ??
+          detail.proposedCase.enigmaDays
+        },
+        "updatedAt" = now()
+      where "tenantId" = ${scoped} and id = ${detail.businessCase.id}
+    `;
+    changed = true;
+  }
+
+  for (const line of detail.lines) {
+    if (
+      line.annualVolume != null &&
+      line.unitPrice != null &&
+      line.hoursSavedPerUnit != null &&
+      line.hourlyCost != null
+    ) {
+      continue;
+    }
+
+    await sql`
+      update "BusinessCaseLine"
+      set
+        "annualVolume" = ${
+          line.annualVolume ?? project?.annualVolume ?? line.proposed.annualVolume
+        },
+        "unitPrice" = ${
+          line.unitPrice ?? project?.unitPrice ?? line.proposed.unitPrice
+        },
+        "hoursSavedPerUnit" = ${
+          line.hoursSavedPerUnit ??
+          project?.hoursSavedPerUnit ??
+          line.proposed.hoursSavedPerUnit
+        },
+        "hourlyCost" = ${
+          line.hourlyCost ?? project?.hourlyCost ?? line.proposed.hourlyCost
+        },
+        "updatedAt" = now()
+      where "tenantId" = ${scoped} and id = ${line.id}
+    `;
+    changed = true;
+  }
+
+  const projectInvestment = projectInvestmentTotal(project);
+  for (const [index, line] of detail.lines.entries()) {
+    const nextCost =
+      projectInvestment == null ? null : index === 0 ? projectInvestment : 0;
+    if (line.implementationCost === nextCost) {
+      continue;
+    }
+
+    await sql`
+      update "BusinessCaseLine"
+      set
+        "implementationCost" = ${nextCost},
+        "updatedAt" = now()
+      where "tenantId" = ${scoped} and id = ${line.id}
+    `;
+    changed = true;
+  }
+
+  return changed ? loadBusinessCase(tenantId, detail.businessCase.id) : detail;
+}
+
+async function employeeRangeForProject(tenantId: string, projectId: string) {
+  const scoped = requireTenantId(tenantId);
+  const [row] = await sql<{ employeeRange: string | null }[]>`
+    select o."employeeRange"
+    from "Organization" o
+    join "Project" p
+      on p."organizationId" = o.id and p."tenantId" = o."tenantId"
+    where p."tenantId" = ${scoped} and p.id = ${projectId}
+    limit 1
+  `;
+  return row?.employeeRange ?? null;
 }
 
 async function loadBusinessCase(
@@ -195,24 +494,38 @@ async function loadBusinessCase(
   businessCaseId: string,
 ): Promise<BusinessCaseDetail | null> {
   const scoped = requireTenantId(tenantId);
-  const [businessCase] = await sql<BusinessCaseRow[]>`
+  const [row] = await sql<BusinessCaseRow[]>`
     select *
     from "BusinessCase"
     where "tenantId" = ${scoped} and id = ${businessCaseId}
     limit 1
   `;
 
-  if (!businessCase) {
+  if (!row) {
     return null;
   }
 
+  const businessCase = withCase(row);
+  const [employeeRange, project] = await Promise.all([
+    employeeRangeForProject(tenantId, businessCase.projectId),
+    getProject(tenantId, businessCase.projectId),
+  ]);
   const rows = await sql<LineJoinRow[]>`
     select
       l.*,
       o.name as "opportunityName",
       o."businessArea",
+      o."businessProcess",
       o."recommendedCapability",
-      c.key as "candidateKey"
+      o.confidence,
+      c.key as "candidateKey",
+      c.finding,
+      c."supportingSignals",
+      c.evidence,
+      c."consumptionDrivers",
+      c."valueDrivers",
+      c.constraints,
+      c.dependencies
     from "BusinessCaseLine" l
     join "ProjectOpportunity" o
       on o.id = l."opportunityId" and o."tenantId" = l."tenantId"
@@ -222,8 +535,32 @@ async function loadBusinessCase(
     order by o."createdAt"
   `;
 
-  const lines = rows.map((row) => {
-    const { opportunityName, businessArea, recommendedCapability, candidateKey, ...line } = row;
+  const lines = rows.map((joined) => {
+    const definition = opportunityDefinition(joined.candidateKey);
+    const {
+      opportunityName,
+      businessArea,
+      businessProcess,
+      recommendedCapability,
+      candidateKey,
+      confidence,
+      finding,
+      supportingSignals,
+      evidence,
+      consumptionDrivers,
+      valueDrivers,
+      constraints,
+      dependencies,
+      ...line
+    } = joined;
+
+    const nextConstraints =
+      definition?.constraints ??
+      (Array.isArray(constraints) ? constraints : []);
+    const nextSignals = Array.isArray(supportingSignals)
+      ? supportingSignals
+      : [];
+
     return {
       ...withUtc(line),
       annualVolume: asNumber(line.annualVolume),
@@ -233,19 +570,72 @@ async function loadBusinessCase(
       implementationCost: asNumber(line.implementationCost),
       opportunityName,
       businessArea,
+      businessProcess,
       recommendedCapability,
       candidateKey,
       unitHint: consumptionPosture({ key: candidateKey, score: 0 }).unitHint,
+      confidence,
+      finding,
+      supportingSignals: nextSignals,
+      evidence: Array.isArray(evidence) ? evidence : [],
+      consumptionDrivers:
+        definition?.consumptionDrivers ??
+        (Array.isArray(consumptionDrivers) ? consumptionDrivers : []),
+      valueDrivers:
+        definition?.valueDrivers ??
+        (Array.isArray(valueDrivers) ? valueDrivers : []),
+      constraints: nextConstraints,
+      dependencies:
+        definition?.dependencies ??
+        (Array.isArray(dependencies) ? dependencies : []),
+      proposed: proposeLineAssumptions({
+        candidateKey,
+        confidence,
+        signals: nextSignals,
+        constraintCount: nextConstraints.length,
+        employeeRange,
+      }),
     };
   });
 
-  return {
-    businessCase: withUtc(businessCase),
+  const summary = summarizeCase({
     lines,
-    rollup: rollUpCase({
-      lines,
-      scenario: businessCase.scenario,
-      monthsAccelerated: asNumber(businessCase.monthsAccelerated),
+    scenario: businessCase.scenario,
+    conservativeAdoption: businessCase.conservativeAdoption,
+    expectedAdoption: businessCase.expectedAdoption,
+    aggressiveAdoption: businessCase.aggressiveAdoption,
+    baselineDays: businessCase.baselineDays,
+    enigmaDays: businessCase.enigmaDays,
+    implementationCost: projectInvestmentTotal(project),
+    hasWeakSignals: lines.some((line) =>
+      line.supportingSignals.some((signal) => signal.strength === "weak"),
+    ),
+    confidence: rollupConfidence(lines.map((line) => line.confidence)),
+  });
+
+  return {
+    businessCase,
+    lines,
+    rollup: summary.rollup,
+    gaps: summary.gaps,
+    recommendationState: summary.recommendationState,
+    proposedCase: proposeCaseTiming({
+      confidence: rollupConfidence(lines.map((line) => line.confidence)),
+      signals: lines.flatMap((line) => line.supportingSignals),
+      constraintCount: Math.max(
+        0,
+        ...lines.map((line) => line.constraints.length),
+      ),
     }),
   };
+}
+
+function rollupConfidence(values: CandidateConfidence[]) {
+  if (values.includes("high")) {
+    return "high" as const;
+  }
+  if (values.includes("medium")) {
+    return "medium" as const;
+  }
+  return values[0] ?? null;
 }

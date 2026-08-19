@@ -5,7 +5,10 @@ import { ReadinessCategories } from "@/components/intelligence/readiness-categor
 import { ScoreRing, strengthColors } from "@/components/ui/score-ring";
 import { requireSession } from "@/lib/auth/session";
 import { formatDateTime } from "@/lib/format";
-import { splitSignalCopy } from "@/modules/intelligence/signals";
+import {
+  signalExplainer,
+  splitSignalCopy,
+} from "@/modules/intelligence/signals";
 import { overallScore, signalState } from "@/modules/intelligence/score";
 import {
   getLatestAssessmentDetail,
@@ -13,6 +16,7 @@ import {
 } from "@/server/services/assessments";
 import { ensureOpportunityCandidates } from "@/server/services/opportunities";
 import { getConnectionOrgProfile } from "@/server/services/connections";
+import { discoveryToolLabel } from "@/modules/mcp/catalog";
 import { getProjectOverview } from "@/server/services/projects";
 
 const stateLabel = {
@@ -78,8 +82,12 @@ export default async function ProjectIntelligencePage({
             <ScoreRing score={strength} size="xl" showBadge={false} />
             <div className="min-w-0">
               <p className="text-sm font-semibold">Signal Strength</p>
+              <p className="mt-1 text-xs text-muted">
+                How strongly this environment supports agent work, from the
+                latest intelligence run.
+              </p>
               <p
-                className={`mt-1 text-sm ${strength == null ? "text-muted" : ""}`}
+                className={`mt-2 text-sm ${strength == null ? "text-muted" : ""}`}
                 style={
                   strength == null
                     ? undefined
@@ -97,11 +105,10 @@ export default async function ProjectIntelligencePage({
             <MetaRow label="Date">
               {detail ? formatDateTime(detail.assessment.createdAt) : "—"}
             </MetaRow>
-            <MetaRow label="Status">
-              {detail?.assessment.status ?? "Not run"}
-            </MetaRow>
-            <MetaRow label="Sources">
-              {sources.length > 0 ? sources.join(", ") : "—"}
+            <MetaRow label="Discovery Tools">
+              {sources.length > 0
+                ? sources.map(discoveryToolLabel).join(", ")
+                : "—"}
             </MetaRow>
             <MetaRow label="Facts">{detail?.traces.length ?? 0}</MetaRow>
             <MetaRow label="Signals">{complete ? signals.length : 0}</MetaRow>
@@ -115,6 +122,7 @@ export default async function ProjectIntelligencePage({
       {complete && signals.length > 0 ? (
         <ReadinessCategories
           title="Business signals"
+          description="Each signal is a judgment from discovery: what it means, how it affects consumption, and what to do next."
           tone="signal"
           items={signals.map((item) => {
             const copy = splitSignalCopy(item.reason);
@@ -127,6 +135,7 @@ export default async function ProjectIntelligencePage({
               consumption: copy.consumption,
               risk: item.risk,
               recommendation: item.recommendation,
+              description: signalExplainer(item.key),
             };
           })}
         />

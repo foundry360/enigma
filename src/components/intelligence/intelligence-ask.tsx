@@ -132,7 +132,7 @@ export function IntelligenceAsk({
       </div>
 
       <form
-        className="border-t border-border p-4"
+        className="border-t border-border bg-ask-footer p-4"
         onSubmit={(event) => {
           event.preventDefault();
           send(input);

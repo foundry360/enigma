@@ -59,6 +59,8 @@ export type ProjectPhase = (typeof projectPhases)[number];
 export function projectProgress(input: {
   connected: boolean;
   assessmentStatus?: string | null;
+  hasBusinessCase?: boolean;
+  businessCaseStatus?: string | null;
 }) {
   const status = input.assessmentStatus;
   const notStarted = !status || status === "DRAFT" || status === "FAILED";
@@ -66,9 +68,13 @@ export function projectProgress(input: {
     ? 0
     : notStarted
       ? 1
-      : status === "COMPLETE"
-        ? 3
-        : 2;
+      : status !== "COMPLETE"
+        ? 2
+        : input.businessCaseStatus === "approved"
+          ? 5
+          : input.hasBusinessCase
+            ? 4
+            : 3;
   const current = projectPhases[Math.min(completed, projectPhases.length - 1)];
 
   return {

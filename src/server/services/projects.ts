@@ -43,6 +43,27 @@ export async function getProject(tenantId: string, projectId: string) {
   return project ?? null;
 }
 
+export async function getProjectForEdit(tenantId: string, projectId: string) {
+  const scoped = requireTenantId(tenantId);
+  const project = await getProject(tenantId, projectId);
+
+  if (!project) {
+    return null;
+  }
+
+  const platforms = await sql<Pick<ProjectPlatformScopeRow, "platformType">[]>`
+    select "platformType"
+    from "ProjectPlatformScope"
+    where "tenantId" = ${scoped} and "projectId" = ${project.id}
+    order by "platformType"
+  `;
+
+  return {
+    project,
+    platforms: platforms.map((row) => row.platformType),
+  };
+}
+
 export async function getProjectOverview(tenantId: string, projectId: string) {
   const scoped = requireTenantId(tenantId);
   const project = await getProject(tenantId, projectId);
@@ -59,6 +80,7 @@ export async function getProjectOverview(tenantId: string, projectId: string) {
     connections,
     assessments,
     activity,
+    businessCases,
   ] = await Promise.all([
       sql<{ id: string; name: string }[]>`
         select id, name
@@ -114,6 +136,12 @@ export async function getProjectOverview(tenantId: string, projectId: string) {
         order by "updatedAt" desc
       `,
       listProjectActivity(tenantId, project.id),
+      sql<{ status: string }[]>`
+        select status
+        from "BusinessCase"
+        where "tenantId" = ${scoped} and "projectId" = ${project.id}
+        limit 1
+      `,
     ]);
 
   const scopedTypes = platforms.map((platform) => platform.platformType);
@@ -124,6 +152,7 @@ export async function getProjectOverview(tenantId: string, projectId: string) {
         scopedTypes.includes(connection.platformType)),
   );
   const assessment = assessments[0] ?? null;
+  const businessCase = businessCases[0] ?? null;
   const nextAction: "connect" | "discover" | "continue" | "prioritize" =
     !connected
       ? "connect"
@@ -146,6 +175,8 @@ export async function getProjectOverview(tenantId: string, projectId: string) {
     assessments,
     activity,
     nextAction,
+    hasBusinessCase: Boolean(businessCase),
+    businessCaseStatus: businessCase?.status ?? null,
   };
 }
 
@@ -171,6 +202,21 @@ export async function createProject(input: {
   priority?: string;
   successMetrics?: string;
   notes?: string;
+  implementationCost?: number;
+  discoveryCost?: number;
+  knowledgeCost?: number;
+  changeManagementCost?: number;
+  servicesCost?: number;
+  otherCost?: number;
+  annualVolume?: number;
+  unitPrice?: number;
+  hoursSavedPerUnit?: number;
+  hourlyCost?: number;
+  conservativeAdoption?: number;
+  expectedAdoption?: number;
+  aggressiveAdoption?: number;
+  baselineDays?: number;
+  enigmaDays?: number;
 }) {
   const organization = await getAccount(input.tenantId, input.organizationId);
 
@@ -198,6 +244,21 @@ export async function createProject(input: {
     priority: input.priority || null,
     successMetrics: input.successMetrics || null,
     notes: input.notes || null,
+    implementationCost: input.implementationCost ?? null,
+    discoveryCost: input.discoveryCost ?? null,
+    knowledgeCost: input.knowledgeCost ?? null,
+    changeManagementCost: input.changeManagementCost ?? null,
+    servicesCost: input.servicesCost ?? null,
+    otherCost: input.otherCost ?? null,
+    annualVolume: input.annualVolume ?? null,
+    unitPrice: input.unitPrice ?? null,
+    hoursSavedPerUnit: input.hoursSavedPerUnit ?? null,
+    hourlyCost: input.hourlyCost ?? null,
+    conservativeAdoption: input.conservativeAdoption ?? null,
+    expectedAdoption: input.expectedAdoption ?? null,
+    aggressiveAdoption: input.aggressiveAdoption ?? null,
+    baselineDays: input.baselineDays ?? null,
+    enigmaDays: input.enigmaDays ?? null,
     connectPlatformLater: (input.environmentIds?.length ?? 0) === 0,
     platformType: primaryPlatform,
   });
@@ -208,8 +269,12 @@ export async function createProject(input: {
       id, "tenantId", "organizationId", name, "platformType", "projectType",
       objective, outcomes, "outcomeOther", "ownerId", status, description,
       "businessUnit", department, "executiveSponsor", "customerLead",
-      "targetDate", priority, "successMetrics", notes, "connectPlatformLater",
-      "createdAt", "updatedAt"
+      "targetDate", priority, "successMetrics", notes, "implementationCost",
+      "discoveryCost", "knowledgeCost", "changeManagementCost", "servicesCost",
+      "otherCost", "annualVolume", "unitPrice", "hoursSavedPerUnit", "hourlyCost",
+      "conservativeAdoption", "expectedAdoption", "aggressiveAdoption",
+      "baselineDays", "enigmaDays", "connectPlatformLater", "createdAt",
+      "updatedAt"
     )
     values (
       ${id},
@@ -232,6 +297,21 @@ export async function createProject(input: {
       ${data.priority},
       ${data.successMetrics},
       ${data.notes},
+      ${data.implementationCost},
+      ${data.discoveryCost},
+      ${data.knowledgeCost},
+      ${data.changeManagementCost},
+      ${data.servicesCost},
+      ${data.otherCost},
+      ${data.annualVolume},
+      ${data.unitPrice},
+      ${data.hoursSavedPerUnit},
+      ${data.hourlyCost},
+      ${data.conservativeAdoption},
+      ${data.expectedAdoption},
+      ${data.aggressiveAdoption},
+      ${data.baselineDays},
+      ${data.enigmaDays},
       ${data.connectPlatformLater},
       now(),
       now()
@@ -319,6 +399,21 @@ export async function updateProject(input: {
   priority?: string;
   successMetrics?: string;
   notes?: string;
+  implementationCost?: number;
+  discoveryCost?: number;
+  knowledgeCost?: number;
+  changeManagementCost?: number;
+  servicesCost?: number;
+  otherCost?: number;
+  annualVolume?: number;
+  unitPrice?: number;
+  hoursSavedPerUnit?: number;
+  hourlyCost?: number;
+  conservativeAdoption?: number;
+  expectedAdoption?: number;
+  aggressiveAdoption?: number;
+  baselineDays?: number;
+  enigmaDays?: number;
 }) {
   const scoped = requireTenantId(input.tenantId);
   const project = await getProject(input.tenantId, input.projectId);
@@ -350,6 +445,21 @@ export async function updateProject(input: {
       priority = ${input.priority || null},
       "successMetrics" = ${input.successMetrics || null},
       notes = ${input.notes || null},
+      "implementationCost" = ${input.implementationCost ?? null},
+      "discoveryCost" = ${input.discoveryCost ?? null},
+      "knowledgeCost" = ${input.knowledgeCost ?? null},
+      "changeManagementCost" = ${input.changeManagementCost ?? null},
+      "servicesCost" = ${input.servicesCost ?? null},
+      "otherCost" = ${input.otherCost ?? null},
+      "annualVolume" = ${input.annualVolume ?? null},
+      "unitPrice" = ${input.unitPrice ?? null},
+      "hoursSavedPerUnit" = ${input.hoursSavedPerUnit ?? null},
+      "hourlyCost" = ${input.hourlyCost ?? null},
+      "conservativeAdoption" = ${input.conservativeAdoption ?? null},
+      "expectedAdoption" = ${input.expectedAdoption ?? null},
+      "aggressiveAdoption" = ${input.aggressiveAdoption ?? null},
+      "baselineDays" = ${input.baselineDays ?? null},
+      "enigmaDays" = ${input.enigmaDays ?? null},
       "updatedAt" = now()
     where id = ${project.id} and "tenantId" = ${scoped}
     returning *
@@ -381,7 +491,10 @@ export async function updateProject(input: {
     action: "project.update",
     entity: "Project",
     entityId: project.id,
-    metadata: { name: input.name },
+    metadata: {
+      name: input.name,
+      organizationId: project.organizationId,
+    },
   });
 
   return updated ?? null;
@@ -457,7 +570,11 @@ export async function setProjectEnvironment(input: {
     action: input.attached ? "project.connection.attach" : "project.connection.detach",
     entity: "Project",
     entityId: project.id,
-    metadata: { connectionId: connection.id },
+    metadata: {
+      connectionId: connection.id,
+      organizationId: project.organizationId,
+      name: project.name,
+    },
   });
 
   return project;
@@ -491,7 +608,10 @@ export async function deleteProject(input: {
     action: "project.delete",
     entity: "Project",
     entityId: project.id,
-    metadata: { name: project.name },
+    metadata: {
+      name: project.name,
+      organizationId: project.organizationId,
+    },
   });
 
   return project;

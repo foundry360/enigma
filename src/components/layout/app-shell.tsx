@@ -21,7 +21,6 @@ export function AppShell({
   projects,
   users,
   currentUserId,
-  connections,
   children,
 }: {
   tenantName: string;
@@ -32,13 +31,6 @@ export function AppShell({
   projects: HeaderProject[];
   users: { id: string; name: string }[];
   currentUserId: string;
-  connections: {
-    id: string;
-    organizationId: string;
-    platformType: string;
-    status: string;
-    externalOrgName: string | null;
-  }[];
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -64,7 +56,6 @@ export function AppShell({
         selectedAccountId={selectedAccountId}
         users={users}
         currentUserId={currentUserId}
-        connections={connections}
       >
         <div
           className={`h-dvh overflow-hidden bg-background${signed ? "" : " workspace-unsigned"}`}

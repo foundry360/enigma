@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { strengthColors } from "@/components/ui/score-ring";
 import type { CandidateSignalRef } from "@/lib/db/types";
@@ -40,11 +42,7 @@ export function OpportunityFlow({
   ];
 
   return (
-    <ol className="relative space-y-6">
-      <span
-        aria-hidden="true"
-        className="absolute bottom-3 left-2 top-2 w-px bg-foreground/15"
-      />
+    <ol className="space-y-6">
       <FlowStep title="Business context">
         <Tree>
           <TreeItem last>
@@ -120,19 +118,16 @@ export function OpportunityFlow({
                 last={index === evidenceGroups.length - 1}
               >
                 {group.label ? (
-                  <>
-                    <p className="text-sm font-bold">{group.label}</p>
-                    <Tree>
-                      {group.items.map((item, itemIndex) => (
-                        <TreeItem
-                          key={item}
-                          last={itemIndex === group.items.length - 1}
-                        >
-                          <p className="text-sm">{item}</p>
-                        </TreeItem>
-                      ))}
-                    </Tree>
-                  </>
+                  <TreeBranch title={group.label}>
+                    {group.items.map((item, itemIndex) => (
+                      <TreeItem
+                        key={item}
+                        last={itemIndex === group.items.length - 1}
+                      >
+                        <p className="text-sm">{item}</p>
+                      </TreeItem>
+                    ))}
+                  </TreeBranch>
                 ) : (
                   <p className="text-sm">{group.items[0]}</p>
                 )}
@@ -156,15 +151,14 @@ export function OpportunityFlow({
           </Tree>
         </FlowStep>
       ) : null}
-      <FlowStep title="Implications">
+      <FlowStep last title="Implications">
         <Tree>
           {implicationBranches.map((branch, index) => (
             <TreeItem
               key={branch.title}
               last={index === implicationBranches.length - 1}
             >
-              <p className="text-sm font-bold">{branch.title}</p>
-              <Tree>
+              <TreeBranch title={branch.title}>
                 {(branch.items.length > 0 ? branch.items : ["—"]).map(
                   (item, itemIndex, items) => (
                     <TreeItem
@@ -179,7 +173,7 @@ export function OpportunityFlow({
                     </TreeItem>
                   ),
                 )}
-              </Tree>
+              </TreeBranch>
             </TreeItem>
           ))}
         </Tree>
@@ -191,27 +185,103 @@ export function OpportunityFlow({
 function FlowStep({
   title,
   children,
+  last = false,
 }: {
   title: string;
   children: ReactNode;
+  last?: boolean;
 }) {
   return (
     <li className="relative">
-      <div className="flex items-center gap-3">
+      {last ? null : (
         <span
           aria-hidden="true"
-          className="relative z-10 size-4 shrink-0 rounded-full border-2 bg-surface"
-          style={{ borderColor: strengthColors.strong }}
+          className="absolute bottom-[-2rem] left-2 top-2 w-px bg-foreground/15"
         />
-        <h3 className="text-sm font-bold">{title}</h3>
-      </div>
-      <div className="ml-2">{children}</div>
+      )}
+      <ToggleDetails openByDefault className="group/step">
+        <summary className={`${dotSummary} gap-3`}>
+          <DotToggle tone="solid" />
+          <h3 className="text-sm font-bold">{title}</h3>
+        </summary>
+        <div className="ml-2">{children}</div>
+      </ToggleDetails>
     </li>
+  );
+}
+
+function ToggleDetails({
+  openByDefault = false,
+  className,
+  children,
+}: {
+  openByDefault?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  const node = useRef<HTMLDetailsElement>(null);
+
+  useLayoutEffect(() => {
+    if (openByDefault && node.current) {
+      node.current.open = true;
+    }
+  }, [openByDefault]);
+
+  return (
+    <details ref={node} className={className}>
+      {children}
+    </details>
+  );
+}
+
+const dotSummary =
+  "relative z-10 flex cursor-pointer items-center list-none [&::-webkit-details-marker]:hidden [&::marker]:hidden";
+
+function DotToggle({ tone }: { tone: "solid" | "outline" }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={
+        tone === "solid"
+          ? "flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[11px] font-semibold leading-none text-accent-fg"
+          : "flex h-4 w-4 items-center justify-center rounded-full border border-accent bg-transparent text-[11px] font-semibold leading-none text-accent"
+      }
+    >
+      {tone === "solid" ? (
+        <>
+          <span className="group-open/step:hidden">+</span>
+          <span className="hidden group-open/step:inline">-</span>
+        </>
+      ) : (
+        <>
+          <span className="group-open/branch:hidden">+</span>
+          <span className="hidden group-open/branch:inline">-</span>
+        </>
+      )}
+    </span>
   );
 }
 
 function Tree({ children }: { children: ReactNode }) {
   return <ul>{children}</ul>;
+}
+
+function TreeBranch({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <ToggleDetails className="group/branch">
+      <summary className={`${dotSummary} gap-2`}>
+        <DotToggle tone="outline" />
+        <p className="text-sm font-bold">{title}</p>
+      </summary>
+      <Tree>{children}</Tree>
+    </ToggleDetails>
+  );
 }
 
 function TreeItem({

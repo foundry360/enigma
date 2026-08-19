@@ -15,21 +15,23 @@ const colors = {
 } as const;
 
 const labels = {
-  high: "High confidence",
-  medium: "Medium confidence",
-  low: "Low confidence",
+  high: "High Confidence",
+  medium: "Medium Confidence",
+  low: "Low Confidence",
 } as const;
 
 export function ConfidenceIcon({
   confidence,
+  className = "size-[22px]",
 }: {
   confidence: CandidateConfidence;
+  className?: string;
 }) {
   const Icon = icons[confidence];
 
   return (
     <Icon
-      className="size-[22px] shrink-0"
+      className={`block shrink-0 ${className}`}
       style={{ color: colors[confidence] }}
       aria-label={labels[confidence]}
     />

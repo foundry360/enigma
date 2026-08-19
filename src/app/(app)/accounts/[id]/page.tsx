@@ -10,6 +10,25 @@ import { formatDate, formatLastActivity } from "@/lib/format";
 import { platformLabel } from "@/lib/platforms";
 import { getOrganizationOverview } from "@/server/services/organization-overview";
 
+function IntelligenceRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <dt className="shrink-0 text-muted">{label}</dt>
+      <span
+        aria-hidden="true"
+        className="mb-1 min-w-4 flex-1 border-b border-dotted border-border"
+      />
+      <dd className="shrink-0">{children}</dd>
+    </div>
+  );
+}
+
 function MetaRow({
   label,
   children,
@@ -85,6 +104,13 @@ export default async function OrganizationOverviewPage({
     { label: "Review opportunities", done: false },
   ];
   const complete = checklist.filter((item) => item.done).length;
+  const nextStep = !connected
+    ? "Connect a platform, then create a project to assess this organization."
+    : projects.length === 0
+      ? "A platform is connected. Create a project to assess this organization."
+      : assessments.length === 0
+        ? "A project is in place. Run intelligence on a connected environment."
+        : "Intelligence has run. Review opportunities on a project.";
   const maxEnvironments = Math.max(
     ...landscape.map((platform) => platform.environments),
     0,
@@ -107,26 +133,22 @@ export default async function OrganizationOverviewPage({
         <div className="grid gap-6 border-t border-border p-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:p-6">
           <div className="flex min-h-56 flex-col rounded-md border border-border bg-background p-4">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">Enterprise intelligence</h2>
+              <h2 className="text-sm font-semibold">Enterprise Intelligence</h2>
               <Badge>Organization-wide</Badge>
             </div>
             <dl className="space-y-2 text-sm">
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted">Active initiatives</dt>
-                <dd>{intelligence.initiatives}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted">Technology complexity</dt>
-                <dd>{intelligence.technologyComplexity ?? "Not enough data"}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted">AI transformation coverage</dt>
-                <dd>Not enough data</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted">Platforms assessed</dt>
-                <dd>Not enough data</dd>
-              </div>
+              <IntelligenceRow label="Active initiatives">
+                {intelligence.initiatives}
+              </IntelligenceRow>
+              <IntelligenceRow label="Technology complexity">
+                {intelligence.technologyComplexity ?? "Not enough data"}
+              </IntelligenceRow>
+              <IntelligenceRow label="AI transformation coverage">
+                Not enough data
+              </IntelligenceRow>
+              <IntelligenceRow label="Platforms assessed">
+                Not enough data
+              </IntelligenceRow>
             </dl>
           </div>
           <dl className="divide-y divide-border">
@@ -165,10 +187,7 @@ export default async function OrganizationOverviewPage({
             <Badge tone="accent">
               {complete}/{checklist.length} complete
             </Badge>
-            <p className="text-sm text-muted">
-              Connect a platform, then create a project to assess this
-              organization.
-            </p>
+            <p className="text-sm text-muted">{nextStep}</p>
           </div>
           <Link
             href={`/accounts/${id}/projects`}
@@ -238,7 +257,7 @@ export default async function OrganizationOverviewPage({
         </Card>
 
         <Card
-          title="Connected environments"
+          title="Connected Environments"
           action={<Badge>{environmentCount}</Badge>}
         >
           {connections.length === 0 ? (
@@ -262,19 +281,28 @@ export default async function OrganizationOverviewPage({
                   key={connection.id}
                   className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2.5 text-sm"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">
-                      {connection.externalOrgName ??
-                        `${platformLabel(connection.platformType)} environment`}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-muted">
-                      {platformLabel(connection.platformType)}
-                      {connection.externalOrgId
-                        ? ` · ${connection.externalOrgId}`
-                        : connection.externalOrgName
-                          ? ` · ${connection.externalOrgName}`
-                          : ""}
-                    </p>
+                  <div className="flex min-w-0 items-start gap-2">
+                    {connection.platformType === "SALESFORCE" ? (
+                      <img
+                        src="/brands/salesforce.png"
+                        alt=""
+                        className="mt-0.5 h-8 w-auto shrink-0"
+                      />
+                    ) : null}
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">
+                        {connection.externalOrgName ??
+                          `${platformLabel(connection.platformType)} environment`}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-muted">
+                        {platformLabel(connection.platformType)}
+                        {connection.externalOrgId
+                          ? ` · ${connection.externalOrgId}`
+                          : connection.externalOrgName
+                            ? ` · ${connection.externalOrgName}`
+                            : ""}
+                      </p>
+                    </div>
                   </div>
                   <Badge
                     tone={

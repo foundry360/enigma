@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   normalizeSignals,
+  signalExplainer,
+  signalExplainers,
   splitSignalCopy,
 } from "@/modules/intelligence/signals";
+import { signalKeys } from "@/modules/intelligence/types";
 import type { AssessmentFacts } from "@/modules/intelligence/types";
 
 const emptyFacts: AssessmentFacts = {
@@ -54,7 +57,7 @@ describe("business signals", () => {
       "Operating path",
       "Grounded answers",
       "Automation collision",
-      "Access surface",
+      "Access control",
       "Write-back control",
     ]);
     expect(context.signals.every((item) => item.evidence.length > 0)).toBe(true);
@@ -72,6 +75,14 @@ describe("business signals", () => {
     expect(text).not.toContain('"Data"');
     expect(text).not.toContain('"Process"');
     expect(text).not.toMatch(/\$\d/);
+  });
+
+  it("explains every business signal", () => {
+    expect(signalKeys.every((key) => signalExplainers[key].length > 0)).toBe(
+      true,
+    );
+    expect(signalExplainer("addressable_work")).toContain("durable work");
+    expect(signalExplainer("unknown")).toBeUndefined();
   });
 
   it("splits meaning from the consumption implication", () => {

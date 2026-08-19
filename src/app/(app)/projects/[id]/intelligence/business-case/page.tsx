@@ -26,7 +26,19 @@ export default async function IntelligenceBusinessCasePage({
   return (
     <IntelligencePane scroll>
       {detail ? (
-        <BusinessCasePanel projectId={id} detail={detail} />
+        <BusinessCasePanel
+          projectId={id}
+          projectName={overview.project.name}
+          projectInvestment={{
+            discovery: overview.project.discoveryCost,
+            implementation: overview.project.implementationCost,
+            knowledge: overview.project.knowledgeCost,
+            change: overview.project.changeManagementCost,
+            services: overview.project.servicesCost,
+            other: overview.project.otherCost,
+          }}
+          detail={detail}
+        />
       ) : (
         <div className="flex h-full flex-col items-center justify-center rounded-lg border border-border bg-surface px-4 py-8 text-center">
           <p className="text-sm text-muted">

@@ -12,13 +12,21 @@ import {
 } from "react";
 import { useActionState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { createProjectAction } from "@/app/actions/projects";
+import {
+  createProjectAction,
+  getProjectForEditAction,
+} from "@/app/actions/projects";
 import { useCreateOrganization } from "@/components/accounts/create-organization-modal";
+import { EditProjectModal } from "@/components/projects/edit-project-modal";
 import { Button, buttonClassName } from "@/components/ui/button";
+import type { ProjectRow } from "@/lib/db/types";
 import { Field } from "@/components/ui/field";
 import { MultiSelectField } from "@/components/ui/multi-select-field";
 import { SelectField } from "@/components/ui/select-field";
 import { TextAreaField } from "@/components/ui/textarea-field";
+import { ProjectAdditionalFields } from "@/components/projects/project-additional-fields";
+import { ProjectEconomicsFields } from "@/components/projects/project-economics-fields";
+import { ProjectSection } from "@/components/projects/project-section";
 import { platformLabel } from "@/lib/platforms";
 import {
   DEFAULT_PROJECT_STATUS,
@@ -31,16 +39,10 @@ import {
 
 type AccountChoice = { id: string; name: string };
 type UserChoice = { id: string; name: string };
-type ConnectionChoice = {
-  id: string;
-  organizationId: string;
-  platformType: string;
-  status: string;
-  externalOrgName: string | null;
-};
 
 const CreateProjectContext = createContext<{
   open: (organizationId?: string) => void;
+  openEdit: (projectId: string) => Promise<void>;
   close: () => void;
 } | null>(null);
 
@@ -50,6 +52,23 @@ export function useCreateProject() {
     throw new Error("useCreateProject must be used within the provider");
   }
   return context;
+}
+
+export function EditProjectButton({
+  projectId,
+}: {
+  projectId: string;
+}) {
+  const { openEdit } = useCreateProject();
+  return (
+    <button
+      type="button"
+      className={buttonClassName("primary")}
+      onClick={() => void openEdit(projectId)}
+    >
+      Edit Project
+    </button>
+  );
 }
 
 export function CreateProjectButton({
@@ -83,19 +102,21 @@ export function CreateProjectProvider({
   selectedAccountId,
   users,
   currentUserId,
-  connections,
   children,
 }: {
   accounts: AccountChoice[];
   selectedAccountId?: string | null;
   users: UserChoice[];
   currentUserId: string;
-  connections: ConnectionChoice[];
   children: ReactNode;
 }) {
   const { open: openOrganization } = useCreateOrganization();
   const [organizationId, setOrganizationId] = useState<string | undefined>();
   const [isOpen, setIsOpen] = useState(false);
+  const [edit, setEdit] = useState<{
+    project: ProjectRow;
+    platforms: string[];
+  } | null>(null);
 
   const open = useCallback(
     (nextOrganizationId?: string) => {
@@ -109,10 +130,19 @@ export function CreateProjectProvider({
     },
     [accounts.length, openOrganization],
   );
-  const close = useCallback(() => setIsOpen(false), []);
+  const openEdit = useCallback(async (projectId: string) => {
+    const next = await getProjectForEditAction(projectId);
+    if (next) {
+      setEdit(next);
+    }
+  }, []);
+  const close = useCallback(() => {
+    setIsOpen(false);
+    setEdit(null);
+  }, []);
 
   return (
-    <CreateProjectContext.Provider value={{ open, close }}>
+    <CreateProjectContext.Provider value={{ open, openEdit, close }}>
       {children}
       <Suspense fallback={null}>
         <OpenFromQuery />
@@ -123,7 +153,15 @@ export function CreateProjectProvider({
           selectedAccountId={organizationId ?? selectedAccountId}
           users={users}
           currentUserId={currentUserId}
-          connections={connections}
+          onClose={close}
+        />
+      ) : null}
+      {edit ? (
+        <EditProjectModal
+          key={edit.project.id}
+          project={edit.project}
+          platforms={edit.platforms}
+          users={users}
           onClose={close}
         />
       ) : null}
@@ -154,14 +192,12 @@ function CreateProjectModal({
   selectedAccountId,
   users,
   currentUserId,
-  connections,
   onClose,
 }: {
   accounts: AccountChoice[];
   selectedAccountId?: string | null;
   users: UserChoice[];
   currentUserId: string;
-  connections: ConnectionChoice[];
   onClose: () => void;
 }) {
   const titleId = useId();
@@ -173,9 +209,6 @@ function CreateProjectModal({
     selectedAccountId ?? "",
   );
   const [showOtherOutcome, setShowOtherOutcome] = useState(false);
-  const orgConnections = connections.filter(
-    (connection) => connection.organizationId === organizationId,
-  );
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -218,9 +251,8 @@ function CreateProjectModal({
             Close
           </button>
         </div>
-        <form action={action} className="space-y-5">
-          <section className="space-y-3">
-            <h3 className="text-xs font-medium text-muted">Project details</h3>
+        <form action={action} className="space-y-4">
+          <ProjectSection title="Project" defaultOpen>
             <Field
               layout="horizontal"
               label="Project name"
@@ -298,43 +330,9 @@ function CreateProjectModal({
                 </option>
               ))}
             </SelectField>
-          </section>
-
-          {orgConnections.length > 0 ? (
-            <section className="space-y-3">
-              <h3 className="text-xs font-medium text-muted">Scope</h3>
-              <fieldset>
-                <legend className="mb-1.5 text-sm font-medium">
-                  Connected environments
-                </legend>
-                <div className="space-y-1.5">
-                  {orgConnections.map((connection) => (
-                    <label
-                      key={connection.id}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        name="environmentIds"
-                        value={connection.id}
-                        className="accent-foreground"
-                      />
-                      {connection.externalOrgName ??
-                        `${platformLabel(connection.platformType)} environment`}
-                      <span className="text-xs text-muted">
-                        {platformLabel(connection.platformType)} ·{" "}
-                        {connection.status}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                <p className="mt-1.5 text-xs text-muted">Optional.</p>
-              </fieldset>
-            </section>
-          ) : null}
-
-          <section className="space-y-3">
-            <h3 className="text-xs font-medium text-muted">Ownership</h3>
+          </ProjectSection>
+          <ProjectEconomicsFields errors={state?.errors} />
+          <ProjectSection title="Ownership">
             <SelectField
               layout="horizontal"
               label="Project owner"
@@ -362,81 +360,29 @@ function CreateProjectModal({
                 </option>
               ))}
             </SelectField>
-          </section>
-
-          <details className="rounded-md border border-border px-3 py-2">
-            <summary className="cursor-pointer text-sm font-medium">
-              Additional details
-            </summary>
-            <div className="mt-3 space-y-3">
-              <TextAreaField
-                layout="horizontal"
-                label="Description"
-                name="description"
-                rows={2}
-                error={state?.errors?.description}
-              />
-              <Field
-                layout="horizontal"
-                label="Business unit"
-                name="businessUnit"
-                error={state?.errors?.businessUnit}
-              />
-              <Field
-                layout="horizontal"
-                label="Department"
-                name="department"
-                error={state?.errors?.department}
-              />
-              <Field
-                layout="horizontal"
-                label="Executive sponsor"
-                name="executiveSponsor"
-                error={state?.errors?.executiveSponsor}
-              />
-              <Field
-                layout="horizontal"
-                label="Customer lead"
-                name="customerLead"
-                error={state?.errors?.customerLead}
-              />
-              <Field
-                layout="horizontal"
-                label="Target date"
-                name="targetDate"
-                type="date"
-                error={state?.errors?.targetDate}
-              />
-              <SelectField
-                layout="horizontal"
-                label="Priority"
-                name="priority"
-                defaultValue=""
-                error={state?.errors?.priority}
-              >
-                <option value="">-</option>
-                {projectPriorities.map((priority) => (
-                  <option key={priority} value={priority}>
-                    {priority}
-                  </option>
-                ))}
-              </SelectField>
-              <TextAreaField
-                layout="horizontal"
-                label="Success metrics"
-                name="successMetrics"
-                rows={2}
-                error={state?.errors?.successMetrics}
-              />
-              <TextAreaField
-                layout="horizontal"
-                label="Notes"
-                name="notes"
-                rows={2}
-                error={state?.errors?.notes}
-              />
-            </div>
-          </details>
+            <SelectField
+              layout="horizontal"
+              label="Priority"
+              name="priority"
+              defaultValue=""
+              error={state?.errors?.priority}
+            >
+              <option value="">-</option>
+              {projectPriorities.map((priority) => (
+                <option key={priority} value={priority}>
+                  {priority}
+                </option>
+              ))}
+            </SelectField>
+            <Field
+              layout="horizontal"
+              label="Target date"
+              name="targetDate"
+              type="date"
+              error={state?.errors?.targetDate}
+            />
+          </ProjectSection>
+          <ProjectAdditionalFields errors={state?.errors} />
 
           {state?.message ? (
             <p className="text-sm text-accent">{state.message}</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useActionState } from "react";
 import { updateProjectAction } from "@/app/actions/projects";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,9 @@ import { Field } from "@/components/ui/field";
 import { MultiSelectField } from "@/components/ui/multi-select-field";
 import { SelectField } from "@/components/ui/select-field";
 import { TextAreaField } from "@/components/ui/textarea-field";
+import { ProjectAdditionalFields } from "@/components/projects/project-additional-fields";
+import { ProjectEconomicsFields } from "@/components/projects/project-economics-fields";
+import { ProjectSection } from "@/components/projects/project-section";
 import { dateInputValue } from "@/lib/format";
 import { platformLabel } from "@/lib/platforms";
 import {
@@ -19,28 +22,17 @@ import {
   scopePlatforms,
 } from "@/lib/projects";
 
-function SettingsCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <div>
-      <h2 className="mb-2 text-sm font-semibold">{title}</h2>
-      <section className="rounded-lg border border-border bg-background p-5">
-        <div className="space-y-4">{children}</div>
-      </section>
-    </div>
-  );
-}
-
 export function EditProjectForm({
   project,
   platforms,
   users,
+  fromModal = false,
+  onCancel,
+  onSaved,
 }: {
+  fromModal?: boolean;
+  onCancel?: () => void;
+  onSaved?: () => void;
   project: {
     id: string;
     organizationId: string;
@@ -61,6 +53,21 @@ export function EditProjectForm({
     priority: string | null;
     successMetrics: string | null;
     notes: string | null;
+    implementationCost: number | null;
+    discoveryCost: number | null;
+    knowledgeCost: number | null;
+    changeManagementCost: number | null;
+    servicesCost: number | null;
+    otherCost: number | null;
+    annualVolume: number | null;
+    unitPrice: number | null;
+    hoursSavedPerUnit: number | null;
+    hourlyCost: number | null;
+    conservativeAdoption: number | null;
+    expectedAdoption: number | null;
+    aggressiveAdoption: number | null;
+    baselineDays: number | null;
+    enigmaDays: number | null;
   };
   platforms: string[];
   users: { id: string; name: string }[];
@@ -77,12 +84,19 @@ export function EditProjectForm({
   );
   const selectedPlatform = platforms[0] ?? project.platformType ?? "";
 
+  useEffect(() => {
+    if (state?.ok) {
+      onSaved?.();
+    }
+  }, [onSaved, state]);
+
   return (
-    <form action={action} className="space-y-8">
+    <form action={action} className="space-y-4">
       <input type="hidden" name="projectId" value={project.id} />
       <input type="hidden" name="organizationId" value={project.organizationId} />
+      {fromModal ? <input type="hidden" name="fromModal" value="1" /> : null}
 
-      <SettingsCard title="Project">
+      <ProjectSection title="Project" defaultOpen>
         <Field
           layout="horizontal"
           label="Project name"
@@ -144,9 +158,10 @@ export function EditProjectForm({
             </option>
           ))}
         </SelectField>
-      </SettingsCard>
+      </ProjectSection>
+      <ProjectEconomicsFields defaults={project} errors={state?.errors} />
 
-      <SettingsCard title="Ownership">
+      <ProjectSection title="Ownership">
         <SelectField
           layout="horizontal"
           label="Project owner"
@@ -196,67 +211,22 @@ export function EditProjectForm({
           defaultValue={dateInputValue(project.targetDate)}
           error={state?.errors?.targetDate}
         />
-      </SettingsCard>
+      </ProjectSection>
 
-      <SettingsCard title="Additional details">
-        <TextAreaField
-          layout="horizontal"
-          label="Description"
-          name="description"
-          defaultValue={project.description ?? ""}
-          rows={2}
-          error={state?.errors?.description}
-        />
-        <Field
-          layout="horizontal"
-          label="Business unit"
-          name="businessUnit"
-          defaultValue={project.businessUnit ?? ""}
-          error={state?.errors?.businessUnit}
-        />
-        <Field
-          layout="horizontal"
-          label="Department"
-          name="department"
-          defaultValue={project.department ?? ""}
-          error={state?.errors?.department}
-        />
-        <Field
-          layout="horizontal"
-          label="Executive sponsor"
-          name="executiveSponsor"
-          defaultValue={project.executiveSponsor ?? ""}
-          error={state?.errors?.executiveSponsor}
-        />
-        <Field
-          layout="horizontal"
-          label="Customer lead"
-          name="customerLead"
-          defaultValue={project.customerLead ?? ""}
-          error={state?.errors?.customerLead}
-        />
-        <TextAreaField
-          layout="horizontal"
-          label="Success metrics"
-          name="successMetrics"
-          defaultValue={project.successMetrics ?? ""}
-          rows={2}
-          error={state?.errors?.successMetrics}
-        />
-        <TextAreaField
-          layout="horizontal"
-          label="Notes"
-          name="notes"
-          defaultValue={project.notes ?? ""}
-          rows={2}
-          error={state?.errors?.notes}
-        />
-      </SettingsCard>
+      <ProjectAdditionalFields
+        defaults={project}
+        errors={state?.errors}
+      />
 
       {state?.message ? (
         <p className="text-sm text-accent">{state.message}</p>
       ) : null}
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        {onCancel ? (
+          <Button type="button" variant="secondary" onClick={onCancel}>
+            Cancel
+          </Button>
+        ) : null}
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : "Save project"}
         </Button>

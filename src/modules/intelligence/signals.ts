@@ -54,9 +54,30 @@ const signalTitles: Record<SignalKey, string> = {
   operating_path: "Operating path",
   grounded_answers: "Grounded answers",
   automation_collision: "Automation collision",
-  access_surface: "Access surface",
+  access_surface: "Access control",
   writeback_control: "Write-back control",
 };
+
+export const signalExplainers: Record<SignalKey, string> = {
+  addressable_work:
+    "Whether durable work records exist for an agent to read and act on.",
+  operating_path:
+    "Whether a recognizable service or revenue path exists to start and hand off.",
+  grounded_answers:
+    "Whether approved content exists so answers can be retrieved instead of invented.",
+  automation_collision:
+    "How many automations already handle this work, and whether an agent would fight them.",
+  access_surface:
+    "Can you limit what the agent is allowed to see and change?",
+  writeback_control:
+    "Whether write-path rules would keep agent-created records complete.",
+};
+
+export function signalExplainer(key: string) {
+  return Object.hasOwn(signalExplainers, key)
+    ? signalExplainers[key as SignalKey]
+    : undefined;
+}
 
 export function normalizeSignals(facts: AssessmentFacts): SignalContext {
   const objects = new Map(
@@ -288,7 +309,7 @@ function accessSurface(
         "security_summary",
         facts.security
           ? `${profileCount} profiles and ${permissionSetCount} permission sets.`
-          : "Access surface could not be read.",
+          : "Access control could not be read.",
       ),
     ],
     meaning: facts.security

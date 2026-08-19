@@ -87,7 +87,7 @@ describe("assessment scoring", () => {
         { title: "Operating path", score: 100 },
         { title: "Grounded answers", score: 80 },
         { title: "Automation collision", score: 15 },
-        { title: "Access surface", score: 40 },
+        { title: "Access control", score: 40 },
         { title: "Write-back control", score: 30 },
       ],
     });

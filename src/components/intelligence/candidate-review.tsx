@@ -2,16 +2,13 @@ import { updateCandidateAction } from "@/app/actions/opportunities";
 import { OpportunityFlow } from "@/components/intelligence/opportunity-flow";
 import { Button } from "@/components/ui/button";
 import type { OpportunityCandidateRow } from "@/lib/db/types";
-import { formatDateTime } from "@/lib/format";
 
 export function CandidateReview({
   candidate,
   projectId,
-  runDate,
 }: {
   candidate: OpportunityCandidateRow;
   projectId: string;
-  runDate: Date | string;
 }) {
   const open =
     candidate.status === "candidate" || candidate.status === "validated";
@@ -37,10 +34,6 @@ export function CandidateReview({
         constraints={candidate.constraints}
         dependencies={candidate.dependencies}
       />
-
-      <p className="mt-5 text-xs text-muted">
-        Intelligence run · {formatDateTime(runDate)}
-      </p>
 
       {open ? (
         <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">

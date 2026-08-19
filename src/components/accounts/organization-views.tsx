@@ -48,7 +48,7 @@ function CustomerStatusMark({ status }: { status: string | null }) {
     return null;
   }
 
-  const color = customerDot[status] ?? "#173e76";
+  const color = customerDot[status] ?? "#0284c7";
 
   return (
     <span title={status} className="inline-flex shrink-0 items-center">

@@ -125,12 +125,73 @@ export function formatCurrency(value: number | null | undefined) {
   }).format(value);
 }
 
+export function formatCompactCurrency(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) {
+    const millions = value / 1_000_000;
+    return `$${millions.toFixed(millions >= 10 ? 0 : 2).replace(/\.00$/, "")}M`;
+  }
+  if (abs >= 1000) {
+    return `$${Math.round(value / 1000)}K`;
+  }
+
+  return formatCurrency(value);
+}
+
+export function formatCompactNumber(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  }
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1).replace(/\.0$/, "")}K`;
+  }
+
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
+export function formatCurrencyPrecise(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: value % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export function formatMultiple(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) {
     return "—";
   }
 
   return `${value.toFixed(1)}x`;
+}
+
+export function formatMonths(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  return `${value.toFixed(1)} mo`;
+}
+
+export function formatPercent(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  return `${Math.round(value * 100)}%`;
 }
 
 export function formatLastActivity(value: Date | string | null) {

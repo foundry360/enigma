@@ -86,14 +86,14 @@ export function ConnectionStatusMark({
 }
 
 const projectDot: Record<string, string> = {
-  Planning: "#173e76",
+  Planning: "#0284c7",
   Active: "#3ECF8E",
   "On hold": "#F5C542",
   Complete: "#3ECF8E",
 };
 
 export function ProjectStatusMark({ status }: { status: string }) {
-  const color = projectDot[status] ?? "#173e76";
+  const color = projectDot[status] ?? "#0284c7";
 
   return (
     <span title={status} className="inline-flex shrink-0 items-center">

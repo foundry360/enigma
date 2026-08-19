@@ -100,7 +100,7 @@ export const opportunityCatalog: OpportunityDefinition[] = [
     title: "Grounded Q&A",
     process: "Trusted answer retrieval",
     description:
-      "Existing knowledge sources and a usable access surface provide a potential grounding layer.",
+      "Existing knowledge sources and usable access control provide a potential grounding layer.",
     businessArea: "Service",
     recommendedCapability: "Grounded Q&A",
     requiredSignals: ["grounded_answers", "access_surface"],
@@ -123,7 +123,7 @@ export const opportunityCatalog: OpportunityDefinition[] = [
       "A dedicated agent identity",
     ],
     reason:
-      "Approved content and a usable access surface support a grounded Q&A hypothesis.",
+      "Approved content and usable access control support a grounded Q&A hypothesis.",
     risk: "Stale or thin articles will show up as confident wrong answers.",
     recommendation:
       "Review this candidate and use retrieval on one high-volume reason before write-back.",

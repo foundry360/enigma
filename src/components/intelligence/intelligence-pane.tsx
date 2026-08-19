@@ -11,7 +11,7 @@ export function IntelligencePane({
     <div
       className={
         scroll
-          ? "absolute inset-0 min-h-0 space-y-4 overflow-y-auto"
+          ? "absolute inset-0 min-h-0 space-y-4 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           : "absolute inset-0 flex min-h-0 flex-col overflow-hidden"
       }
     >

@@ -14,3 +14,11 @@ export type McpToolName = (typeof mcpTools)[number];
 export function isMcpToolName(value: string): value is McpToolName {
   return mcpTools.includes(value as McpToolName);
 }
+
+export function discoveryToolLabel(tool: string) {
+  return tool
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}

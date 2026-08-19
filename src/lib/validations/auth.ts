@@ -69,9 +69,25 @@ export const createProjectSchema = z.object({
   priority: z.enum(projectPriorities).optional(),
   successMetrics: z.string().trim().optional(),
   notes: z.string().trim().optional(),
+  implementationCost: z.number().nonnegative().optional(),
+  discoveryCost: z.number().nonnegative().optional(),
+  knowledgeCost: z.number().nonnegative().optional(),
+  changeManagementCost: z.number().nonnegative().optional(),
+  servicesCost: z.number().nonnegative().optional(),
+  otherCost: z.number().nonnegative().optional(),
+  annualVolume: z.number().nonnegative().optional(),
+  unitPrice: z.number().nonnegative().optional(),
+  hoursSavedPerUnit: z.number().nonnegative().optional(),
+  hourlyCost: z.number().nonnegative().optional(),
+  conservativeAdoption: z.number().min(0).max(1).optional(),
+  expectedAdoption: z.number().min(0).max(1).optional(),
+  aggressiveAdoption: z.number().min(0).max(1).optional(),
+  baselineDays: z.number().nonnegative().optional(),
+  enigmaDays: z.number().nonnegative().optional(),
 });
 
 export type AuthFormState = {
   errors?: Record<string, string[] | undefined>;
   message?: string;
+  ok?: boolean;
 } | undefined;

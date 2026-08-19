@@ -5,7 +5,6 @@ export const dynamic = "force-dynamic";
 import { requireSession } from "@/lib/auth/session";
 import {
   listAccountChoices,
-  listTenantConnections,
   resolveSelectedAccount,
 } from "@/server/services/accounts";
 import { getProfileAvatarUrl } from "@/server/services/profile";
@@ -18,12 +17,11 @@ import {
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
-  const [user, tenant, accounts, users, connections, projects] = await Promise.all([
+  const [user, tenant, accounts, users, projects] = await Promise.all([
     getUserProfile(session.tenantId, session.userId),
     getTenant(session.tenantId),
     listAccountChoices(session.tenantId),
     listTenantUsers(session.tenantId),
-    listTenantConnections(session.tenantId),
     listProjects(session.tenantId),
   ]);
   const selected = resolveSelectedAccount(
@@ -46,13 +44,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       }))}
       users={users}
       currentUserId={session.userId}
-      connections={connections.map((connection) => ({
-        id: connection.id,
-        organizationId: connection.organizationId,
-        platformType: connection.platformType,
-        status: connection.status,
-        externalOrgName: connection.externalOrgName,
-      }))}
     >
       {children}
     </AppShell>

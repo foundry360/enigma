@@ -1,58 +1,54 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/auth/session";
 import { intelligenceHref } from "@/lib/intelligence/routes";
 import { isScenario } from "@/modules/economics/model";
-import { saveBusinessCase } from "@/server/services/business-case";
+import type { BusinessCaseDraft } from "@/modules/economics/model";
+import {
+  approveBusinessCase,
+  saveBusinessCase,
+} from "@/server/services/business-case";
 
-export async function saveBusinessCaseAction(formData: FormData) {
+export async function saveBusinessCaseAction(input: {
+  projectId: string;
+  draft: BusinessCaseDraft;
+  refreshRecommendation?: boolean;
+}) {
   const session = await requireSession();
-  const projectId = String(formData.get("projectId") ?? "");
-  const scenario = String(formData.get("scenario") ?? "");
-  const opportunityIds = formData.getAll("opportunityId").map(String);
-
-  if (!projectId || !isScenario(scenario)) {
-    return;
+  if (!input.projectId || !isScenario(input.draft.scenario)) {
+    return { error: "invalid" as const };
   }
 
   const result = await saveBusinessCase({
     tenantId: session.tenantId,
     userId: session.userId,
-    projectId,
-    scenario,
-    monthsAccelerated: readNumber(formData.get("monthsAccelerated")),
-    lines: opportunityIds.map((opportunityId) => ({
-      opportunityId,
-      annualVolume: readNumber(formData.get(`annualVolume:${opportunityId}`)),
-      unitPrice: readNumber(formData.get(`unitPrice:${opportunityId}`)),
-      hoursSavedPerUnit: readNumber(
-        formData.get(`hoursSavedPerUnit:${opportunityId}`),
-      ),
-      hourlyCost: readNumber(formData.get(`hourlyCost:${opportunityId}`)),
-      implementationCost: readNumber(
-        formData.get(`implementationCost:${opportunityId}`),
-      ),
-    })),
+    projectId: input.projectId,
+    draft: input.draft,
+    refreshRecommendation: input.refreshRecommendation,
   });
 
   if (!result || "error" in result) {
-    return;
+    return { error: result && "error" in result ? result.error : "invalid" };
   }
 
-  redirect(intelligenceHref(projectId, "business-case"));
+  revalidatePath(intelligenceHref(input.projectId, "business-case"));
+  return { ok: true as const, detail: result };
 }
 
-function readNumber(value: FormDataEntryValue | null) {
-  const raw = String(value ?? "").trim();
-  if (!raw) {
-    return null;
+export async function approveBusinessCaseAction(projectId: string) {
+  const session = await requireSession();
+  const result = await approveBusinessCase({
+    tenantId: session.tenantId,
+    userId: session.userId,
+    projectId,
+  });
+
+  if (!result || "error" in result) {
+    return { error: result && "error" in result ? result.error : "invalid" };
   }
 
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return null;
-  }
-
-  return parsed;
+  revalidatePath(intelligenceHref(projectId, "business-case"));
+  revalidatePath(intelligenceHref(projectId, "deployment"));
+  return { ok: true as const, detail: result };
 }
