@@ -23,6 +23,10 @@ const briefing = {
       valueDrivers: ["Less time spent handling each service request"],
       constraints: ["Write-back controls must stay narrow"],
       dependencies: ["A durable service work object"],
+      annualVolume: 1000,
+      unitPrice: 2,
+      hoursSavedPerUnit: 0.25,
+      hourlyCost: 80,
     },
   ],
   assumptions: [
@@ -40,6 +44,8 @@ const briefing = {
   },
   gaps: [],
   recommendationState: "proceed" as const,
+  calculations: ["Consumption 300. Value 3000."],
+  recommendationWhy: "Proceed because the case is complete.",
 };
 
 describe("business case briefing", () => {

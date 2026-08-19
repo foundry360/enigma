@@ -119,7 +119,7 @@ function compactProjectBriefing(
       .join("\n") || "No implication copy yet.",
   );
 
-  if (wantsCalculationWalk(question) || parseCaseWhatIf(question)) {
+  if (wantsCalculationWalk(question) || parseCaseWhatIf(question ?? "")) {
     parts.push(
       briefing.businessCase.calculations.join("\n") || "No calculated lines yet.",
     );

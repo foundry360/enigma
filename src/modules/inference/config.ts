@@ -14,7 +14,7 @@ export type InferenceConfig = {
 export const defaultClaudeModel = "claude-sonnet-5";
 
 export function resolveInferenceConfig(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
 ): InferenceConfig | null {
   const apiKey = env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) {

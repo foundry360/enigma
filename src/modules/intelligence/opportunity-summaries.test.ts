@@ -20,8 +20,8 @@ describe("opportunity summaries", () => {
 
   it("writes supporting signals as one paragraph", () => {
     const copy = summarizeSupportingSignals([
-      { key: "addressable_work", title: "Addressable work", strength: "strong", score: 80 },
-      { key: "writeback_control", title: "Write-back control", strength: "weak", score: 30 },
+      { title: "Addressable work", strength: "strong" },
+      { title: "Write-back control", strength: "weak" },
     ]);
 
     expect(copy).toMatch(/Addressable work is strong/i);

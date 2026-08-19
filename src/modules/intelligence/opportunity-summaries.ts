@@ -9,7 +9,7 @@ export function summarizeBusinessContext(input: {
 }
 
 export function summarizeSupportingSignals(
-  signals: Array<Pick<CandidateSignalRef, "title" | "strength">>,
+  signals: Array<Pick<CandidateSignalRef, "title" | "strength"> & Partial<CandidateSignalRef>>,
 ) {
   if (signals.length === 0) {
     return "No supporting signals were inherited on this opportunity.";
