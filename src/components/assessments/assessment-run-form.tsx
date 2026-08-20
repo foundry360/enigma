@@ -7,19 +7,15 @@ import { Button } from "@/components/ui/button";
 export function AssessmentRunForm({
   projectId,
   label,
-  orgName,
-  orgId,
 }: {
   projectId: string;
   label: string;
-  orgName?: string | null;
-  orgId?: string | null;
 }) {
   return (
     <form action={startDiscoveryAction}>
       <input type="hidden" name="projectId" value={projectId} />
       <SubmitButton label={label} />
-      <AssessmentRunOverlay orgName={orgName} orgId={orgId} />
+      <AssessmentRunOverlay />
     </form>
   );
 }
@@ -34,13 +30,7 @@ function SubmitButton({ label }: { label: string }) {
   );
 }
 
-function AssessmentRunOverlay({
-  orgName,
-  orgId,
-}: {
-  orgName?: string | null;
-  orgId?: string | null;
-}) {
+function AssessmentRunOverlay() {
   const { pending } = useFormStatus();
 
   if (!pending) {
@@ -63,20 +53,6 @@ function AssessmentRunOverlay({
           />
           <p className="text-sm font-semibold">Starting intelligence</p>
         </div>
-        <dl className="mt-5 space-y-2 text-sm">
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted">Name</dt>
-            <dd className="min-w-0 text-right font-medium">
-              {orgName || "Connected org"}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted">Org Instance ID</dt>
-            <dd className="min-w-0 break-all text-right font-medium">
-              {orgId || "—"}
-            </dd>
-          </div>
-        </dl>
       </div>
     </div>
   );

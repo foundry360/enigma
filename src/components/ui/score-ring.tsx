@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import {
   readinessRisk,
   type ReadinessRisk,
@@ -10,22 +11,16 @@ export const riskColors: Record<ReadinessRisk, string> = {
   high: "#F16A50",
 };
 
-const riskBadge: Record<ReadinessRisk, string> = {
-  low: "border-transparent bg-[#3ECF8E] text-[#2d3340]",
-  medium: "border-transparent bg-[#F5C542] text-[#2d3340]",
-  high: "border-transparent bg-[#F16A50] text-white",
-};
+const riskTone = {
+  low: "high",
+  medium: "medium",
+  high: "low",
+} as const;
 
 const riskLabel: Record<ReadinessRisk, string> = {
   low: "Low Risk",
   medium: "Medium Risk",
   high: "High Risk",
-};
-
-const strengthBadge: Record<SignalStrength, string> = {
-  strong: "border-transparent bg-[#3ECF8E] text-[#2d3340]",
-  mixed: "border-transparent bg-[#F5C542] text-[#2d3340]",
-  weak: "border-transparent bg-[#F16A50] text-white",
 };
 
 const strengthLabel: Record<SignalStrength, string> = {
@@ -49,13 +44,7 @@ export function StrengthBadge({
     return null;
   }
 
-  return (
-    <span
-      className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium ${strengthBadge[state]}`}
-    >
-      {strengthLabel[state]}
-    </span>
-  );
+  return <Badge tone={state}>{strengthLabel[state]}</Badge>;
 }
 
 export function RiskBadge({ risk }: { risk: ReadinessRisk | null }) {
@@ -63,13 +52,7 @@ export function RiskBadge({ risk }: { risk: ReadinessRisk | null }) {
     return null;
   }
 
-  return (
-    <span
-      className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium ${riskBadge[risk]}`}
-    >
-      {riskLabel[risk]}
-    </span>
-  );
+  return <Badge tone={riskTone[risk]}>{riskLabel[risk]}</Badge>;
 }
 
 const ringSize = {

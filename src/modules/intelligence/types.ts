@@ -6,6 +6,7 @@ import type {
   KnowledgePosture,
   ObjectDescribe,
   OrgLimits,
+  ProcessControls,
   SecuritySummary,
   ValidationRuleSummary,
 } from "@/modules/enterprise/types";
@@ -84,6 +85,7 @@ export type AssessmentFacts = {
   describes: Record<string, ObjectDescribe>;
   automations: AutomationSummary[];
   validationRules: ValidationRuleSummary[];
+  process: ProcessControls | null;
   security: SecuritySummary | null;
   knowledge: KnowledgePosture | null;
   limits: OrgLimits | null;
@@ -99,4 +101,5 @@ export type AssessmentRunResult = {
   }[];
   judgments: Judgment[];
   overallScore: number;
+  orgIntelligence?: import("@/modules/intelligence/org-model").OrgIntelligence;
 };

@@ -202,7 +202,7 @@ export async function saveBusinessCase(input: {
 
   let next = await loadBusinessCase(input.tenantId, detail.businessCase.id);
   if (input.refreshRecommendation && next) {
-    next = await persistRecommendation(input.tenantId, next);
+    next = await persistRecommendation(input.tenantId, next, { force: true });
   }
 
   return next;
@@ -231,6 +231,7 @@ export async function approveBusinessCase(input: {
         rollup: detail.rollup,
         recommendationState: detail.recommendationState,
         recommendationNarrative: detail.businessCase.recommendationNarrative,
+        justificationNarrative: detail.businessCase.justificationNarrative,
         intelligenceNarrative: detail.businessCase.intelligenceNarrative,
       })},
       "updatedAt" = now()
@@ -252,11 +253,25 @@ export async function approveBusinessCase(input: {
 export async function persistRecommendation(
   tenantId: string,
   detail: BusinessCaseDetail,
+  options?: { force?: boolean },
 ) {
+  const { hasStorySlots } = await import("@/modules/economics/story-slots");
+  if (
+    !options?.force &&
+    hasStorySlots(detail.businessCase.justificationNarrative) &&
+    hasStorySlots(detail.businessCase.recommendationNarrative)
+  ) {
+    return detail;
+  }
+
   const { explainBusinessCase } = await import(
     "@/server/services/business-case-ask"
   );
   const explained = await explainBusinessCase(buildCaseBriefing(detail));
+  if (!explained.fromModel && !options?.force) {
+    return detail;
+  }
+
   const scoped = requireTenantId(tenantId);
 
   await sql`
@@ -264,6 +279,7 @@ export async function persistRecommendation(
     set
       "recommendationState" = ${explained.recommendationState},
       "recommendationNarrative" = ${explained.recommendationNarrative},
+      "justificationNarrative" = ${explained.justificationNarrative},
       "intelligenceNarrative" = ${explained.intelligenceNarrative},
       "updatedAt" = now()
     where "tenantId" = ${scoped} and id = ${detail.businessCase.id}
@@ -376,6 +392,7 @@ function withCase(row: BusinessCaseRow): BusinessCaseRow {
     baselineDays: asNumber(row.baselineDays),
     enigmaDays: asNumber(row.enigmaDays),
     status: (row.status ?? "draft") as BusinessCaseStatus,
+    justificationNarrative: row.justificationNarrative ?? null,
   };
 }
 

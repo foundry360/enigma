@@ -55,14 +55,15 @@ Metadata-first. Org **shape**, not customer **rows**.
 | --- | --- | --- |
 | Org identity | REST | `/services/oauth2/userinfo` and allowlisted `Organization` query (`Name` from Company Information) |
 | Object inventory | REST | `/services/data/v61.0/sobjects/` |
-| Object/field/record-type shape | REST | `/sobjects/{name}/describe` |
+| Object/field/record-type shape | REST | `/sobjects/{name}/describe` (includes status picklists and lookup targets) |
 | Flows | Tooling | `FlowDefinition`, `Flow` |
 | Apex | Tooling | `ApexTrigger` (name, object, status, events — not source) |
 | Validation rules | Tooling | `ValidationRule` |
 | Custom objects | Metadata or Tooling | `CustomObject` |
 | Service/sales signals | REST describe + limits | Case, Lead, Opportunity, KnowledgeArticle **presence** |
-| Security posture | REST / Tooling | Profile, PermissionSet counts and object-permission summaries |
-| Knowledge posture | REST describe | Knowledge article objects and data categories if present |
+| Security posture | REST / Tooling | Profile and PermissionSet **names** and counts |
+| Process controls | REST / Tooling | Queue names, AssignmentRule, BusinessHours |
+| Knowledge posture | REST describe + Tooling | Knowledge article objects and DataCategoryGroup names |
 
 Do not SOQL Account, Contact, Case, Opportunity, or any other business object. Do not pull field values, emails, files, or Chatter.
 

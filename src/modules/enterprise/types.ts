@@ -39,6 +39,8 @@ export type EnterpriseField = {
   type: string;
   required: boolean;
   custom: boolean;
+  picklistLabels?: string[];
+  referenceTo?: string[];
 };
 
 export type EnterpriseRecordType = {
@@ -74,6 +76,8 @@ export type ValidationRuleSummary = {
 export type SecuritySummary = {
   profileCount: number;
   permissionSetCount: number;
+  profileNames?: string[];
+  permissionSetNames?: string[];
 };
 
 export type KnowledgePosture = {
@@ -82,6 +86,14 @@ export type KnowledgePosture = {
   dataCategories: string[];
 };
 
+export type ProcessControls = {
+  queues: { name: string }[];
+  assignmentRules: { name: string; objectApiName: string; active: boolean }[];
+  businessHours: { name: string; active: boolean }[];
+};
+
 export type OrgLimits = {
   dailyApiRequests: { max: number; remaining: number } | null;
+  dataStorageMb: { max: number; remaining: number } | null;
+  fileStorageMb: { max: number; remaining: number } | null;
 };

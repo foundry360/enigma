@@ -7,8 +7,10 @@ import type {
   WorkKind,
 } from "@/modules/intelligence/types";
 
-const workCatalog: { apiName: string; kind: WorkKind }[] = [
+export const workCatalog: { apiName: string; kind: WorkKind }[] = [
   { apiName: "Case", kind: "service" },
+  { apiName: "WorkOrder", kind: "service" },
+  { apiName: "Incident", kind: "service" },
   { apiName: "Account", kind: "customer" },
   { apiName: "Contact", kind: "customer" },
   { apiName: "Lead", kind: "revenue" },
@@ -135,8 +137,8 @@ export function normalizeSignals(facts: AssessmentFacts): SignalContext {
     ...context,
     signals: [
       addressableWork(context),
-      operatingPath(context),
-      groundedAnswers(context),
+      operatingPath(facts, context),
+      groundedAnswers(facts, context),
       automationCollision(facts, context),
       accessSurface(facts, context),
       writebackControl(facts, context),
@@ -190,6 +192,7 @@ function addressableWork(
 }
 
 function operatingPath(
+  facts: AssessmentFacts,
   context: Omit<SignalContext, "signals">,
 ): BusinessSignal {
   const service = context.workKinds.includes("service");
@@ -209,6 +212,7 @@ function operatingPath(
           ? `Operating objects: ${labels}.`
           : "No service or revenue path objects were found.",
       ),
+      ...citeProcessPath(facts),
     ],
     meaning:
       score >= 50
@@ -225,10 +229,12 @@ function operatingPath(
 }
 
 function groundedAnswers(
+  facts: AssessmentFacts,
   context: Omit<SignalContext, "signals">,
 ): BusinessSignal {
   const grounded = context.groundingLabels.length > 0;
   const score = grounded ? 80 : 25;
+  const categories = facts.knowledge?.dataCategories ?? [];
 
   return signal("grounded_answers", score, {
     evidence: [
@@ -238,6 +244,14 @@ function groundedAnswers(
           ? `Approved content sources: ${context.groundingLabels.join(", ")}.`
           : "No approved knowledge source was found.",
       ),
+      ...(categories.length > 0
+        ? [
+            cite(
+              "knowledge_posture",
+              `Data categories: ${categories.join(", ")}.`,
+            ),
+          ]
+        : []),
     ],
     meaning: grounded
       ? "Approved content exists, so answers can be grounded instead of invented."
@@ -268,7 +282,7 @@ function automationCollision(
       count === 0
         ? "Work looks manual today, so an agent may become the first system of action."
         : count < 8
-          ? "Some automation exists, but the estate is light enough that an agent can attach."
+          ? "Some automation exists, but it is light enough that an agent can attach."
           : "Automation is dense, so an agent is likely to duplicate or fight existing paths.",
     consumption:
       count < 8
@@ -299,24 +313,21 @@ function accessSurface(
         : 65;
 
   return signal("access_surface", score, {
-    evidence: [
-      cite(
-        "security_summary",
-        facts.security
-          ? `${profileCount} profiles and ${permissionSetCount} permission sets.`
-          : "Access control could not be read.",
-      ),
-    ],
-    meaning: facts.security
-      ? "An access estate exists to constrain what an agent identity can invoke and change."
-      : "Access shape could not be read, so agent permissions cannot be judged.",
+    evidence: facts.security
+      ? citeAccessControl(facts.security)
+      : [cite("security_summary", "Access control could not be read.")],
+    meaning: !facts.security
+      ? "Access shape could not be read, so agent permissions cannot be judged."
+      : context.permissionEstate === "sprawling"
+        ? "The permission surface is broad, so an agent identity is hard to keep least-privilege."
+        : "Access can be constrained, so an agent identity can be limited to what it should see and change.",
     consumption:
       context.permissionEstate === "sprawling"
         ? "A broad identity will over-consume write actions and make the forecast noisy."
         : "A dedicated agent identity keeps consumption scoped to intended topics.",
     risk:
       context.permissionEstate === "sprawling"
-        ? "A large permission estate makes least-privilege agent access harder."
+        ? "A reused human profile can change more than the topic needs."
         : "An over-privileged agent identity is the main access failure mode.",
     recommendation:
       "Use a dedicated agent permission set; do not reuse a broad human profile.",
@@ -393,6 +404,78 @@ function citeAutomations(
           ),
         ]
       : []),
+  ];
+}
+
+function citeProcessPath(facts: AssessmentFacts): Evidence[] {
+  const described = Object.values(facts.describes);
+  const statuses = described.flatMap((item) => {
+    const field = item.fields.find((entry) =>
+      /^(status|stagename)$/i.test(entry.apiName),
+    );
+    return field?.picklistLabels?.length
+      ? [`${item.label} statuses: ${field.picklistLabels.join(", ")}.`]
+      : [];
+  });
+  const recordTypes = described.flatMap((item) => {
+    const names = item.recordTypes
+      .filter((recordType) => recordType.active)
+      .map((recordType) => recordType.label);
+    return names.length > 0
+      ? [`${item.label} record types: ${names.join(", ")}.`]
+      : [];
+  });
+  const queues = (facts.process?.queues ?? []).map((item) => item.name);
+  const rules = (facts.process?.assignmentRules ?? []).filter(
+    (rule) => rule.active,
+  );
+  const hours = (facts.process?.businessHours ?? []).filter((item) => item.active);
+
+  return [
+    ...statuses.map((citation) => cite("describe_object", citation)),
+    ...recordTypes.map((citation) => cite("describe_object", citation)),
+    ...(queues.length > 0
+      ? [cite("list_process_controls", `Queues: ${queues.join(", ")}.`)]
+      : []),
+    ...(rules.length > 0
+      ? [
+          cite(
+            "list_process_controls",
+            `Assignment rules: ${rules
+              .map((rule) => `${rule.name} on ${rule.objectApiName}`)
+              .join(", ")}.`,
+          ),
+        ]
+      : []),
+    ...(hours.length > 0
+      ? [
+          cite(
+            "list_process_controls",
+            `Business hours: ${hours.map((item) => item.name).join(", ")}.`,
+          ),
+        ]
+      : []),
+  ];
+}
+
+function citeAccessControl(
+  security: NonNullable<AssessmentFacts["security"]>,
+): Evidence[] {
+  const profileNames = security.profileNames ?? [];
+  const permissionSetNames = security.permissionSetNames ?? [];
+  const profiles =
+    profileNames.length > 0
+      ? `${security.profileCount} profiles: ${profileNames.join(", ")}.`
+      : `${security.profileCount} profiles.`;
+
+  return [
+    cite("security_summary", profiles),
+    cite(
+      "security_summary",
+      permissionSetNames.length > 0
+        ? `${security.permissionSetCount} permission sets: ${permissionSetNames.join(", ")}.`
+        : `${security.permissionSetCount} permission sets.`,
+    ),
   ];
 }
 

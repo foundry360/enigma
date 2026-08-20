@@ -8,6 +8,9 @@ const serviceObjects = [
   "Knowledge__kav",
   "KnowledgeArticleVersion",
   "Task",
+  "WorkOrder",
+  "Incident",
+  "EmailMessage",
 ];
 
 const salesObjects = ["Lead", "Opportunity", "Account", "Contact", "Campaign"];
@@ -65,6 +68,7 @@ export function followUpToolPlan(input: {
     ...describes,
     { tool: "list_automations" },
     { tool: "list_validation_rules" },
+    { tool: "list_process_controls" },
     { tool: "security_summary" },
     { tool: "knowledge_posture" },
     { tool: "org_limits" },

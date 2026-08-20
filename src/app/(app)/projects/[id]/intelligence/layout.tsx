@@ -97,8 +97,6 @@ export default async function IntelligenceLayout({
               <AssessmentRunForm
                 projectId={id}
                 label={complete ? "Run again" : "Run intelligence"}
-                orgName={org?.name}
-                orgId={org?.orgId}
               />
             </div>
           </div>

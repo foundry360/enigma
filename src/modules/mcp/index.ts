@@ -10,6 +10,7 @@ import {
   instanceKind,
   listSalesforceAutomations,
   listSalesforceObjects,
+  listSalesforceProcessControls,
   listSalesforceValidationRules,
   mapSalesforceOrgProfile,
   withSalesforceAccess,
@@ -183,6 +184,8 @@ export async function callMcpTool(input: McpCall): Promise<McpResult> {
         return listSalesforceAutomations(live);
       case "list_validation_rules":
         return listSalesforceValidationRules(live);
+      case "list_process_controls":
+        return listSalesforceProcessControls(live);
       case "security_summary":
         return getSalesforceSecuritySummary(live);
       case "knowledge_posture":

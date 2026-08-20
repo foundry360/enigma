@@ -28,11 +28,13 @@ The model may:
 - Name gaps, risks, and “what must be true”
 - Write the readiness story, recommended next move, and executive brief
 
-Every intelligence output must include **score, evidence, reason, risk, and recommendation**. Evidence must cite tool results (object present, field missing, Flow active), not ungrounded claims.
+Org Intelligence is an operational model of the connected environment (environment, workload, process, data, knowledge, automation, access, integrations, platform constraints, and findings). Business signals are judgments derived from that model. They are not the whole intelligence layer.
+
+Every finding and signal must include evidence. Evidence must cite tool results (object present, field missing, Flow active), not ungrounded claims. Volumes, quality percentages, and coverage are never invented. Workload volume, data quality statistics, and external-system integrations stay in the org model as **not observed** until an allowlisted tool reads them. Do not omit those gaps.
 
 The model never receives Salesforce tokens, raw HTTP, or customer records.
 
-Ask Enigma uses Claude (Anthropic Messages API) for MVP conversation. Consumption, ROC, and ROA stay calculated. Official Salesforce prices are refused. Without `ANTHROPIC_API_KEY`, Ask stays on grounded fallback copy.
+Ask Enigma uses Claude (Anthropic Messages API) for MVP conversation. Deployment Justification and Enigma Recommendation are also Claude stories, written on load with number slots so the share slider updates live figures without another model call. Consumption, ROC, and ROA stay calculated. Official Salesforce prices are refused. Without `ANTHROPIC_API_KEY`, Ask and those stories stay on grounded fallback copy.
 
 ## What stays deterministic
 

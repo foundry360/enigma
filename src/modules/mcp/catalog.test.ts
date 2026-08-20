@@ -9,6 +9,7 @@ describe("MCP catalog", () => {
   it("exposes the metadata-only tool set", () => {
     expect(mcpTools).toContain("list_objects");
     expect(mcpTools).toContain("describe_object");
+    expect(mcpTools).toContain("list_process_controls");
     expect(mcpTools).not.toContain("query_records");
     expect(mcpTools).not.toContain("soql");
   });

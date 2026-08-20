@@ -4,6 +4,7 @@ import { emptyRollup } from "@/modules/economics/model";
 import { buildIntelligenceBriefing } from "@/modules/intelligence/briefing";
 import {
   answerProjectAsk,
+  hasScriptedProjectAnswer,
   projectAskPrompt,
   suggestedProjectAsks,
 } from "@/modules/intelligence/project-ask";
@@ -28,6 +29,15 @@ const intelligence = buildIntelligenceBriefing({
       risk: "An agent could write more than intended.",
       recommendation: "Limit write-back to a known Case path.",
       evidence: [{ citation: "security: write surface open" }],
+    },
+    {
+      key: "access_surface",
+      title: "Access control",
+      score: 40,
+      reason: "The permission set is large.\n\nA broad identity over-consumes writes.",
+      risk: "A broad profile would let the agent change too much.",
+      recommendation: "Use a dedicated agent permission set.",
+      evidence: [{ citation: "44 profiles and 179 permission sets." }],
     },
   ],
   candidates: [
@@ -127,6 +137,18 @@ describe("project ask", () => {
     expect(answer).toMatch(/hours given back/i);
     expect(answer).not.toMatch(/Impacted 150/);
     expect(answer).not.toMatch(/Proceed with Conditions because/);
+  });
+
+  it("does not answer a profile question with case math", () => {
+    const answer = answerProjectAsk(
+      "Can you name the 44 profiles in the org?",
+      briefing,
+    );
+
+    expect(answer).toMatch(/44 profiles/i);
+    expect(answer).toMatch(/did not store/i);
+    expect(answer).not.toMatch(/I can walk the saved Business Case/i);
+    expect(answer).not.toMatch(/work item cost/i);
   });
 
   it("reruns consumption when work item cost is what-if'd", () => {
@@ -238,8 +260,35 @@ describe("project ask", () => {
     });
 
     expect(answer).toContain("Investment is not provided.");
-    expect(answer).toContain("Volume can still be uneven.");
-    expect(answer).toContain("Write-back is weak.");
+    expect(answer).toMatch(/Write-back control/i);
+    expect(answer).toMatch(/unconstrained go-live|Proceed with Conditions/i);
+    expect(answer).not.toMatch(/Addressable work still carries/i);
+    expect(answer).not.toMatch(/Grounded answers still carries/i);
+  });
+
+  it("does not script a named-signal explanation", () => {
+    expect(
+      hasScriptedProjectAnswer("Explain automation collision", briefing),
+    ).toBe(false);
+  });
+
+  it("answers a named signal risk instead of dumping every risk", () => {
+    const access = answerProjectAsk(
+      "Ok, what is the risk associated with Access Control?",
+      briefing,
+    );
+    const holds = answerProjectAsk(
+      "What do the gaps and risks block, and what should I do next?",
+      briefing,
+    );
+
+    expect(access).toMatch(/Access control/i);
+    expect(access).toMatch(/profile|permission/i);
+    expect(access).not.toMatch(/no listed input gaps/i);
+    expect(access).not.toMatch(/Addressable work still carries/i);
+    expect(access).not.toEqual(holds);
+    expect(holds).toMatch(/no listed input gaps|not what is holding/i);
+    expect(holds).toMatch(/next|Deployment|Proceed/i);
   });
 
   it("answers why only one opportunity in readable paragraphs", () => {
@@ -272,7 +321,33 @@ describe("project ask", () => {
     expect(prompt).toMatch(/Value comes from/i);
     expect(prompt).toMatch(/conversation/i);
     expect(prompt).not.toContain("Impacted 150 =");
-    expect(prompt).not.toMatch(/Proceed because/i);
+  });
+
+  it("lets the model answer conversational questions instead of scripting them", () => {
+    expect(
+      hasScriptedProjectAnswer(
+        "Ok, what is the risk associated with Access Control?",
+        briefing,
+      ),
+    ).toBe(false);
+    expect(
+      hasScriptedProjectAnswer(
+        "What do the gaps and risks block, and what should I do next?",
+        briefing,
+      ),
+    ).toBe(false);
+    expect(
+      hasScriptedProjectAnswer("Why is Access control weak?", briefing),
+    ).toBe(false);
+    expect(
+      hasScriptedProjectAnswer("How is Consumption calculated?", briefing),
+    ).toBe(true);
+    expect(
+      hasScriptedProjectAnswer(
+        "What is the Salesforce license price?",
+        briefing,
+      ),
+    ).toBe(true);
   });
 
   it("puts process, formulas, evidence, and case math in the model prompt", () => {
@@ -281,6 +356,7 @@ describe("project ask", () => {
     expect(prompt).toContain("Decipher");
     expect(prompt).toMatch(/Impacted = Work Per Year/i);
     expect(prompt).toMatch(/Case present/i);
+    expect(prompt).toMatch(/Named evidence from this run/i);
     expect(prompt).toContain("$300");
     expect(prompt).toContain("Confirm the case");
     expect(prompt.toLowerCase()).not.toContain("list price");

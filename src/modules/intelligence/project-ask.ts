@@ -7,19 +7,24 @@ import { formatCurrency, formatCurrencyPrecise } from "@/lib/format";
 import {
   answerFromBriefing,
   formatCandidateAnswer,
+  formatSignalFacts,
   formatSignalAnswer,
   isOfficialPriceAsk,
   isOpportunityCountAsk,
+  withoutEstate,
   type IntelligenceBriefing,
 } from "@/modules/intelligence/briefing";
 import { formatAskAnswer } from "@/modules/intelligence/ask-format";
 import { summarizeEvidenceLayers } from "@/modules/intelligence/evidence-expand";
 import { summarizeImplication } from "@/modules/intelligence/opportunity-summaries";
+import { formatOrgIntelligenceBrief } from "@/modules/intelligence/org-intelligence";
+import type { OrgIntelligence } from "@/modules/intelligence/org-model";
 import { composeKnowledge } from "@/modules/knowledge";
 
 export type ProjectAskBriefing = {
   intelligence: IntelligenceBriefing;
   businessCase: BusinessCaseBriefing | null;
+  orgIntelligence?: OrgIntelligence | null;
 };
 
 export function navigatorInstructions(question?: string) {
@@ -79,7 +84,7 @@ function compactProjectBriefing(
   question?: string,
 ) {
   const signals = briefing.intelligence.signals
-    .map((signal) => formatSignalAnswer(signal))
+    .map((signal) => formatSignalFacts(signal))
     .join("\n\n");
   const candidates = briefing.intelligence.candidates
     .map((candidate) => {
@@ -92,17 +97,33 @@ function compactProjectBriefing(
     })
     .join("\n\n");
 
+  const wantsNames = /name|list the|what are the/i.test(question ?? "");
+  const namedEvidence = briefing.intelligence.signals
+    .flatMap((signal) =>
+      signal.evidence.map((citation) => {
+        const line = `${signal.title}: ${citation}`;
+        return wantsNames ? line : compactLongNameList(line);
+      }),
+    )
+    .join("\n");
+
   const parts = [
+    briefing.orgIntelligence
+      ? formatOrgIntelligenceBrief(briefing.orgIntelligence)
+      : null,
     `Environment: ${briefing.intelligence.environment}.`,
     signals || "No business signals were produced.",
     candidates || "No opportunity candidates were produced.",
+    namedEvidence
+      ? `Named evidence from this run.\n${namedEvidence}`
+      : "No named evidence was stored on this run.",
   ];
 
   if (!briefing.businessCase) {
     parts.push(
       "No business case has been opened yet. Promote a candidate before totals can be explained.",
     );
-    return parts.join("\n\n");
+    return parts.filter(Boolean).join("\n\n");
   }
 
   parts.push(
@@ -125,18 +146,15 @@ function compactProjectBriefing(
     );
   }
 
-  if (/recommend|proceed|defer|validate/i.test(question ?? "")) {
-    parts.push(briefing.businessCase.recommendationWhy);
-  }
-
   parts.push(
+    `Recommendation is ${recommendationLabel[briefing.businessCase.recommendationState]}. ${briefing.businessCase.recommendationWhy}`,
     briefing.businessCase.gaps.length
       ? `Gaps: ${briefing.businessCase.gaps.join(" ")}`
       : "No listed input gaps.",
     `Deployment path: Confirm the case (${recommendationLabel[briefing.businessCase.recommendationState]}), stand up the work, then go live.`,
   );
 
-  return parts.join("\n\n");
+  return parts.filter(Boolean).join("\n\n");
 }
 
 export function hasScriptedProjectAnswer(
@@ -145,35 +163,28 @@ export function hasScriptedProjectAnswer(
   history?: Array<{ role: string; content: string }>,
 ) {
   const trimmed = resolveAskQuestion(question, history);
-  if (
-    isOfficialPriceAsk(trimmed) ||
-    isOpportunityCountAsk(trimmed) ||
-    parseCaseWhatIf(question) ||
-    parseCaseWhatIf(trimmed)
-  ) {
+  if (isOfficialPriceAsk(trimmed) || isOpportunityCountAsk(trimmed)) {
     return true;
   }
 
+  if (parseCaseWhatIf(question) || parseCaseWhatIf(trimmed)) {
+    return true;
+  }
+
+  return Boolean(briefing.businessCase && isExplicitCalculationAsk(trimmed));
+}
+
+function isExplicitCalculationAsk(question: string) {
   if (
-    /value driver|consumption driver|implication|constraint|dependenc/i.test(
-      trimmed,
+    /driver|implication|mean|why are they|risk|gap|signal|access|object|profile|queue/i.test(
+      question,
     )
   ) {
-    return true;
-  }
-
-  if (!briefing.businessCase) {
     return false;
   }
 
-  return (
-    /consump|impacted|\broc\b|\broi\b|payback|\broa\b|accelerat|calculat|formula|how (is|do|does|are).*(value|consumption|impacted)/i.test(
-      trimmed,
-    ) ||
-    /recommend|proceed|defer|validate|should (we|i) (go|proceed)|next (step|move)/i.test(
-      trimmed,
-    ) ||
-    /gap|risk|block|watch|missing|incomplete/i.test(trimmed)
+  return /how (is|do|does|are) (consumption|value|impacted|roc|roi|payback)|walk me through.*(consumption|value|calculat)|calculat(e|ion|ed) (consumption|value|roc)/i.test(
+    question,
   );
 }
 
@@ -223,54 +234,54 @@ export function answerProjectAsk(
     );
   }
 
-  if (
-    businessCase &&
-    /recommend|proceed|defer|validate|should (we|i) (go|proceed)|next (step|move)/i.test(
-      trimmed,
-    )
-  ) {
-    return formatAskAnswer(reasonAboutRecommendation(briefing));
+  if (businessCase && (isCaseHoldAsk(trimmed) || isNextMoveAsk(trimmed))) {
+    return formatAskAnswer(explainCaseHolds(briefing, trimmed));
   }
 
-  if (businessCase && /gap|risk|block|watch|missing|incomplete/i.test(trimmed)) {
-    const gaps = businessCase.gaps.length
-      ? `Business case gaps: ${businessCase.gaps.map(asSentence).join(" ")}`
-      : "The business case has no listed input gaps.";
-    const risks = briefing.intelligence.signals
-      .filter((signal) => signal.risk)
-      .map((signal) => `${signal.title} still carries this risk. ${asSentence(signal.risk)}`);
-    const constraints = briefing.intelligence.candidates.flatMap((candidate) =>
-      candidate.constraints.map(
-        (constraint) =>
-          `On ${candidate.name}, ${asSentence(constraint.charAt(0).toLowerCase() + constraint.slice(1))}`,
-      ),
-    );
-    return formatAskAnswer(
-      [
-        gaps,
-        risks.length
-          ? risks.join(" ")
-          : "No signal risks are listed on this run.",
-        constraints.length
-          ? constraints.join(" ")
-          : "",
-      ]
-        .filter(Boolean)
-        .join("\n\n"),
-    );
+  return formatAskAnswer(answerFromBriefing(trimmed, briefing.intelligence));
+}
+
+function isCaseHoldAsk(question: string) {
+  return /gaps?( and risks?)?|what (do|does) .*(block|hold)|what blocks|missing input|incomplete (case|line)|input gaps/i.test(
+    question,
+  );
+}
+
+function isNextMoveAsk(question: string) {
+  return /recommend|proceed|defer|validate|should (we|i) (go|proceed)|what should i do next|next (step|move)/i.test(
+    question,
+  );
+}
+
+function explainCaseHolds(briefing: ProjectAskBriefing, question: string) {
+  const businessCase = briefing.businessCase;
+  if (!businessCase) {
+    return "Promote a candidate and open the Business Case before Enigma can explain what is holding the path.";
   }
 
-  const fromIntel = answerFromBriefing(trimmed, briefing.intelligence);
-  if (
-    businessCase &&
-    /I can only explain this intelligence run/i.test(fromIntel)
-  ) {
-    return formatAskAnswer(
-      "I can walk the saved Business Case numbers, or rerun them as a what-if if you change work item cost, work per year, hours, labor cost, or share. Official Salesforce prices are not used.",
-    );
-  }
+  const weak = briefing.intelligence.signals.filter(
+    (signal) => signal.strength === "weak",
+  );
+  const gapText = businessCase.gaps.length
+    ? `These input gaps block a complete case: ${businessCase.gaps.map(asSentence).join(" ")}`
+    : "There are no listed input gaps, so missing rates or volumes are not what is holding the case.";
+  const riskText = weak.length
+    ? `The risks that still condition go-live are on ${weak
+        .map((signal) => signal.title)
+        .join(" and ")}. ${weak
+        .map(
+          (signal) =>
+            `${signal.title}: ${asSentence(withoutEstate(signal.risk))}`,
+        )
+        .join(" ")}`
+    : "No signals are weak, so signal risk is not blocking the path.";
+  const next = isNextMoveAsk(question)
+    ? reasonAboutRecommendation(briefing)
+    : `They block unconstrained go-live and keep the recommendation at ${recommendationLabel[businessCase.recommendationState]}.`;
 
-  return formatAskAnswer(fromIntel);
+  return [gapText, riskText, explainConstraintsOnThisProject(briefing), next]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export function parseCaseWhatIf(question: string) {
@@ -522,6 +533,20 @@ function reasonAboutRecommendation(briefing: ProjectAskBriefing) {
   ]
     .filter(Boolean)
     .join("\n\n");
+}
+
+function compactLongNameList(citation: string) {
+  const split = citation.lastIndexOf(": ");
+  if (split < 0) {
+    return citation;
+  }
+
+  const values = citation.slice(split + 2);
+  if ((values.match(/,/g) ?? []).length < 6) {
+    return citation;
+  }
+
+  return `${citation.slice(0, split)}.`;
 }
 
 function asSentence(value: string) {

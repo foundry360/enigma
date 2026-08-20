@@ -35,6 +35,18 @@ describe("Salesforce path allowlist", () => {
       salesforcePath("tooling", toolingQueries.apexTriggers),
     ).not.toThrow();
     expect(() =>
+      salesforcePath("tooling", toolingQueries.profiles),
+    ).not.toThrow();
+    expect(() =>
+      salesforcePath("tooling", toolingQueries.permissionSets),
+    ).not.toThrow();
+    expect(() =>
+      salesforcePath("tooling", toolingQueries.assignmentRules),
+    ).not.toThrow();
+    expect(() =>
+      salesforcePath("query", restQueries.queues),
+    ).not.toThrow();
+    expect(() =>
       assertAllowedSalesforcePath(
         `/services/data/v61.0/tooling/query?q=${encodeURIComponent("SELECT Id FROM Account")}`,
       ),

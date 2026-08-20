@@ -17,13 +17,15 @@ import {
   Gauge,
   Layers,
   Percent,
-  TrendingDown,
   TrendingUp,
   TriangleAlert,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
-import { saveBusinessCaseAction } from "@/app/actions/business-case";
+import {
+  ensureBusinessCaseStoriesAction,
+  saveBusinessCaseAction,
+} from "@/app/actions/business-case";
 import { IntelligenceHeaderPortal } from "@/components/intelligence/intelligence-header-actions";
 import { OpportunityFlow } from "@/components/intelligence/opportunity-flow";
 import { strengthColors } from "@/components/ui/score-ring";
@@ -38,12 +40,15 @@ import {
   formatPercent,
 } from "@/lib/format";
 import { intelligenceHref } from "@/lib/intelligence/routes";
-import {
-  fallbackNarratives,
-  splitCitedCopy,
-  toBusinessCaseBriefing,
-} from "@/modules/economics/briefing";
+import { splitCitedCopy } from "@/modules/economics/briefing";
 import type { BusinessCaseDetail } from "@/modules/economics/case-view";
+import {
+  fallbackJustificationStory,
+  fallbackRecommendationStory,
+  fillStorySlots,
+  hasStorySlots,
+  storyValues,
+} from "@/modules/economics/story-slots";
 import {
   adoptionForScenario,
   defaultAdoption,
@@ -77,8 +82,10 @@ export function BusinessCasePanel({
   const [draft, setDraft] = useState(() => toDraft(initial));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showingRecommendation, setShowingRecommendation] = useState(true);
+  const [showingJustification, setShowingJustification] = useState(false);
+  const [showingRecommendation, setShowingRecommendation] = useState(false);
   const [showingEvidence, setShowingEvidence] = useState(false);
+  const [showingGaps, setShowingGaps] = useState(false);
   const scenarioRates = useMemo(
     () =>
       normalizeAdoption({
@@ -117,7 +124,6 @@ export function BusinessCasePanel({
     JSON.stringify(draft) !== JSON.stringify(toDraft(detail)) ||
     Math.abs(liveAdoption - scenarioRates[draft.scenario]) > 0.0005;
 
-  const primary = detail.lines[0];
   const confidence = detail.lines.some((line) => line.confidence === "high")
     ? "high"
     : detail.lines.some((line) => line.confidence === "medium")
@@ -160,48 +166,6 @@ export function BusinessCasePanel({
     ],
   );
 
-  const briefing = useMemo(
-    () =>
-      toBusinessCaseBriefing({
-        opportunities: detail.lines.map((line, index) => ({
-          name: line.opportunityName,
-          process: line.businessProcess,
-          capability: line.recommendedCapability,
-          confidence: line.confidence,
-          finding: line.finding,
-          signals: line.supportingSignals.map((signal) => ({
-            key: signal.key,
-            title: signal.title,
-            strength: signal.strength,
-          })),
-          evidence: line.evidence.map((entry) => entry.citation),
-          consumptionDrivers: line.consumptionDrivers,
-          valueDrivers: line.valueDrivers,
-          constraints: line.constraints,
-          dependencies: line.dependencies,
-          annualVolume: draft.lines[index]?.annualVolume ?? null,
-          unitPrice: draft.lines[index]?.unitPrice ?? null,
-        })),
-        scenario: draft.scenario,
-        adoption: liveAdoption,
-        rollup: live.rollup,
-        gaps: live.gaps,
-        recommendationState: live.recommendationState,
-      }),
-    [detail.lines, draft, live, liveAdoption],
-  );
-
-  const narratives = fallbackNarratives(briefing);
-  const storedNarrative = detail.businessCase.recommendationNarrative;
-  const shortStored = (storedNarrative?.length ?? 0) < 280;
-  const genericNarrative =
-    /calculated model uses inherited intelligence|It moves toward Proceed if/i.test(
-      storedNarrative ?? "",
-    );
-  const recommendationNarrative =
-    !dirty && storedNarrative && !genericNarrative && !shortStored
-      ? storedNarrative
-      : narratives.recommendationNarrative;
   const volume = draft.lines.reduce(
     (sum, line) => sum + (line.annualVolume ?? 0),
     0,
@@ -224,11 +188,6 @@ export function BusinessCasePanel({
     };
   }
 
-  function selectScenario(scenario: Scenario) {
-    setDraft((current) => ({ ...current, scenario }));
-    setLiveAdoption(scenarioRates[scenario]);
-  }
-
   function slideAdoption(percent: number) {
     const next = percent / 100;
     setLiveAdoption(next);
@@ -249,7 +208,83 @@ export function BusinessCasePanel({
   const laborCost = draft.lines[0]?.hourlyCost ?? null;
   const workItemCost = draft.lines[0]?.unitPrice ?? null;
   const workTaken = live.rollup.impacted;
-  const workLabel = workUnitLabel(primary?.candidateKey);
+  const liveStory = storyValues({
+    volume: volume || null,
+    share: adoption,
+    impacted: workTaken,
+    hours: hoursOnItem,
+    labor: laborCost,
+    value: live.rollup.value,
+    workItemCost,
+    consumption: live.rollup.consumption,
+    net: live.rollup.netAnnual,
+    roc: live.rollup.roc,
+    state: live.recommendationState,
+  });
+  const justificationTemplate = hasStorySlots(
+    detail.businessCase.justificationNarrative,
+  )
+    ? detail.businessCase.justificationNarrative!
+    : fallbackJustificationStory({
+        complete: live.rollup.complete,
+        process: detail.lines[0]?.businessProcess ?? null,
+        area: detail.lines[0]?.businessArea ?? null,
+        capability: detail.lines[0]?.recommendedCapability ?? null,
+        valueDrivers: detail.lines[0]?.valueDrivers ?? [],
+        consumptionDrivers: detail.lines[0]?.consumptionDrivers ?? [],
+        constraints: detail.lines[0]?.constraints ?? [],
+      });
+  const recommendationTemplate = hasStorySlots(
+    detail.businessCase.recommendationNarrative,
+  )
+    ? detail.businessCase.recommendationNarrative!
+    : fallbackRecommendationStory(live.rollup.complete);
+  const justificationNarrative = fillStorySlots(
+    justificationTemplate,
+    liveStory,
+  );
+  const recommendationNarrative = fillStorySlots(
+    recommendationTemplate,
+    liveStory,
+  );
+
+  useEffect(() => {
+    if (locked) {
+      return;
+    }
+    if (
+      hasStorySlots(detail.businessCase.justificationNarrative) &&
+      hasStorySlots(detail.businessCase.recommendationNarrative)
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    void ensureBusinessCaseStoriesAction(projectId).then((result) => {
+      if (cancelled || !result || "error" in result) {
+        return;
+      }
+      setDetail(result.detail);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    detail.businessCase.justificationNarrative,
+    detail.businessCase.recommendationNarrative,
+    locked,
+    projectId,
+  ]);
+
+  const shareThresholdLabel =
+    liveAdoption + 0.0005 >= scenarioRates.aggressive
+      ? scenarioLabel.aggressive
+      : liveAdoption + 0.0005 >= scenarioRates.expected
+        ? scenarioLabel.expected
+        : liveAdoption + 0.0005 >= scenarioRates.conservative
+          ? scenarioLabel.conservative
+          : null;
   const risks = [
     ...live.gaps.map((gap) => ({
       text: gap,
@@ -336,7 +371,7 @@ export function BusinessCasePanel({
       )}
 
       <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
-        <Card className="flex flex-col justify-center">
+        <Card className="flex min-w-0 flex-col justify-center">
           <div className="grid grid-cols-2 gap-x-8 gap-y-8">
             <StatMicro
               icon={CircleDollarSign}
@@ -386,41 +421,8 @@ export function BusinessCasePanel({
           </div>
         </Card>
 
-        <Card>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Consumption & Value</h2>
-            <div
-              className="inline-flex rounded-full bg-surface-2 p-0.5"
-              role="radiogroup"
-              aria-label="Scenario"
-            >
-              {scenarios.map((scenario) => {
-                const selected = draft.scenario === scenario;
-                return (
-                  <button
-                    key={scenario}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    disabled={locked}
-                    onClick={() => selectScenario(scenario)}
-                    className={`rounded-full px-3 py-1 text-sm transition-colors ${
-                      selected
-                        ? "bg-surface font-medium text-foreground"
-                        : "text-muted hover:text-foreground"
-                    }`}
-                  >
-                    {scenarioLabel[scenario]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <p className="mt-1 text-sm text-muted">
-            {live.rollup.complete
-              ? `That's ${formatCompactNumber(live.rollup.impacted)} of ${formatCompactNumber(volume || null)} ${workLabel.toLowerCase()} an agent would actually take this year.`
-              : `How much of this year's ${workLabel.toLowerCase()} could an agent take on?`}
-          </p>
+        <Card className="min-w-0">
+          <h2 className="text-lg font-semibold">Consumption & Value</h2>
           <label className="mt-4 block">
             <span className="mb-1.5 block text-sm font-medium">
               Work Per Year
@@ -489,9 +491,12 @@ export function BusinessCasePanel({
                 }
                 aria-label="Share An Agent Could Handle"
               />
-              <span className="w-10 shrink-0 text-right text-sm tabular-nums text-muted">
-                {formatPercent(adoption)}
-              </span>
+              <div className="w-24 shrink-0 text-right">
+                {shareThresholdLabel ? (
+                  <p className="text-xs text-muted">{shareThresholdLabel}</p>
+                ) : null}
+                <p className="text-sm">{formatPercent(adoption)}</p>
+              </div>
             </div>
             <p className="mt-1.5 text-xs text-muted">
               What percentage of this work could an agent realistically handle, even if it isn't fully automated?
@@ -503,6 +508,20 @@ export function BusinessCasePanel({
       <Card>
         <h2 className="text-lg font-semibold">How to Proceed</h2>
         <div className="mt-3 space-y-3">
+          <FoldCard
+            title="Deployment Justification"
+            open={showingJustification}
+            onToggle={() => setShowingJustification((open) => !open)}
+          >
+            <div className="space-y-2.5 text-sm leading-relaxed">
+              {justificationNarrative
+                .split(/\n{2,}/)
+                .filter(Boolean)
+                .map((paragraph, index) => (
+                  <p key={index}>{paragraph}</p>
+                ))}
+            </div>
+          </FoldCard>
           <FoldCard
             title="Enigma Recommendation"
             open={showingRecommendation}
@@ -552,6 +571,34 @@ export function BusinessCasePanel({
               ))}
             </div>
           </FoldCard>
+          <FoldCard
+            title="Gaps / Risks"
+            open={showingGaps}
+            onToggle={() => setShowingGaps((open) => !open)}
+          >
+            {risks.length > 0 ? (
+              <ul className="space-y-2 text-sm">
+                {risks.map((risk) => (
+                  <li
+                    key={risk.text}
+                    className="flex items-start gap-2 rounded-md border border-border bg-background px-3 py-4"
+                  >
+                    <TriangleAlert
+                      aria-hidden="true"
+                      className="mt-0.5 size-4 shrink-0"
+                      style={{ color: strengthColors[risk.tone] }}
+                    />
+                    <span>{risk.text}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted">
+                Required model inputs are present. Customer assumptions still need
+                validation before they are treated as official prices.
+              </p>
+            )}
+          </FoldCard>
         </div>
       </Card>
 
@@ -599,9 +646,9 @@ export function BusinessCasePanel({
           </div>
         </Card>
         <Card>
-          <h2 className="text-lg font-semibold">Assumptions & Evidence</h2>
+          <h2 className="text-lg font-semibold">Assumptions & Calculations</h2>
           <p className="mt-1 text-xs text-muted">
-            What we heard from the customer, plus the numbers this run produced.
+            Customer input and the numbers this run produced.
           </p>
           <div className="mt-3 border-t border-border" />
           <ModelRow
@@ -679,67 +726,10 @@ export function BusinessCasePanel({
             value={
               daysAccelerated != null ? `${daysAccelerated} days` : "—"
             }
-            hint={
-              draft.baselineDays != null && draft.enigmaDays != null
-                ? `${draft.baselineDays} − ${draft.enigmaDays}`
-                : undefined
-            }
             strong
           />
-          <p className="mt-4 text-xs font-medium text-muted">
-            Potential value of landing this earlier
-          </p>
-          <p className="mt-2 flex items-center gap-2 font-mono text-2xl font-semibold tabular-nums tracking-tight">
-            {draft.baselineDays != null && draft.enigmaDays != null ? (
-              daysAccelerated != null && daysAccelerated > 0 ? (
-                <TrendingUp
-                  aria-hidden="true"
-                  className="size-6 shrink-0"
-                  style={{ color: strengthColors.strong }}
-                />
-              ) : (
-                <TrendingDown
-                  aria-hidden="true"
-                  className="size-6 shrink-0"
-                  style={{ color: strengthColors.weak }}
-                />
-              )
-            ) : null}
-            <span>{shown(formatCompactCurrency(live.rollup.roa))}</span>
-            {live.rollup.value != null && daysAccelerated != null ? (
-              <span className="text-xs font-normal text-muted">
-                ({formatCompactCurrency(live.rollup.value)} ÷ 12 × {daysAccelerated} ÷ 30)
-              </span>
-            ) : null}
-          </p>
         </Card>
       </div>
-
-      <Card>
-        <h2 className="text-lg font-semibold">Gaps / Risks</h2>
-        {risks.length > 0 ? (
-          <ul className="mt-3 space-y-2 text-sm">
-            {risks.map((risk) => (
-              <li
-                key={risk.text}
-                className="flex items-start gap-2 rounded-md border border-border bg-surface-2 px-3 py-2"
-              >
-                <TriangleAlert
-                  aria-hidden="true"
-                  className="mt-0.5 size-4 shrink-0"
-                  style={{ color: strengthColors[risk.tone] }}
-                />
-                <span>{risk.text}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-3 text-sm text-muted">
-            Required model inputs are present. Customer assumptions still need
-            validation before they are treated as official prices.
-          </p>
-        )}
-      </Card>
 
       {error ? (
         <p className="text-sm text-red-500">{error}</p>
@@ -747,6 +737,7 @@ export function BusinessCasePanel({
     </div>
   );
 }
+
 
 function FoldCard({
   title,
@@ -853,7 +844,7 @@ function ModelRow({
       </p>
       <p className="shrink-0 text-right">
         <span
-          className={`font-mono text-sm tabular-nums ${strong ? "font-bold" : ""}`}
+          className={`text-sm ${strong ? "font-bold" : ""}`}
         >
           {value}
         </span>
@@ -871,19 +862,6 @@ function productFormula(...parts: Array<string | null | undefined>) {
   }
 
   return parts.join(" × ");
-}
-
-function workUnitLabel(key: string | undefined) {
-  if (key === "case_service_agent") {
-    return "Requests";
-  }
-  if (key === "knowledge_assist") {
-    return "Answers";
-  }
-  if (key === "guided_case_flow") {
-    return "Paths";
-  }
-  return "Units";
 }
 
 function CitedParagraph({ text }: { text: string }) {

@@ -17,6 +17,7 @@ const emptyFacts: AssessmentFacts = {
   describes: {},
   automations: [],
   validationRules: [],
+  process: null,
   security: null,
   knowledge: null,
   limits: null,
@@ -86,6 +87,73 @@ describe("business signals", () => {
     expect(work?.score).toBeGreaterThan(
       normalizeSignals(emptyFacts).signals.find((item) => item.key === "addressable_work")
         ?.score ?? 0,
+    );
+  });
+
+  it("cites path statuses, queues, and profile names when tools returned them", () => {
+    const context = normalizeSignals({
+      ...emptyFacts,
+      describes: {
+        Case: {
+          apiName: "Case",
+          label: "Case",
+          custom: false,
+          fields: [
+            {
+              apiName: "Status",
+              label: "Status",
+              type: "picklist",
+              required: true,
+              custom: false,
+              picklistLabels: ["New", "Working", "Closed"],
+            },
+          ],
+          recordTypes: [
+            { developerName: "Support", label: "Support", active: true },
+          ],
+        },
+      },
+      process: {
+        queues: [{ name: "Tier 1" }],
+        assignmentRules: [
+          { name: "Case Routing", objectApiName: "Case", active: true },
+        ],
+        businessHours: [{ name: "Default", active: true }],
+      },
+      security: {
+        profileCount: 3,
+        permissionSetCount: 2,
+        profileNames: ["Admin", "Standard User", "Minimum Access"],
+        permissionSetNames: ["Case Agent"],
+      },
+    });
+    const path = context.signals.find((item) => item.key === "operating_path");
+    const access = context.signals.find((item) => item.key === "access_surface");
+    expect(path?.evidence.some((entry) => /New/.test(entry.citation))).toBe(true);
+    expect(path?.evidence.some((entry) => /Tier 1/.test(entry.citation))).toBe(
+      true,
+    );
+    expect(access?.evidence.some((entry) => /Admin/.test(entry.citation))).toBe(
+      true,
+    );
+  });
+
+  it("cites profile names when security_summary returned them", () => {
+    const context = normalizeSignals({
+      ...emptyFacts,
+      security: {
+        profileCount: 3,
+        permissionSetCount: 2,
+        profileNames: ["Admin", "Standard User", "Minimum Access"],
+        permissionSetNames: ["Case Agent"],
+      },
+    });
+    const access = context.signals.find((item) => item.key === "access_surface");
+    expect(access?.evidence.some((entry) => /Admin/.test(entry.citation))).toBe(
+      true,
+    );
+    expect(access?.evidence.some((entry) => /Case Agent/.test(entry.citation))).toBe(
+      true,
     );
   });
 

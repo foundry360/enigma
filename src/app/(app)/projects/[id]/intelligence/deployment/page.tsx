@@ -8,7 +8,11 @@ import {
   recommendationLabel,
   sumProjectInvestment,
 } from "@/modules/economics/model";
-import { ensureBusinessCase } from "@/server/services/business-case";
+import { fillStorySlots, storyValues } from "@/modules/economics/story-slots";
+import {
+  caseAdoption,
+  ensureBusinessCase,
+} from "@/server/services/business-case";
 import { getProjectOverview } from "@/server/services/projects";
 
 export default async function IntelligenceDeploymentPage({
@@ -27,11 +31,34 @@ export default async function IntelligenceDeploymentPage({
   const detail = await ensureBusinessCase(session.tenantId, id);
   const approved = detail?.businessCase.status === "approved";
   const state = detail?.recommendationState;
-  const recommendation =
-    detail?.businessCase.recommendationNarrative ??
-    (state && isRecommendationState(state)
+  const storedRecommendation = detail?.businessCase.recommendationNarrative;
+  const recommendation = storedRecommendation
+    ? fillStorySlots(
+        storedRecommendation,
+        storyValues({
+          volume:
+            detail?.lines.reduce(
+              (sum, line) => sum + (line.annualVolume ?? 0),
+              0,
+            ) || null,
+          share: detail ? caseAdoption(detail.businessCase) : null,
+          impacted: detail?.rollup.impacted ?? null,
+          hours: detail?.lines[0]?.hoursSavedPerUnit ?? null,
+          labor: detail?.lines[0]?.hourlyCost ?? null,
+          value: detail?.rollup.value ?? null,
+          workItemCost: detail?.lines[0]?.unitPrice ?? null,
+          consumption: detail?.rollup.consumption ?? null,
+          net: detail?.rollup.netAnnual ?? null,
+          roc: detail?.rollup.roc ?? null,
+          state:
+            state && isRecommendationState(state)
+              ? state
+              : "do_not_proceed",
+        }),
+      )
+    : state && isRecommendationState(state)
       ? recommendationLabel[state]
-      : "Save the business case to shape this path.");
+      : "Save the business case to shape this path.";
 
   return (
     <IntelligencePane scroll>

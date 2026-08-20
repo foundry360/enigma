@@ -278,25 +278,37 @@ function summarizeAutomations(facts: string[]) {
     return `${opening}: ${names}. Those paths can write the same work an agent would touch, so volume should assume overlap rather than clean deflection.`;
   }
 
-  return `${opening}. The names and triggers were not listed on this run, so collision is an estate risk until those automations are named.`;
+  return `${opening}. The names and triggers were not listed on this run, so collision stays a risk until those automations are named.`;
 }
 
 function summarizeAccess(facts: string[], signals: EvidenceSignal[]) {
-  const estate = facts
-    .map((fact) => fact.match(/^(\d+) profiles and (\d+) permission sets$/i))
+  if (/could not be read/i.test(facts.join(" "))) {
+    return "Access control could not be read, so it is not possible to judge whether an agent identity can be constrained.";
+  }
+
+  const combined = facts
+    .map((fact) => fact.match(/^(\d+) profiles and (\d+) permission sets\.?$/i))
     .find(Boolean);
-  if (!estate || /could not be read/i.test(facts.join(" "))) {
+  const profileFact = facts
+    .map((fact) => fact.match(/^(\d+) profiles(?::\s*(.+))?\.?$/i))
+    .find(Boolean);
+  const permissionFact = facts
+    .map((fact) => fact.match(/^(\d+) permission sets(?::\s*(.+))?\.?$/i))
+    .find(Boolean);
+  const profileCount = combined?.[1] ?? profileFact?.[1];
+  const permissionCount = combined?.[2] ?? permissionFact?.[1];
+  if (!profileCount || !permissionCount) {
     return "Access control could not be read, so it is not possible to judge whether an agent identity can be constrained.";
   }
 
   const access = signals.find(
     (signal) => resolveSignalKey(signal.key, signal.title) === "access_surface",
   );
-  const fact = `${estate[1]} ${estate[1] === "1" ? "profile" : "profiles"} and ${estate[2]} permission ${estate[2] === "1" ? "set" : "sets"} were read`;
+  const fact = `${profileCount} ${profileCount === "1" ? "profile" : "profiles"} and ${permissionCount} permission ${permissionCount === "1" ? "set" : "sets"} were read`;
   if (access?.strength === "weak") {
-    return `${fact}. A large or unread permission estate makes a dedicated agent identity harder, so a broad human profile should not be reused.`;
+    return `${fact}. That breadth makes a dedicated agent identity harder, so a broad human profile should not be reused.`;
   }
-  return `${fact}. That estate is what lets you limit what an agent identity can see and change.`;
+  return `${fact}. That shape is what lets you limit what an agent identity can see and change.`;
 }
 
 function summarizeWriteback(facts: string[]) {

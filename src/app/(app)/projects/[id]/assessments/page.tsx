@@ -28,11 +28,6 @@ export default async function ProjectAssessmentsPage({
     overview.project.projectType,
     primaryPlatform ? platformLabel(primaryPlatform) : null,
   );
-  const connectedOrg =
-    overview.connections.find((connection) => connection.status === "CONNECTED") ??
-    overview.connections[0] ??
-    null;
-
   const hasRun = assessments.some(
     (assessment) => assessment.status === "COMPLETE",
   );
@@ -51,8 +46,6 @@ export default async function ProjectAssessmentsPage({
         <AssessmentRunForm
           projectId={id}
           label={hasRun ? "Run again" : "Run intelligence"}
-          orgName={connectedOrg?.externalOrgName}
-          orgId={connectedOrg?.externalOrgId}
         />
       }
     />

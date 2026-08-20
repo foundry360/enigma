@@ -6,6 +6,7 @@ import type {
   KnowledgePosture,
   ObjectDescribe,
   OrgLimits,
+  ProcessControls,
   SecuritySummary,
   ValidationRuleSummary,
 } from "@/modules/enterprise/types";
@@ -51,10 +52,112 @@ export function summarizeToolResult(
       recordTypes: (described.recordTypes ?? []).map(
         (recordType) => recordType.developerName,
       ),
+      statuses: (described.fields ?? [])
+        .filter((field) => /^(status|stagename)$/i.test(field.apiName))
+        .flatMap((field) => field.picklistLabels ?? []),
     };
   }
 
   return data;
+}
+
+export function factsFromTraces(
+  input: {
+    projectType: string;
+    objective: string;
+    outcomes: string[];
+  },
+  traces: { tool: string; apiName?: string | null; ok: boolean; summary: unknown }[],
+): AssessmentFacts {
+  return factsFromResults(
+    input,
+    traces.map((trace) => ({
+      tool: trace.tool as McpToolName,
+      apiName: trace.apiName ?? undefined,
+      ok: trace.ok,
+      data: reconstructTraceData(trace.tool, trace.apiName, trace.summary),
+    })),
+  );
+}
+
+function reconstructTraceData(
+  tool: string,
+  apiName: string | null | undefined,
+  summary: unknown,
+) {
+  if (!summary || typeof summary !== "object") {
+    return summary;
+  }
+
+  if (tool === "list_objects") {
+    const listed = summary as { present?: string[]; count?: number };
+    if (Array.isArray(listed.present)) {
+      return listed.present.map((name) => ({
+        apiName: name,
+        label: name.replace(/([a-z])([A-Z])/g, "$1 $2"),
+        custom: name.endsWith("__c"),
+        queryable: true,
+      }));
+    }
+  }
+
+  if (tool === "describe_object") {
+    const described = summary as {
+      apiName?: string;
+      label?: string;
+      fieldCount?: number;
+      required?: string[];
+      recordTypes?: string[];
+      statuses?: string[];
+    };
+    const required = described.required ?? [];
+    const statuses = described.statuses ?? [];
+    const fields: ObjectDescribe["fields"] = [];
+    if (statuses.length > 0) {
+      fields.push({
+        apiName: "Status",
+        label: "Status",
+        type: "picklist",
+        required: required.includes("Status"),
+        custom: false,
+        picklistLabels: statuses,
+      });
+    }
+    for (const name of required) {
+      if (name === "Status") {
+        continue;
+      }
+      fields.push({
+        apiName: name,
+        label: name,
+        type: "string",
+        required: true,
+        custom: false,
+      });
+    }
+    while (fields.length < (described.fieldCount ?? fields.length)) {
+      fields.push({
+        apiName: `Field${fields.length}`,
+        label: `Field ${fields.length}`,
+        type: "string",
+        required: false,
+        custom: false,
+      });
+    }
+    return {
+      apiName: described.apiName ?? apiName ?? "Unknown",
+      label: described.label ?? described.apiName ?? apiName ?? "Unknown",
+      custom: false,
+      fields,
+      recordTypes: (described.recordTypes ?? []).map((name) => ({
+        developerName: name,
+        label: name,
+        active: true,
+      })),
+    };
+  }
+
+  return summary;
 }
 
 export function factsFromResults(
@@ -100,6 +203,9 @@ export function factsFromResults(
       facts.validationRules = result.data as ValidationRuleSummary[];
     }
     if (result.tool === "security_summary") {
+    if (result.tool === "list_process_controls") {
+      facts.process = result.data as ProcessControls;
+    }
       facts.security = result.data as SecuritySummary;
     }
     if (result.tool === "knowledge_posture") {

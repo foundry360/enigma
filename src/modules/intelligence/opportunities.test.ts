@@ -15,6 +15,7 @@ const emptyFacts: AssessmentFacts = {
   describes: {},
   automations: [],
   validationRules: [],
+  process: null,
   security: null,
   knowledge: null,
   limits: null,

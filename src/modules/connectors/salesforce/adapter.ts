@@ -6,11 +6,13 @@ import type {
   KnowledgePosture,
   ObjectDescribe,
   OrgLimits,
+  ProcessControls,
   SecuritySummary,
   ValidationRuleSummary,
 } from "@/modules/enterprise/types";
 import { salesforceRequest } from "@/modules/connectors/salesforce/http";
 import {
+  restQueries,
   salesforcePath,
   toolingQueries,
 } from "@/modules/connectors/salesforce/paths";
@@ -41,6 +43,8 @@ type SObjectDescribe = {
     nillable: boolean;
     defaultedOnCreate: boolean;
     custom: boolean;
+    picklistValues?: { active?: boolean; label?: string; value?: string }[];
+    referenceTo?: string[];
   }[];
   recordTypeInfos?: {
     developerName: string;
@@ -55,6 +59,8 @@ type ToolingRecords<T> = { records?: T[] };
 
 type LimitsResponse = {
   DailyApiRequests?: { Max: number; Remaining: number };
+  DataStorageMB?: { Max: number; Remaining: number };
+  FileStorageMB?: { Max: number; Remaining: number };
 };
 
 export function mapSalesforceOrgProfile(
@@ -141,6 +147,8 @@ export async function describeSalesforceObject(input: {
       type: field.type,
       required: !field.nillable && !field.defaultedOnCreate,
       custom: field.custom,
+      picklistLabels: picklistLabels(field),
+      referenceTo: field.referenceTo?.filter(Boolean),
     })),
     recordTypes: (data.recordTypeInfos ?? []).map((recordType) => ({
       developerName: recordType.developerName,
@@ -302,22 +310,46 @@ export async function getSalesforceSecuritySummary(input: {
   accessToken: string;
 }): Promise<SecuritySummary> {
   const [profiles, permissionSets] = await Promise.all([
-    salesforceRequest<ToolingCount>({
+    salesforceRequest<
+      ToolingCount & ToolingRecords<{ Name?: string }>
+    >({
       instanceUrl: input.instanceUrl,
       accessToken: input.accessToken,
-      path: salesforcePath("tooling", toolingQueries.profileCount),
+      path: salesforcePath("tooling", toolingQueries.profiles),
     }),
-    salesforceRequest<ToolingCount>({
+    salesforceRequest<
+      ToolingCount &
+        ToolingRecords<{
+          Name?: string;
+          Label?: string;
+          IsOwnedByProfile?: boolean;
+        }>
+    >({
       instanceUrl: input.instanceUrl,
       accessToken: input.accessToken,
-      path: salesforcePath("tooling", toolingQueries.permissionSetCount),
+      path: salesforcePath("tooling", toolingQueries.permissionSets),
     }),
   ]);
 
+  const profileNames = uniqueNames(
+    (profiles.records ?? []).map((record) => record.Name),
+  );
+  const permissionSetNames = uniqueNames(
+    (permissionSets.records ?? [])
+      .filter((record) => !record.IsOwnedByProfile)
+      .map((record) => record.Label || record.Name),
+  );
+
   return {
-    profileCount: profiles.totalSize ?? 0,
-    permissionSetCount: permissionSets.totalSize ?? 0,
+    profileCount: profiles.totalSize ?? profileNames.length,
+    permissionSetCount: permissionSets.totalSize ?? permissionSets.records?.length ?? 0,
+    profileNames,
+    permissionSetNames,
   };
+}
+
+function uniqueNames(values: Array<string | undefined>) {
+  return [...new Set(values.map((value) => value?.trim()).filter(Boolean))] as string[];
 }
 
 export async function getSalesforceKnowledgePosture(input: {
@@ -328,11 +360,53 @@ export async function getSalesforceKnowledgePosture(input: {
   const articleObjects = objects
     .filter((object) => /knowledge|ka__kav|kav$/i.test(object.apiName))
     .map((object) => object.apiName);
+  const categories = await optionalToolingRecords<{
+    DeveloperName?: string;
+    MasterLabel?: string;
+  }>(input, toolingQueries.dataCategoryGroups);
 
   return {
     enabled: articleObjects.length > 0,
     articleObjects,
-    dataCategories: [],
+    dataCategories: uniqueNames(
+      categories.map((item) => item.MasterLabel || item.DeveloperName),
+    ),
+  };
+}
+
+export async function listSalesforceProcessControls(input: {
+  instanceUrl: string;
+  accessToken: string;
+}): Promise<ProcessControls> {
+  const [queues, hours, rules] = await Promise.all([
+    optionalRestRecords<{ Name?: string; DeveloperName?: string }>(
+      input,
+      restQueries.queues,
+    ),
+    optionalRestRecords<{ Name?: string; IsActive?: boolean }>(
+      input,
+      restQueries.businessHours,
+    ),
+    optionalToolingRecords<{
+      Name?: string;
+      SobjectType?: string;
+      Active?: boolean;
+    }>(input, toolingQueries.assignmentRules),
+  ]);
+
+  return {
+    queues: uniqueNames(queues.map((item) => item.Name || item.DeveloperName)).map(
+      (name) => ({ name }),
+    ),
+    assignmentRules: rules.map((rule) => ({
+      name: rule.Name ?? "Assignment rule",
+      objectApiName: rule.SobjectType ?? "Unknown",
+      active: Boolean(rule.Active),
+    })),
+    businessHours: hours.map((item) => ({
+      name: item.Name ?? "Business hours",
+      active: item.IsActive !== false,
+    })),
   };
 }
 
@@ -347,11 +421,59 @@ export async function getSalesforceOrgLimits(input: {
   });
 
   return {
-    dailyApiRequests: limits.DailyApiRequests
-      ? {
-          max: limits.DailyApiRequests.Max,
-          remaining: limits.DailyApiRequests.Remaining,
-        }
-      : null,
+    dailyApiRequests: readLimit(limits.DailyApiRequests),
+    dataStorageMb: readLimit(limits.DataStorageMB),
+    fileStorageMb: readLimit(limits.FileStorageMB),
   };
+}
+
+function picklistLabels(field: NonNullable<SObjectDescribe["fields"]>[number]) {
+  if (!/picklist|multipicklist/i.test(field.type)) {
+    return undefined;
+  }
+
+  const labels = uniqueNames(
+    (field.picklistValues ?? [])
+      .filter((value) => value.active !== false)
+      .map((value) => value.label || value.value),
+  );
+  return labels.length > 0 ? labels.slice(0, 40) : undefined;
+}
+
+function readLimit(value?: { Max: number; Remaining: number }) {
+  return value
+    ? { max: value.Max, remaining: value.Remaining }
+    : null;
+}
+
+async function optionalToolingRecords<T>(
+  input: { instanceUrl: string; accessToken: string },
+  query: string,
+) {
+  try {
+    const data = await salesforceRequest<ToolingRecords<T>>({
+      instanceUrl: input.instanceUrl,
+      accessToken: input.accessToken,
+      path: salesforcePath("tooling", query),
+    });
+    return data.records ?? [];
+  } catch {
+    return [];
+  }
+}
+
+async function optionalRestRecords<T>(
+  input: { instanceUrl: string; accessToken: string },
+  query: string,
+) {
+  try {
+    const data = await salesforceRequest<ToolingRecords<T>>({
+      instanceUrl: input.instanceUrl,
+      accessToken: input.accessToken,
+      path: salesforcePath("query", query),
+    });
+    return data.records ?? [];
+  } catch {
+    return [];
+  }
 }

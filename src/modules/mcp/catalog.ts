@@ -4,6 +4,7 @@ export const mcpTools = [
   "describe_object",
   "list_automations",
   "list_validation_rules",
+  "list_process_controls",
   "security_summary",
   "knowledge_posture",
   "org_limits",

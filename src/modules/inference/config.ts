@@ -14,7 +14,11 @@ export type InferenceConfig = {
 export const defaultClaudeModel = "claude-sonnet-5";
 
 export function resolveInferenceConfig(
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = {
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
+    INFERENCE_TIMEOUT_MS: process.env.INFERENCE_TIMEOUT_MS,
+  },
 ): InferenceConfig | null {
   const apiKey = env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) {
@@ -29,6 +33,21 @@ export function resolveInferenceConfig(
     model: env.ANTHROPIC_MODEL?.trim() || defaultClaudeModel,
     apiKey,
     timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30_000,
+  };
+}
+
+export function anthropicMessageBody(input: {
+  model: string;
+  maxTokens: number;
+  system?: string;
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+}) {
+  return {
+    model: input.model,
+    max_tokens: input.maxTokens,
+    thinking: { type: "disabled" as const },
+    ...(input.system ? { system: input.system } : {}),
+    messages: input.messages,
   };
 }
 

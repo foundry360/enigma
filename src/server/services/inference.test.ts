@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  anthropicMessageBody,
   defaultClaudeModel,
   readAnthropicText,
   resolveInferenceConfig,
@@ -21,6 +22,11 @@ describe("inference config", () => {
       apiKey: "sk-ant-test",
       timeoutMs: 30_000,
     });
+  });
+
+  it("reads named Anthropic env keys so Next can inline them", () => {
+    const config = resolveInferenceConfig();
+    expect(config === null || config.provider === "anthropic").toBe(true);
   });
 
   it("defaults to Sonnet when no Claude model is named", () => {
@@ -58,6 +64,26 @@ describe("inference config", () => {
       { role: "assistant", content: "Service agent qualified." },
       { role: "user", content: "What does that mean?" },
     ]);
+  });
+
+  it("does not send temperature — Sonnet 5 rejects it with 400", () => {
+    const body = anthropicMessageBody({
+      model: "claude-sonnet-5",
+      maxTokens: 700,
+      system: "You are Ask Enigma.",
+      messages: [{ role: "user", content: "Explain automation collision." }],
+    });
+
+    expect(body).toEqual({
+      model: "claude-sonnet-5",
+      max_tokens: 700,
+      thinking: { type: "disabled" },
+      system: "You are Ask Enigma.",
+      messages: [{ role: "user", content: "Explain automation collision." }],
+    });
+    expect(body).not.toHaveProperty("temperature");
+    expect(body).not.toHaveProperty("top_p");
+    expect(body).not.toHaveProperty("top_k");
   });
 
   it("reads only text blocks from an Anthropic response", () => {

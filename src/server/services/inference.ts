@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  anthropicMessageBody,
   readAnthropicText,
   resolveInferenceConfig,
   toAnthropicMessages,
@@ -12,7 +13,6 @@ export type { InferenceMessage };
 
 export async function completeChat(input: {
   messages: InferenceMessage[];
-  temperature?: number;
   json?: boolean;
   maxTokens?: number;
   timeoutMs?: number;
@@ -23,8 +23,9 @@ export async function completeChat(input: {
   }
 
   try {
-    return completeAnthropic(config, input);
+    return await completeAnthropic(config, input);
   } catch {
+    console.error("Ask model request failed.");
     return null;
   }
 }
@@ -33,7 +34,6 @@ async function completeAnthropic(
   config: InferenceConfig,
   input: {
     messages: InferenceMessage[];
-    temperature?: number;
     maxTokens?: number;
     timeoutMs?: number;
   },
@@ -43,36 +43,30 @@ async function completeAnthropic(
     return null;
   }
 
-  const requestBody = {
+  const requestBody = anthropicMessageBody({
     model: config.model,
-    max_tokens: input.maxTokens ?? 700,
-    temperature: input.temperature ?? 0.3,
+    maxTokens: input.maxTokens ?? 700,
     system: system || undefined,
     messages,
-  };
-  const headers = {
-    "content-type": "application/json",
-    "x-api-key": config.apiKey,
-    "anthropic-version": "2023-06-01",
-  };
-  const timeoutMs = input.timeoutMs ?? config.timeoutMs;
-
-  const first = await fetch(config.url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ ...requestBody, thinking: { type: "disabled" } }),
-    signal: AbortSignal.timeout(timeoutMs),
   });
-  const response = first.ok
-    ? first
-    : await fetch(config.url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
+  const response = await fetch(config.url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": config.apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify(requestBody),
+    signal: AbortSignal.timeout(input.timeoutMs ?? config.timeoutMs),
+  });
 
   if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      error?: { type?: string; message?: string };
+    } | null;
+    console.error(
+      `Ask model request failed: ${response.status} ${payload?.error?.type ?? ""} ${payload?.error?.message ?? ""}`.trim(),
+    );
     return null;
   }
 

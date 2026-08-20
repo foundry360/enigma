@@ -1,8 +1,10 @@
 import "server-only";
 
-import { formatAskAnswer, looksLikeAskDump } from "@/modules/intelligence/ask-format";
+import { formatAskAnswer } from "@/modules/intelligence/ask-format";
 import { buildIntelligenceBriefing } from "@/modules/intelligence/briefing";
+import { buildOrgIntelligence } from "@/modules/intelligence/org-intelligence";
 import { opportunityDefinition } from "@/modules/intelligence/opportunities";
+import { factsFromTraces } from "@/modules/intelligence/summarize";
 import {
   answerProjectAsk,
   hasScriptedProjectAnswer,
@@ -17,6 +19,7 @@ import {
 import { getConnectionOrgProfile } from "@/server/services/connections";
 import { completeChat } from "@/server/services/inference";
 import { ensureOpportunityCandidates } from "@/server/services/opportunities";
+import { getProject } from "@/server/services/projects";
 
 export type AskMessage = {
   role: "user" | "assistant";
@@ -49,7 +52,7 @@ export async function askIntelligence(input: {
     return { error: "This run is not complete yet." };
   }
 
-  const [candidates, org, businessCase] = await Promise.all([
+  const [candidates, org, businessCase, project] = await Promise.all([
     ensureOpportunityCandidates(input.tenantId, detail.assessment.id),
     detail.assessment.connectionId
       ? getConnectionOrgProfile(
@@ -58,6 +61,7 @@ export async function askIntelligence(input: {
         )
       : Promise.resolve(null),
     getBusinessCaseDetail(input.tenantId, input.projectId),
+    getProject(input.tenantId, input.projectId),
   ]);
 
   const intelligence = buildIntelligenceBriefing({
@@ -85,16 +89,36 @@ export async function askIntelligence(input: {
     }),
   });
 
+  const stored = detail.assessment.orgIntelligence;
+  const orgIntelligence =
+    stored?.version === 1
+      ? stored
+      : project
+        ? buildOrgIntelligence(
+            factsFromTraces(
+              {
+                projectType: project.projectType,
+                objective: project.objective,
+                outcomes: project.outcomes,
+              },
+              detail.traces,
+            ),
+            { opportunityName: candidates[0]?.name ?? null },
+          )
+        : null;
+
   const briefing = {
     intelligence,
     businessCase: businessCase ? buildCaseBriefing(businessCase) : null,
+    orgIntelligence,
   };
 
   const history = sanitizeHistory(input.history);
   const resolved = resolveAskQuestion(question, history);
-  const grounded = answerProjectAsk(question, briefing, history);
   if (hasScriptedProjectAnswer(question, briefing, history)) {
-    return { answer: formatAskAnswer(grounded) };
+    return {
+      answer: formatAskAnswer(answerProjectAsk(question, briefing, history)),
+    };
   }
 
   const modeled = await explainWithModel(
@@ -102,10 +126,11 @@ export async function askIntelligence(input: {
     projectAskPrompt(briefing, resolved),
     history,
   );
-  const answer =
-    modeled && !looksLikeAskDump(modeled) ? modeled : grounded;
+  if (!modeled) {
+    return { error: "Ask Enigma could not reach the model. Try again." };
+  }
 
-  return { answer: formatAskAnswer(answer) };
+  return { answer: formatAskAnswer(modeled) };
 }
 
 function sanitizeHistory(history: AskMessage[] | undefined): AskMessage[] {
@@ -115,10 +140,10 @@ function sanitizeHistory(history: AskMessage[] | undefined): AskMessage[] {
         (message.role === "user" || message.role === "assistant") &&
         typeof message.content === "string",
     )
-    .slice(-4)
+    .slice(-8)
     .map((message) => ({
       role: message.role,
-      content: message.content.trim().slice(0, 800),
+      content: message.content.trim().slice(0, 1200),
     }))
     .filter((message) => message.content.length > 0);
 }
@@ -139,7 +164,9 @@ async function explainWithModel(
       ...history,
       {
         role: "user",
-        content: `Answer me in 2-4 short paragraphs. Do not paste labeled evidence lists or signal(strength) dumps. ${question}`,
+        content: `The user asked: ${question}
+
+Answer that question. Lead with the answer they asked for: definition, recommendation, risk, why, names, or next move. If they asked what a signal is or to explain it, define it first, then say what this run found. If they named a signal or opportunity, speak only to that. Use the labeled brief as evidence. Do not invent names, scores, volumes, or official Salesforce prices. Do not recap the whole brief or paste a roster unless they asked you to name or list things. 2-4 short conversational paragraphs.`,
       },
     ],
   });

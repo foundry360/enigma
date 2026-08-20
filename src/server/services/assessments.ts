@@ -375,6 +375,11 @@ export async function startProjectDiscovery(input: {
           toolCalls: result.traces.length,
           failedTools,
         })},
+        "orgIntelligence" = ${
+          result.orgIntelligence
+            ? sql.json(asSqlJson(result.orgIntelligence))
+            : sql`null`
+        },
         "updatedAt" = now()
       where "tenantId" = ${input.tenantId} and id = ${assessment.id}
     `;

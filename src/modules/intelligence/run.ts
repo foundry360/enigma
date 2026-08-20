@@ -7,6 +7,9 @@ import {
   followUpToolPlan,
   initialToolPlan,
 } from "@/modules/intelligence/plan";
+import { buildOrgIntelligence } from "@/modules/intelligence/org-intelligence";
+import { detectOpportunityCandidates } from "@/modules/intelligence/opportunities";
+import { normalizeSignals } from "@/modules/intelligence/signals";
 import { overallScore, scoreAssessment } from "@/modules/intelligence/score";
 import { factsFromResults, summarizeToolResult } from "@/modules/intelligence/summarize";
 import type { AssessmentRunResult, ToolCall } from "@/modules/intelligence/types";
@@ -68,6 +71,7 @@ export async function runAssessmentPass(input: {
   const results = [...first, ...second];
   const facts = factsFromResults(input, results);
   const judgments = scoreAssessment(facts);
+  const opportunity = detectOpportunityCandidates(normalizeSignals(facts))[0];
 
   return {
     facts,
@@ -81,6 +85,9 @@ export async function runAssessmentPass(input: {
     })),
     judgments,
     overallScore: overallScore(judgments),
+    orgIntelligence: buildOrgIntelligence(facts, {
+      opportunityName: opportunity?.title ?? null,
+    }),
   };
 }
 

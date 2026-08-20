@@ -40,6 +40,25 @@ export async function saveBusinessCaseAction(input: {
   return { ok: true as const, detail: result };
 }
 
+export async function ensureBusinessCaseStoriesAction(projectId: string) {
+  const session = await requireSession();
+  const detail = await getBusinessCaseDetail(session.tenantId, projectId);
+  if (!detail) {
+    return { error: "not-found" as const };
+  }
+
+  if (detail.businessCase.status === "approved") {
+    return { ok: true as const, detail };
+  }
+
+  const next = await persistRecommendation(session.tenantId, detail);
+  if (!next) {
+    return { error: "invalid" as const };
+  }
+
+  return { ok: true as const, detail: next };
+}
+
 export async function refreshBusinessCaseNarrativesAction(projectId: string) {
   const session = await requireSession();
   const detail = await getBusinessCaseDetail(session.tenantId, projectId);
@@ -55,7 +74,9 @@ export async function refreshBusinessCaseNarrativesAction(projectId: string) {
     return { ok: true as const, detail };
   }
 
-  const next = await persistRecommendation(session.tenantId, detail);
+  const next = await persistRecommendation(session.tenantId, detail, {
+    force: true,
+  });
   if (!next) {
     return { error: "invalid" as const };
   }

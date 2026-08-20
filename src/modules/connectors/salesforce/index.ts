@@ -16,6 +16,7 @@ export {
   getSalesforceSecuritySummary,
   listSalesforceAutomations,
   listSalesforceObjects,
+  listSalesforceProcessControls,
   listSalesforceValidationRules,
   mapSalesforceOrgProfile,
   withSalesforceAccess,

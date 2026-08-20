@@ -1,3 +1,4 @@
+import { peelLayerPrefix } from "@/modules/intelligence/evidence-expand";
 import { opportunityCatalog } from "@/modules/intelligence/opportunities";
 import {
   summarizeImplication,
@@ -188,9 +189,7 @@ export function answerFromBriefing(
     return "This intelligence run has no business signals yet. Run intelligence against a connected environment first.";
   }
 
-  const matchedSignals = briefing.signals.filter((signal) =>
-    matchesPhrase(trimmed, signal.title),
-  );
+  const matchedSignals = signalsNamedInQuestion(trimmed, briefing);
   const matchedCandidates = briefing.candidates.filter((candidate) =>
     matchesPhrase(trimmed, candidate.name),
   );
@@ -241,21 +240,115 @@ export function answerFromBriefing(
     ].join("\n\n");
   }
 
-  return "I can only explain this intelligence run. Ask about a business signal, an opportunity, supporting evidence, or why an opportunity did or did not appear. I will not invent scores, volumes, or prices.";
+  return answerFromStoredEvidence(trimmed, briefing);
+}
+
+export function signalsNamedInQuestion(
+  question: string,
+  briefing: IntelligenceBriefing,
+) {
+  return briefing.signals.filter((signal) =>
+    matchesPhrase(question, signal.title),
+  );
+}
+
+export function formatSignalFacts(
+  signal: IntelligenceBriefing["signals"][number],
+) {
+  const copy = signalAdvice(signal);
+  const fact = evidenceReason(signal.evidence);
+  return [
+    `${signal.title}: ${signal.strength}.`,
+    `Definition: ${copy.explainer} ${copy.meaning} ${copy.risk}`,
+    `Meaning: ${withoutEstate(signal.meaning)}`,
+    `Consumption: ${withoutEstate(signal.consumption)}`,
+    `Risk: ${withoutEstate(signal.risk)}`,
+    `Recommendation: ${signal.recommendation}`,
+    fact ? `Evidence: ${fact}.` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function formatSignalAnswer(
   signal: IntelligenceBriefing["signals"][number],
 ) {
-  const cite = signal.evidence[0]
-    ? ` The run cited ${signal.evidence[0].replace(/\.$/, "")}.`
-    : "";
+  const meaning = withoutEstate(signal.meaning);
+  const consumption = withoutEstate(signal.consumption);
+  const risk = withoutEstate(signal.risk);
+  const fact = evidenceReason(signal.evidence);
+  const opening = fact
+    ? `${signal.title} is ${signal.strength} because ${fact}.`
+    : `${signal.title} is ${signal.strength}. ${asSentence(meaning)}`;
+
   return [
-    `${signal.title} is ${signal.strength}. ${asSentence(signal.meaning)} ${asSentence(signal.consumption)}`.trim(),
-    `${asSentence(`The risk is ${lowerStart(signal.risk)}`)} ${asSentence(signal.recommendation)}${cite}`.trim(),
+    `${opening} ${asSentence(consumption)}`.trim(),
+    `${asSentence(`The risk is ${lowerStart(risk)}`)} ${asSentence(signal.recommendation)}`.trim(),
   ]
     .filter(Boolean)
     .join("\n\n");
+}
+
+function evidenceReason(citations: string[]) {
+  const combined = matchCitation(
+    citations,
+    /^(\d+) profiles and (\d+) permission sets\.?$/i,
+  );
+  if (combined) {
+    return `the run found ${combined[1]} profiles and ${combined[2]} permission sets`;
+  }
+
+  const profiles = matchCitation(
+    citations,
+    /^(\d+) profiles(?::\s*(.+))?\.?$/i,
+  );
+  const permissionSets = matchCitation(
+    citations,
+    /^(\d+) permission sets(?::\s*(.+))?\.?$/i,
+  );
+  if (profiles) {
+    const extra = permissionSets
+      ? ` and ${permissionSets[1]} permission sets`
+      : "";
+    return `the run found ${profiles[1]} profiles${extra}`;
+  }
+
+  const first = citations[0];
+  if (!first) {
+    return "";
+  }
+
+  if ((first.match(/,/g) ?? []).length >= 6 || first.length > 160) {
+    const labeled = first.match(/^([^:]{2,40}):\s*(.+)$/);
+    if (labeled?.[2]) {
+      const count = labeled[2].split(/,\s*/).filter(Boolean).length;
+      return `the run found ${count} ${labeled[1].toLowerCase()}`;
+    }
+    return "";
+  }
+
+  return `the run cited ${first.replace(/\.$/, "")}`;
+}
+
+function matchCitation(citations: string[], pattern: RegExp) {
+  for (const citation of citations) {
+    const match =
+      citation.match(pattern) ?? peelLayerPrefix(citation).fact.match(pattern);
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+export function withoutEstate(value: string) {
+  return value
+    .replace(/\ban access estate\b/gi, "access control")
+    .replace(/\bpermission estate\b/gi, "permission surface")
+    .replace(/\bthe estate is light\b/gi, "automation is light")
+    .replace(/\ban estate risk\b/gi, "a collision risk")
+    .replace(/\bestate\b/gi, "org");
 }
 
 export function formatCandidateAnswer(
@@ -284,6 +377,221 @@ export function formatCandidateAnswer(
       : "";
 
   return [intro, support, close, evidence].filter(Boolean).join("\n\n");
+}
+
+type BriefingFact = {
+  text: string;
+  source: string;
+  kind: "evidence" | "meaning" | "finding";
+};
+
+function answerFromStoredEvidence(
+  question: string,
+  briefing: IntelligenceBriefing,
+) {
+  const facts = collectBriefingFacts(briefing);
+  const ranked = rankBriefingFacts(question, facts);
+  if (ranked.length === 0) {
+    return "This run did not store that. I will not invent names, scores, volumes, or prices that are not in the evidence.";
+  }
+
+  const focus = ranked.find((fact) => fact.kind === "evidence") ?? ranked[0];
+  const related = facts.filter(
+    (fact) => fact.source === focus.source && fact.kind === "evidence",
+  );
+  const pool = related.length > 0 ? related : ranked.filter((fact) => fact.kind === "evidence");
+  const names = uniqueStrings(pool.flatMap((fact) => namedValuesInCitation(fact.text)));
+
+  if (wantsNamedInventory(question)) {
+    if (names.length > 0) {
+      return `Yes. This run named ${joinAnd(names)}. I will not add names that were not stored.`;
+    }
+
+    if (pool.length > 0) {
+      return [
+        `This run recorded ${joinAnd(pool.map((fact) => fact.text.replace(/\.$/, "")))}.`,
+        "It did not store a named list I can read. Re-run intelligence to pull those metadata names. I will not invent them.",
+      ].join("\n\n");
+    }
+  }
+
+  const lines = ranked.slice(0, 3).map((fact) => {
+    if (fact.kind === "evidence") {
+      return `The run cited ${fact.text.replace(/\.$/, "")}.`;
+    }
+
+    return asSentence(fact.text);
+  });
+
+  return [
+    lines.join(" "),
+    "I will not invent names, scores, volumes, or prices that are not in the evidence.",
+  ].join("\n\n");
+}
+
+function collectBriefingFacts(briefing: IntelligenceBriefing): BriefingFact[] {
+  const facts: BriefingFact[] = [];
+
+  for (const signal of briefing.signals) {
+    if (signal.meaning) {
+      facts.push({ text: signal.meaning, source: signal.title, kind: "meaning" });
+    }
+    for (const citation of signal.evidence) {
+      facts.push({ text: citation, source: signal.title, kind: "evidence" });
+    }
+  }
+
+  for (const candidate of briefing.candidates) {
+    if (candidate.finding) {
+      facts.push({
+        text: candidate.finding,
+        source: candidate.name,
+        kind: "finding",
+      });
+    }
+    for (const citation of candidate.evidence) {
+      facts.push({ text: citation, source: candidate.name, kind: "evidence" });
+    }
+  }
+
+  return facts;
+}
+
+const askStopWords = new Set([
+  "about",
+  "and",
+  "are",
+  "can",
+  "did",
+  "do",
+  "does",
+  "enigma",
+  "for",
+  "from",
+  "how",
+  "in",
+  "is",
+  "list",
+  "me",
+  "name",
+  "named",
+  "of",
+  "on",
+  "org",
+  "please",
+  "run",
+  "tell",
+  "that",
+  "the",
+  "them",
+  "they",
+  "this",
+  "what",
+  "which",
+  "who",
+  "why",
+  "with",
+  "you",
+  "your",
+]);
+
+function questionTerms(question: string) {
+  return normalizeAsk(question)
+    .split(" ")
+    .filter((word) => word.length > 2 && !askStopWords.has(word));
+}
+
+function rankBriefingFacts(question: string, facts: BriefingFact[]) {
+  const terms = questionTerms(question);
+  if (terms.length === 0) {
+    return [];
+  }
+
+  return facts
+    .map((fact) => {
+      const hay = normalizeAsk(`${fact.source} ${fact.text}`);
+      let score = 0;
+      for (const term of terms) {
+        if (hay.includes(term)) {
+          score += term.length > 4 ? 2 : 1;
+        }
+      }
+      for (let index = 0; index < terms.length - 1; index += 1) {
+        const phrase = `${terms[index]} ${terms[index + 1]}`;
+        if (hay.includes(phrase)) {
+          score += 4;
+        }
+      }
+      if (fact.kind === "evidence" && score > 0) {
+        score += 1;
+      }
+      return { fact, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .map((item) => item.fact);
+}
+
+function wantsNamedInventory(question: string) {
+  return /name|list|what are|which (are|objects|profiles|queues)|who can/i.test(
+    question,
+  );
+}
+
+function namedValuesInCitation(citation: string) {
+  const peeled = peelLayerPrefix(citation);
+  const candidates = [peeled.fact, citation];
+  if (/: /.test(peeled.fact) && peeled.fact !== citation) {
+    candidates.unshift(peelLayerPrefix(peeled.fact).fact, peeled.fact);
+  }
+
+  for (const text of candidates) {
+    const match = text.match(/^((?:\d+\s+)?[^:]{2,40}):\s*(.+)$/);
+    if (!match?.[2]) {
+      continue;
+    }
+
+    const values = match[2].replace(/\.$/, "").trim();
+    if (!values || /^no /i.test(values)) {
+      continue;
+    }
+    if (/\d+\s+\w[\w ]* and \d+\s+\w/i.test(values) && !values.includes(",")) {
+      continue;
+    }
+
+    const items = values
+      .split(/,\s*/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (items.length === 0) {
+      continue;
+    }
+    if (
+      items.length === 1 &&
+      (items[0].split(/\s+/).length > 4 ||
+        /\b(has|were|was|are|is|open)\b/i.test(items[0]))
+    ) {
+      continue;
+    }
+
+    return items;
+  }
+
+  return [];
+}
+
+function uniqueStrings(values: string[]) {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const value of values) {
+    const key = value.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    unique.push(value);
+  }
+  return unique;
 }
 
 export function isOpportunityCountAsk(question: string) {

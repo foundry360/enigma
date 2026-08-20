@@ -171,13 +171,29 @@ export function IntelligenceAsk({
 }
 
 function AskAnswer({ content }: { content: string }) {
-  const paragraphs = content.split(/\n{2,}/).filter(Boolean);
+  const blocks = content.split(/\n{2,}/).filter(Boolean);
 
   return (
     <div className="mr-2 space-y-2.5 text-sm leading-relaxed">
-      {paragraphs.map((paragraph, index) => (
-        <p key={index}>{paragraph}</p>
-      ))}
+      {blocks.map((block, index) => {
+        const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+        const items = lines.filter((line) => /^[-*•]\s+/.test(line));
+        if (items.length === 0) {
+          return <p key={index}>{block}</p>;
+        }
+
+        const intro = lines.filter((line) => !/^[-*•]\s+/.test(line)).join(" ");
+        return (
+          <div key={index} className="space-y-2">
+            {intro ? <p>{intro}</p> : null}
+            <ul className="list-disc space-y-1 pl-5">
+              {items.map((line, itemIndex) => (
+                <li key={itemIndex}>{line.replace(/^[-*•]\s+/, "")}</li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
     </div>
   );
 }

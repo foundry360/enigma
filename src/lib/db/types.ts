@@ -138,6 +138,7 @@ export type AssessmentRow = {
   projectId: string | null;
   connectionId: string | null;
   status: "DRAFT" | "DISCOVERING" | "ANALYZING" | "COMPLETE" | "FAILED";
+  orgIntelligence?: import("@/modules/intelligence/org-model").OrgIntelligence | null;
   summary: {
     overallScore: number;
     toolCalls: number;
@@ -265,6 +266,7 @@ export type BusinessCaseRow = {
   predictedSnapshot: Record<string, unknown> | null;
   recommendationState: string | null;
   recommendationNarrative: string | null;
+  justificationNarrative: string | null;
   intelligenceNarrative: string | null;
   createdAt: Date;
   updatedAt: Date;

@@ -4,7 +4,6 @@ import { useState, type ReactNode } from "react";
 import {
   RiskBadge,
   ScoreRing,
-  StrengthBadge,
   riskColors,
   strengthColors,
 } from "@/components/ui/score-ring";
@@ -112,25 +111,20 @@ export function ReadinessCategories({
       </section>
 
       <section className="rounded-lg border border-border bg-surface p-5">
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-sm font-semibold">
-              {titleCase(selected.title)}
-            </h2>
-            {selected.description ? (
-              <p
-                className="mt-1 truncate text-xs text-muted"
-                title={selected.description}
-              >
-                {selected.description}
-              </p>
-            ) : null}
-          </div>
-          {tone === "signal" ? (
-            <StrengthBadge state={signalState(selected.score)} />
-          ) : (
-            <RiskBadge risk={readinessRisk(selected.score)} />
-          )}
+        <div className="mb-3">
+          <h2 className="text-sm font-semibold">
+            {titleCase(selected.title)}
+          </h2>
+          {selected.description ? (
+            <p className="mt-1 text-xs text-muted">
+              {selected.description}
+            </p>
+          ) : null}
+          {tone === "readiness" ? (
+            <div className="mt-2">
+              <RiskBadge risk={readinessRisk(selected.score)} />
+            </div>
+          ) : null}
         </div>
         <div
           className={

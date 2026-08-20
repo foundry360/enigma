@@ -13,11 +13,17 @@ const allowedExactPaths = new Set([
 export const restQueries = {
   organization:
     "SELECT Id, Name, OrganizationType, IsSandbox, InstanceName, NamespacePrefix, CreatedDate, CreatedBy.Name, LastModifiedDate, LastModifiedBy.Name, DefaultLocaleSidKey, LanguageLocaleKey, TimeZoneSidKey FROM Organization LIMIT 1",
+  queues: "SELECT Name, DeveloperName FROM Group WHERE Type = 'Queue' ORDER BY Name",
+  businessHours: "SELECT Name, IsActive FROM BusinessHours ORDER BY Name",
 } as const;
 
 export const toolingQueries = {
-  profileCount: "SELECT COUNT() FROM Profile",
-  permissionSetCount: "SELECT COUNT() FROM PermissionSet",
+  profiles: "SELECT Name FROM Profile ORDER BY Name",
+  permissionSets:
+    "SELECT Name, Label, IsOwnedByProfile FROM PermissionSet ORDER BY Name",
+  dataCategoryGroups:
+    "SELECT DeveloperName, MasterLabel FROM DataCategoryGroup ORDER BY MasterLabel",
+  assignmentRules: "SELECT Name, SobjectType, Active FROM AssignmentRule",
   flowDefinitions:
     "SELECT Id, DeveloperName, MasterLabel, ActiveVersionId FROM FlowDefinition",
   activeFlows:

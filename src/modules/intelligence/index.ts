@@ -31,6 +31,12 @@ export {
   initialToolPlan,
   objectCandidates,
 } from "@/modules/intelligence/plan";
+export {
+  buildOrgIntelligence,
+  formatOrgIntelligenceBrief,
+} from "@/modules/intelligence/org-intelligence";
+export type { OrgIntelligence } from "@/modules/intelligence/org-model";
+export { factsFromTraces } from "@/modules/intelligence/summarize";
 export type {
   AssessmentFacts,
   AssessmentRunResult,

@@ -29,6 +29,35 @@ describe("ask answer format", () => {
     expect(answer).toContain("Value is $3,000. The case can proceed.");
   });
 
+  it("turns a named inventory into a bullet list", () => {
+    const answer = formatAskAnswer(
+      "The run cited 44 profiles: Analytics Cloud Integration User, Chatter Free User, Standard User, System Administrator, Marketing User. I will not invent names that were not stored.",
+    );
+
+    expect(answer).toContain("The run cited 44 profiles.");
+    expect(answer).toContain("- Analytics Cloud Integration User");
+    expect(answer).toContain("- System Administrator");
+    expect(answer).toContain("I will not invent names that were not stored.");
+    expect(answer).not.toMatch(/44 profiles: Analytics Cloud/);
+  });
+
+  it("keeps an existing bullet list", () => {
+    const answer = formatAskAnswer(
+      "This run named these work objects.\n- Case\n- Account\n- Opportunity",
+    );
+
+    expect(answer).toContain("This run named these work objects.");
+    expect(answer).toContain("- Case");
+    expect(answer).toContain("- Opportunity");
+  });
+
+  it("does not turn ordinary prose commas into bullets", () => {
+    const answer = formatAskAnswer(
+      "If they do, the agent can duplicate or fight those paths, create cleanup, and inflate consumption.",
+    );
+    expect(answer).not.toMatch(/^- /m);
+  });
+
   it("detects labeled evidence dumps", () => {
     expect(
       looksLikeAskDump(
@@ -38,6 +67,22 @@ describe("ask answer format", () => {
     expect(
       looksLikeAskDump(
         "You are only seeing Service agent because write-back control is still weak.",
+      ),
+    ).toBe(false);
+    expect(
+      looksLikeAskDump(
+        "The run cited 44 profiles: Analytics Cloud Integration User, Chatter Free User, Standard User, System Administrator, Marketing User, Solution Manager, Contract Manager, Read Only, Partner Community User, Customer Community User, Identity User, Gold Partner User.",
+      ),
+    ).toBe(true);
+    expect(
+      looksLikeAskDump(
+        "The run cited 44 profiles: Analytics Cloud Integration User, Chatter Free User, Standard User, System Administrator, Marketing User, Solution Manager, Contract Manager, Read Only, Partner Community User, Customer Community User, Identity User, Gold Partner User.",
+        "How many profiles were read in the org and what are they?",
+      ),
+    ).toBe(false);
+    expect(
+      looksLikeAskDump(
+        "Automation collision means existing automations may already write the same work an agent would touch. If they do, the agent can duplicate or fight those paths, create cleanup, inflate consumption, and make the forecast dishonest. On this run, discovery found 0 active automations, so there is nothing to collide with, and the score is mixed, not weak, because ownership of the path may stay informal.",
       ),
     ).toBe(false);
   });

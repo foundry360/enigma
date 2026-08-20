@@ -28,6 +28,9 @@ describe("assessment tool plan", () => {
     const describes = followUp.filter((call) => call.tool === "describe_object");
     expect(describes.map((call) => call.apiName)).toEqual(["Case", "Account"]);
     expect(followUp.some((call) => call.tool === "list_automations")).toBe(true);
+    expect(followUp.some((call) => call.tool === "list_process_controls")).toBe(
+      true,
+    );
     expect(objectCandidates({
       projectType: "AI Opportunity Assessment",
       objective: "Patient service deflection",

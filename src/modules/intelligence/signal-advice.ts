@@ -40,7 +40,7 @@ const advice: Record<
   },
   access_surface: {
     meaning: "This is whether you can limit what the agent is allowed to see and change.",
-    risk: "A broad or reused human profile is the main access failure mode. Least-privilege is harder when the permission estate is large or unread.",
+    risk: "A broad or reused human profile is the main access failure mode. Least-privilege is harder when the permission surface is large or unread.",
     consumption: "A broad identity over-consumes write actions and makes the forecast noisy.",
     next: "Give the agent a dedicated permission set. Do not reuse a broad human profile.",
   },
