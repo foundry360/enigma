@@ -8,23 +8,25 @@ export type ConsumptionPosture = {
   unitHint: string;
 };
 
-const postures: Record<
-  string,
-  { driver: string; unitHint: string }
-> = {
-  case_service_agent: {
-    driver: "Service conversations and write-back",
-    unitHint: "Volume is conversation turns and work updates, not seats.",
-  },
-  knowledge_assist: {
-    driver: "Retrieval turns",
-    unitHint: "Volume is grounded answers. Missing approved content makes the forecast dishonest.",
-  },
-  guided_case_flow: {
-    driver: "Guided path conversations",
-    unitHint: "Volume is assisted service paths. Dense automation will fight the agent.",
-  },
-};
+function postureForKey(key: string) {
+  if (key.startsWith("work:")) {
+    const label = key
+      .slice(5)
+      .replace(/__c$/i, "")
+      .replace(/_/g, " ")
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .trim();
+    return {
+      driver: `${label} conversations and write-back`,
+      unitHint: "Volume is conversation turns and work updates, not seats.",
+    };
+  }
+
+  return {
+    driver: "Agent conversations",
+    unitHint: "Volume is usage, not licenses. A consumption price is optional.",
+  };
+}
 
 export function forecastConfidence(score: number): ForecastConfidence {
   if (score >= 75) {
@@ -42,10 +44,7 @@ export function consumptionPosture(input: {
   key: string;
   score: number;
 }): ConsumptionPosture {
-  const known = postures[input.key] ?? {
-    driver: "Agent conversations",
-    unitHint: "Volume is usage, not licenses. A consumption price is optional.",
-  };
+  const known = postureForKey(input.key);
 
   return {
     driver: known.driver,

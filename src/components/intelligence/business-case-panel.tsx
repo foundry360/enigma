@@ -46,7 +46,7 @@ import {
   fallbackJustificationStory,
   fallbackRecommendationStory,
   fillStorySlots,
-  hasStorySlots,
+  shouldRefreshCaseStories,
   storyValues,
 } from "@/modules/economics/story-slots";
 import {
@@ -208,6 +208,8 @@ export function BusinessCasePanel({
   const laborCost = draft.lines[0]?.hourlyCost ?? null;
   const workItemCost = draft.lines[0]?.unitPrice ?? null;
   const workTaken = live.rollup.impacted;
+  const opportunityIds = detail.lines.map((line) => line.opportunityId);
+  const opportunityNames = detail.lines.map((line) => line.opportunityName);
   const liveStory = storyValues({
     volume: volume || null,
     share: adoption,
@@ -221,24 +223,27 @@ export function BusinessCasePanel({
     roc: live.rollup.roc,
     state: live.recommendationState,
   });
-  const justificationTemplate = hasStorySlots(
-    detail.businessCase.justificationNarrative,
-  )
-    ? detail.businessCase.justificationNarrative!
-    : fallbackJustificationStory({
+  const refreshStories = shouldRefreshCaseStories({
+    justification: detail.businessCase.justificationNarrative,
+    recommendation: detail.businessCase.recommendationNarrative,
+    intelligence: detail.businessCase.intelligenceNarrative,
+    opportunityIds,
+  });
+  const justificationTemplate = refreshStories
+    ? fallbackJustificationStory({
         complete: live.rollup.complete,
         process: detail.lines[0]?.businessProcess ?? null,
         area: detail.lines[0]?.businessArea ?? null,
         capability: detail.lines[0]?.recommendedCapability ?? null,
+        opportunityNames,
         valueDrivers: detail.lines[0]?.valueDrivers ?? [],
         consumptionDrivers: detail.lines[0]?.consumptionDrivers ?? [],
         constraints: detail.lines[0]?.constraints ?? [],
-      });
-  const recommendationTemplate = hasStorySlots(
-    detail.businessCase.recommendationNarrative,
-  )
-    ? detail.businessCase.recommendationNarrative!
-    : fallbackRecommendationStory(live.rollup.complete);
+      })
+    : detail.businessCase.justificationNarrative!;
+  const recommendationTemplate = refreshStories
+    ? fallbackRecommendationStory(live.rollup.complete, opportunityNames)
+    : detail.businessCase.recommendationNarrative!;
   const justificationNarrative = fillStorySlots(
     justificationTemplate,
     liveStory,
@@ -249,13 +254,7 @@ export function BusinessCasePanel({
   );
 
   useEffect(() => {
-    if (locked) {
-      return;
-    }
-    if (
-      hasStorySlots(detail.businessCase.justificationNarrative) &&
-      hasStorySlots(detail.businessCase.recommendationNarrative)
-    ) {
+    if (locked || !refreshStories) {
       return;
     }
 
@@ -271,10 +270,12 @@ export function BusinessCasePanel({
       cancelled = true;
     };
   }, [
+    detail.businessCase.intelligenceNarrative,
     detail.businessCase.justificationNarrative,
     detail.businessCase.recommendationNarrative,
     locked,
     projectId,
+    refreshStories,
   ]);
 
   const shareThresholdLabel =
@@ -515,7 +516,8 @@ export function BusinessCasePanel({
           >
             <div className="space-y-2.5 text-sm leading-relaxed">
               {justificationNarrative
-                .split(/\n{2,}/)
+                .split(/\n+/)
+                .map((paragraph) => paragraph.trim())
                 .filter(Boolean)
                 .map((paragraph, index) => (
                   <p key={index}>{paragraph}</p>
@@ -534,7 +536,8 @@ export function BusinessCasePanel({
                     {recommendationLabel[live.recommendationState]}
                   </p>
                   {recommendationNarrative
-                    .split(/\n{2,}/)
+                    .split(/\n+/)
+                    .map((paragraph) => paragraph.trim())
                     .filter(Boolean)
                     .map((paragraph, index) => (
                       <CitedParagraph key={index} text={paragraph} />

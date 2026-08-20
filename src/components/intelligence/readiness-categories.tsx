@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { EvidenceCitations } from "@/components/intelligence/evidence-citation";
 import {
   RiskBadge,
   ScoreRing,
@@ -151,11 +152,9 @@ export function ReadinessCategories({
             <MetaRow label="Recommendation">{selected.recommendation}</MetaRow>
             {selected.evidence.length > 0 ? (
               <MetaRow label="Evidence">
-                <ul className="space-y-1">
-                  {selected.evidence.map((entry, index) => (
-                    <li key={`${entry.citation}-${index}`}>{entry.citation}</li>
-                  ))}
-                </ul>
+                <EvidenceCitations
+                  citations={selected.evidence.map((entry) => entry.citation)}
+                />
               </MetaRow>
             ) : null}
           </dl>

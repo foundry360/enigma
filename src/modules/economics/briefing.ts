@@ -261,6 +261,9 @@ export function briefingToPrompt(briefing: BusinessCaseBriefing) {
   return [
     "This briefing is the only source of truth for a project Business Case.",
     opportunities || "No promoted opportunities.",
+    briefing.opportunities.length > 1
+      ? `Cover every promoted opportunity by name in both stories: ${briefing.opportunities.map((item) => item.name).join("; ")}. Token totals are rolled up across them.`
+      : null,
     assumptions || "No assumptions recorded.",
     calculations || "No calculated lines yet.",
     totals,

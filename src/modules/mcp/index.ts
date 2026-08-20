@@ -4,6 +4,8 @@ import { z } from "zod";
 import {
   describeSalesforceObject,
   fetchSalesforceIdentity,
+  getSalesforceAgentforceConfiguration,
+  getSalesforceIntegrationMap,
   getSalesforceKnowledgePosture,
   getSalesforceOrgLimits,
   getSalesforceSecuritySummary,
@@ -192,6 +194,10 @@ export async function callMcpTool(input: McpCall): Promise<McpResult> {
         return getSalesforceKnowledgePosture(live);
       case "org_limits":
         return getSalesforceOrgLimits(live);
+      case "get_integration_map":
+        return getSalesforceIntegrationMap(live);
+      case "get_agentforce_configuration":
+        return getSalesforceAgentforceConfiguration(live);
       default:
         throw new Error("Unknown MCP tool.");
     }

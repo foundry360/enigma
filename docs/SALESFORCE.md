@@ -55,15 +55,19 @@ Metadata-first. Org **shape**, not customer **rows**.
 | --- | --- | --- |
 | Org identity | REST | `/services/oauth2/userinfo` and allowlisted `Organization` query (`Name` from Company Information) |
 | Object inventory | REST | `/services/data/v61.0/sobjects/` |
-| Object/field/record-type shape | REST | `/sobjects/{name}/describe` (includes status picklists and lookup targets) |
-| Flows | Tooling | `FlowDefinition`, `Flow` |
+| Object/field/record-type shape | REST | `/sobjects/{name}/describe` (includes status picklists and lookup targets). Field counts drop platform identity and audit stamps that Object Manager hides: Id, IsDeleted, CreatedDate, LastModifiedDate, SystemModstamp, last viewed/referenced/activity, MasterRecordId, CurrencyIsoCode |
+| Flows | REST / Tooling | `FlowDefinitionView` (object + trigger) with Tooling `FlowDefinition` fallback. No Flow XML |
 | Apex | Tooling | `ApexTrigger` (name, object, status, events — not source) |
+| Workflow / approvals | Tooling | `WorkflowRule`, `ProcessDefinition` (Approval), EscalationRule, AutoResponseRule |
 | Validation rules | Tooling | `ValidationRule` |
 | Custom objects | Metadata or Tooling | `CustomObject` |
-| Service/sales signals | REST describe + limits | Case, Lead, Opportunity, KnowledgeArticle **presence** |
-| Security posture | REST / Tooling | Profile and PermissionSet **names** and counts |
-| Process controls | REST / Tooling | Queue names, AssignmentRule, BusinessHours |
+| Work inventory | REST describe + limits | Every queryable inventory object that is layoutable and not platform noise (Share, History, Feed, ChangeEvent, custom setting, mdt). That includes objects from Sales, Service, Health, Revenue, Experience, and other clouds present in the org. A licensed standard object is in-use only when metadata shows custom fields, record types, automations, validation rules, or assignment rules. |
+| Security posture | REST / Tooling | Profile and PermissionSet names, PermissionSetGroup, UserRole counts, EntityDefinition default sharing. Not object/field CRUD |
+| Process controls | REST / Tooling | Queues + QueueSobject, AssignmentRule, EscalationRule, AutoResponseRule, approvals, BusinessHours |
 | Knowledge posture | REST describe + Tooling | Knowledge article objects and DataCategoryGroup names |
+| Integrations | REST / Tooling | NamedCredential (host only), RemoteProxy, ConnectedApplication, `__x` / `__e` objects |
+| Existing AI | REST / Tooling | BotDefinition, GenAiPromptTemplate, GenAiFunction when present |
+| Packages | Tooling | InstalledSubscriberPackage names |
 
 Do not SOQL Account, Contact, Case, Opportunity, or any other business object. Do not pull field values, emails, files, or Chatter.
 

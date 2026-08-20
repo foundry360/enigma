@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { setCandidateStatusAction } from "@/app/actions/assessments";
+import { EvidenceCitations } from "@/components/intelligence/evidence-citation";
 import { Button } from "@/components/ui/button";
 import { riskColors } from "@/components/ui/score-ring";
 import { titleCase } from "@/lib/format";
@@ -136,11 +137,9 @@ export function OpportunityBoard({
           <MetaRow label="Risk">{selected.risk}</MetaRow>
           {selected.evidence.length > 0 ? (
             <MetaRow label="Evidence">
-              <ul className="space-y-1">
-                {selected.evidence.map((entry, index) => (
-                  <li key={`${entry.citation}-${index}`}>{entry.citation}</li>
-                ))}
-              </ul>
+              <EvidenceCitations
+                citations={selected.evidence.map((entry) => entry.citation)}
+              />
             </MetaRow>
           ) : null}
         </dl>

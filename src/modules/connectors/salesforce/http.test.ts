@@ -44,6 +44,15 @@ describe("Salesforce path allowlist", () => {
       salesforcePath("tooling", toolingQueries.assignmentRules),
     ).not.toThrow();
     expect(() =>
+      salesforcePath("tooling", toolingQueries.entitySharing),
+    ).not.toThrow();
+    expect(() =>
+      salesforcePath("query", restQueries.flowDefinitionView),
+    ).not.toThrow();
+    expect(() =>
+      salesforcePath("query", restQueries.namedCredentials),
+    ).not.toThrow();
+    expect(() =>
       salesforcePath("query", restQueries.queues),
     ).not.toThrow();
     expect(() =>

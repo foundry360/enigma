@@ -113,8 +113,8 @@ describe("intelligence briefing", () => {
     );
 
     expect(answer).toMatch(/only seeing Service agent/i);
-    expect(answer).toMatch(/Write-back control/i);
-    expect(answer).toMatch(/Guided workflow/i);
+    expect(answer).toMatch(/durable work/i);
+    expect(answer).not.toMatch(/Guided workflow/i);
     expect(answer).toContain("\n\n");
     expect(answer).not.toMatch(/Evidence:/);
     expect(answer).not.toMatch(/Addressable work \(strong\)/);

@@ -1,12 +1,15 @@
 import "server-only";
 
 import type {
+  AgentforceConfiguration,
   AutomationSummary,
   EnterpriseObject,
+  IntegrationMap,
   KnowledgePosture,
   ObjectDescribe,
   OrgLimits,
   ProcessControls,
+  ProcessRule,
   SecuritySummary,
   ValidationRuleSummary,
 } from "@/modules/enterprise/types";
@@ -21,6 +24,7 @@ import {
   refreshAccessToken,
   type SalesforceIdentity,
 } from "@/modules/connectors/salesforce/oauth";
+import { isPlatformSystemField } from "@/modules/enterprise/fields";
 import type { OrgProfile } from "@/modules/enterprise/types";
 
 type SObjectList = {
@@ -29,6 +33,8 @@ type SObjectList = {
     label: string;
     custom: boolean;
     queryable: boolean;
+    layoutable?: boolean;
+    customSetting?: boolean;
   }[];
 };
 
@@ -43,6 +49,12 @@ type SObjectDescribe = {
     nillable: boolean;
     defaultedOnCreate: boolean;
     custom: boolean;
+    calculated?: boolean;
+    updateable?: boolean;
+    unique?: boolean;
+    externalId?: boolean;
+    cascadeDelete?: boolean;
+    relationshipOrder?: number | null;
     picklistValues?: { active?: boolean; label?: string; value?: string }[];
     referenceTo?: string[];
   }[];
@@ -123,6 +135,8 @@ export async function listSalesforceObjects(input: {
     label: object.label,
     custom: object.custom,
     queryable: object.queryable,
+    layoutable: object.layoutable,
+    customSetting: object.customSetting,
   }));
 }
 
@@ -141,12 +155,24 @@ export async function describeSalesforceObject(input: {
     apiName: data.name,
     label: data.label,
     custom: data.custom,
-    fields: (data.fields ?? []).map((field) => ({
+    fields: (data.fields ?? [])
+      .filter((field) => !isPlatformSystemField(field.name))
+      .map((field) => ({
       apiName: field.name,
       label: field.label,
       type: field.type,
       required: !field.nillable && !field.defaultedOnCreate,
       custom: field.custom,
+      formula: Boolean(field.calculated),
+      readOnly: field.updateable === false,
+      unique: Boolean(field.unique),
+      externalId: Boolean(field.externalId),
+      relationshipKind:
+        field.type === "reference"
+          ? field.cascadeDelete || field.relationshipOrder != null
+            ? ("master_detail" as const)
+            : ("lookup" as const)
+          : ("none" as const),
       picklistLabels: picklistLabels(field),
       referenceTo: field.referenceTo?.filter(Boolean),
     })),
@@ -162,7 +188,89 @@ export async function listSalesforceAutomations(input: {
   instanceUrl: string;
   accessToken: string;
 }): Promise<AutomationSummary[]> {
-  const [definitions, versions, triggers] = await Promise.all([
+  const [flows, triggers, workflows] = await Promise.all([
+    listSalesforceFlows(input),
+    salesforceRequest<
+      ToolingRecords<{
+        Name?: string;
+        TableEnumOrId?: string | null;
+        Status?: string;
+        NamespacePrefix?: string | null;
+        UsageBeforeInsert?: boolean;
+        UsageAfterInsert?: boolean;
+        UsageBeforeUpdate?: boolean;
+        UsageAfterUpdate?: boolean;
+        UsageBeforeDelete?: boolean;
+        UsageAfterDelete?: boolean;
+      }>
+    >({
+      instanceUrl: input.instanceUrl,
+      accessToken: input.accessToken,
+      path: salesforcePath("tooling", toolingQueries.apexTriggers),
+    }),
+    optionalToolingRecords<{
+      Name?: string;
+      TableEnumOrId?: string | null;
+      Active?: boolean;
+    }>(input, toolingQueries.workflowRules),
+  ]);
+
+  return [
+    ...flows,
+    ...(triggers.records ?? []).map((item) => ({
+      kind: "apex_trigger" as const,
+      name: item.Name ?? "ApexTrigger",
+      namespace: item.NamespacePrefix ?? null,
+      status: item.Status ?? null,
+      size: null,
+      objectApiName: objectName(item.TableEnumOrId),
+      triggerType: humanizeApexTrigger(item),
+      actions: [],
+      fieldsAffected: [],
+    })),
+    ...workflows.map((item) => ({
+      kind: "workflow" as const,
+      name: item.Name ?? "Workflow",
+      namespace: null,
+      status: item.Active ? "Active" : "Inactive",
+      size: null,
+      objectApiName: objectName(item.TableEnumOrId),
+      triggerType: null,
+      actions: [],
+      fieldsAffected: [],
+    })),
+  ];
+}
+
+async function listSalesforceFlows(input: {
+  instanceUrl: string;
+  accessToken: string;
+}): Promise<AutomationSummary[]> {
+  const views = await optionalRestRecords<{
+    ApiName?: string;
+    Label?: string;
+    ProcessType?: string;
+    TriggerType?: string;
+    TriggerObjectOrEventLabel?: string;
+    IsActive?: boolean;
+  }>(input, restQueries.flowDefinitionView);
+
+  if (views.length > 0) {
+    return views.map((item) => ({
+      kind: flowKind(item.ProcessType),
+      name: item.ApiName ?? item.Label ?? "Flow",
+      namespace: null,
+      status: item.IsActive ? "Active" : "Inactive",
+      size: null,
+      objectApiName: objectName(item.TriggerObjectOrEventLabel),
+      objectLabel: item.TriggerObjectOrEventLabel ?? null,
+      triggerType: humanizeFlowTrigger(item.TriggerType, item.ProcessType),
+      actions: [],
+      fieldsAffected: [],
+    }));
+  }
+
+  const [definitions, versions] = await Promise.all([
     salesforceRequest<
       ToolingRecords<{
         DeveloperName?: string;
@@ -187,58 +295,46 @@ export async function listSalesforceAutomations(input: {
       accessToken: input.accessToken,
       path: salesforcePath("tooling", toolingQueries.activeFlows),
     }),
-    salesforceRequest<
-      ToolingRecords<{
-        Name?: string;
-        TableEnumOrId?: string | null;
-        Status?: string;
-        NamespacePrefix?: string | null;
-        UsageBeforeInsert?: boolean;
-        UsageAfterInsert?: boolean;
-        UsageBeforeUpdate?: boolean;
-        UsageAfterUpdate?: boolean;
-        UsageBeforeDelete?: boolean;
-        UsageAfterDelete?: boolean;
-      }>
-    >({
-      instanceUrl: input.instanceUrl,
-      accessToken: input.accessToken,
-      path: salesforcePath("tooling", toolingQueries.apexTriggers),
-    }),
   ]);
 
   const versionById = new Map(
     (versions.records ?? []).map((version) => [version.Id, version]),
   );
 
-  return [
-    ...(definitions.records ?? []).map((definition) => {
-      const version = definition.ActiveVersionId
-        ? versionById.get(definition.ActiveVersionId)
-        : undefined;
-      return {
-        kind: "flow" as const,
-        name: definition.DeveloperName ?? definition.MasterLabel ?? "Flow",
-        namespace: null,
-        status: definition.ActiveVersionId ? "Active" : "Inactive",
-        size: null,
-        objectApiName: null,
-        triggerType: humanizeFlowTrigger(
-          version?.TriggerType,
-          version?.ProcessType,
-        ),
-      };
-    }),
-    ...(triggers.records ?? []).map((item) => ({
-      kind: "apex_trigger" as const,
-      name: item.Name ?? "ApexTrigger",
-      namespace: item.NamespacePrefix ?? null,
-      status: item.Status ?? null,
+  return (definitions.records ?? []).map((definition) => {
+    const version = definition.ActiveVersionId
+      ? versionById.get(definition.ActiveVersionId)
+      : undefined;
+    return {
+      kind: flowKind(version?.ProcessType),
+      name: definition.DeveloperName ?? definition.MasterLabel ?? "Flow",
+      namespace: null,
+      status: definition.ActiveVersionId ? "Active" : "Inactive",
       size: null,
-      objectApiName: item.TableEnumOrId ?? null,
-      triggerType: humanizeApexTrigger(item),
-    })),
-  ];
+      objectApiName: null,
+      triggerType: humanizeFlowTrigger(version?.TriggerType, version?.ProcessType),
+      actions: [],
+      fieldsAffected: [],
+    };
+  });
+}
+
+function flowKind(processType?: string): AutomationSummary["kind"] {
+  if (
+    processType === "Workflow" ||
+    processType === "InvocableProcess" ||
+    processType === "CustomEvent"
+  ) {
+    return "process_builder";
+  }
+  return "flow";
+}
+
+function objectName(value?: string | null) {
+  if (!value || /^[a-zA-Z0-9]{15,18}$/.test(value)) {
+    return null;
+  }
+  return value;
 }
 
 function humanizeFlowTrigger(triggerType?: string, processType?: string) {
@@ -309,7 +405,7 @@ export async function getSalesforceSecuritySummary(input: {
   instanceUrl: string;
   accessToken: string;
 }): Promise<SecuritySummary> {
-  const [profiles, permissionSets] = await Promise.all([
+  const [profiles, permissionSets, groups, roles, sharing] = await Promise.all([
     salesforceRequest<
       ToolingCount & ToolingRecords<{ Name?: string }>
     >({
@@ -329,6 +425,16 @@ export async function getSalesforceSecuritySummary(input: {
       accessToken: input.accessToken,
       path: salesforcePath("tooling", toolingQueries.permissionSets),
     }),
+    optionalRestRecords<{ MasterLabel?: string; DeveloperName?: string }>(
+      input,
+      restQueries.permissionSetGroups,
+    ),
+    optionalRestRecords<{ Name?: string }>(input, restQueries.roles),
+    optionalToolingRecords<{
+      QualifiedApiName?: string;
+      InternalSharingModel?: string;
+      ExternalSharingModel?: string;
+    }>(input, toolingQueries.entitySharing),
   ]);
 
   const profileNames = uniqueNames(
@@ -339,12 +445,28 @@ export async function getSalesforceSecuritySummary(input: {
       .filter((record) => !record.IsOwnedByProfile)
       .map((record) => record.Label || record.Name),
   );
+  const groupNames = uniqueNames(
+    groups.map((item) => item.MasterLabel || item.DeveloperName),
+  );
 
   return {
     profileCount: profiles.totalSize ?? profileNames.length,
     permissionSetCount: permissionSets.totalSize ?? permissionSets.records?.length ?? 0,
+    permissionSetGroupCount: groupNames.length,
+    roleCount: roles.length,
     profileNames,
     permissionSetNames,
+    permissionSetGroupNames: groupNames.slice(0, 20),
+    sharing: sharing
+      .filter((item) => item.QualifiedApiName && !isNoiseApiName(item.QualifiedApiName))
+      .slice(0, 80)
+      .map((item) => ({
+        objectApiName: item.QualifiedApiName ?? "",
+        internal: item.InternalSharingModel ?? null,
+        external: item.ExternalSharingModel ?? null,
+      })),
+    objectAccessAvailable: false,
+    fieldAccessAvailable: false,
   };
 }
 
@@ -371,6 +493,7 @@ export async function getSalesforceKnowledgePosture(input: {
     dataCategories: uniqueNames(
       categories.map((item) => item.MasterLabel || item.DeveloperName),
     ),
+    usefulnessKnown: false,
   };
 }
 
@@ -378,36 +501,77 @@ export async function listSalesforceProcessControls(input: {
   instanceUrl: string;
   accessToken: string;
 }): Promise<ProcessControls> {
-  const [queues, hours, rules] = await Promise.all([
-    optionalRestRecords<{ Name?: string; DeveloperName?: string }>(
-      input,
-      restQueries.queues,
-    ),
-    optionalRestRecords<{ Name?: string; IsActive?: boolean }>(
-      input,
-      restQueries.businessHours,
-    ),
-    optionalToolingRecords<{
-      Name?: string;
-      SobjectType?: string;
-      Active?: boolean;
-    }>(input, toolingQueries.assignmentRules),
-  ]);
+  const [queues, queueObjects, hours, assignment, escalation, autoResponse, approvals] =
+    await Promise.all([
+      optionalRestRecords<{ Id?: string; Name?: string; DeveloperName?: string }>(
+        input,
+        restQueries.queues,
+      ),
+      optionalRestRecords<{ QueueId?: string; SobjectType?: string }>(
+        input,
+        restQueries.queueObjects,
+      ),
+      optionalRestRecords<{ Name?: string; IsActive?: boolean }>(
+        input,
+        restQueries.businessHours,
+      ),
+      optionalToolingRecords<{
+        Name?: string;
+        SobjectType?: string;
+        Active?: boolean;
+      }>(input, toolingQueries.assignmentRules),
+      optionalToolingRecords<{
+        Name?: string;
+        SobjectType?: string;
+        Active?: boolean;
+      }>(input, toolingQueries.escalationRules),
+      optionalToolingRecords<{
+        Name?: string;
+        SobjectType?: string;
+        Active?: boolean;
+      }>(input, toolingQueries.autoResponseRules),
+      optionalToolingRecords<{
+        Name?: string;
+        TableEnumOrId?: string;
+        State?: string;
+      }>(input, toolingQueries.approvalProcesses),
+    ]);
+
+  const objectsByQueue = new Map<string, string>();
+  for (const item of queueObjects) {
+    if (item.QueueId && item.SobjectType && !objectsByQueue.has(item.QueueId)) {
+      objectsByQueue.set(item.QueueId, item.SobjectType);
+    }
+  }
 
   return {
-    queues: uniqueNames(queues.map((item) => item.Name || item.DeveloperName)).map(
-      (name) => ({ name }),
-    ),
-    assignmentRules: rules.map((rule) => ({
-      name: rule.Name ?? "Assignment rule",
-      objectApiName: rule.SobjectType ?? "Unknown",
-      active: Boolean(rule.Active),
+    queues: queues.map((item) => ({
+      name: item.Name || item.DeveloperName || "Queue",
+      objectApiName: item.Id ? objectsByQueue.get(item.Id) ?? null : null,
+    })),
+    assignmentRules: toProcessRules(assignment),
+    escalationRules: toProcessRules(escalation),
+    autoResponseRules: toProcessRules(autoResponse),
+    approvalProcesses: approvals.map((item) => ({
+      name: item.Name ?? "Approval process",
+      objectApiName: objectName(item.TableEnumOrId) ?? "Unknown",
+      active: /active/i.test(item.State ?? ""),
     })),
     businessHours: hours.map((item) => ({
       name: item.Name ?? "Business hours",
       active: item.IsActive !== false,
     })),
   };
+}
+
+function toProcessRules(
+  rules: { Name?: string; SobjectType?: string; Active?: boolean }[],
+): ProcessRule[] {
+  return rules.map((rule) => ({
+    name: rule.Name ?? "Rule",
+    objectApiName: rule.SobjectType ?? "Unknown",
+    active: Boolean(rule.Active),
+  }));
 }
 
 export async function getSalesforceOrgLimits(input: {
@@ -420,11 +584,137 @@ export async function getSalesforceOrgLimits(input: {
     path: salesforcePath("limits"),
   });
 
+  const packages = await optionalToolingRecords<{
+    SubscriberPackage?: { Name?: string; NamespacePrefix?: string | null };
+  }>(input, toolingQueries.installedPackages);
+
   return {
     dailyApiRequests: readLimit(limits.DailyApiRequests),
     dataStorageMb: readLimit(limits.DataStorageMB),
     fileStorageMb: readLimit(limits.FileStorageMB),
+    packages: packages
+      .map((item) => ({
+        name: item.SubscriberPackage?.Name ?? "Package",
+        namespace: item.SubscriberPackage?.NamespacePrefix ?? null,
+      }))
+      .filter((item) => item.name !== "Package")
+      .slice(0, 30),
   };
+}
+
+export async function getSalesforceIntegrationMap(input: {
+  instanceUrl: string;
+  accessToken: string;
+}): Promise<IntegrationMap> {
+  const objects = await listSalesforceObjects(input);
+  const [credentials, remoteSites, connectedApps] = await Promise.all([
+    optionalRestRecords<{
+      DeveloperName?: string;
+      MasterLabel?: string;
+      Endpoint?: string;
+    }>(input, restQueries.namedCredentials),
+    optionalRestRecords<{ SiteName?: string; EndpointUrl?: string }>(
+      input,
+      restQueries.remoteSites,
+    ),
+    optionalToolingRecords<{ Name?: string }>(
+      input,
+      toolingQueries.connectedApplications,
+    ),
+  ]);
+
+  return {
+    endpoints: [
+      ...credentials.map((item) => ({
+        name: item.MasterLabel || item.DeveloperName || "Named credential",
+        kind: "named_credential" as const,
+        host: endpointHost(item.Endpoint),
+      })),
+      ...connectedApps.map((item) => ({
+        name: item.Name ?? "Connected app",
+        kind: "connected_app" as const,
+        host: null,
+      })),
+      ...remoteSites.map((item) => ({
+        name: item.SiteName ?? "Remote site",
+        kind: "remote_site" as const,
+        host: endpointHost(item.EndpointUrl),
+      })),
+      ...objects
+        .filter((item) => /__x$/i.test(item.apiName))
+        .map((item) => ({
+          name: item.label,
+          kind: "external_object" as const,
+          host: null,
+        })),
+      ...objects
+        .filter((item) => /__e$/i.test(item.apiName))
+        .map((item) => ({
+          name: item.label,
+          kind: "platform_event" as const,
+          host: null,
+        })),
+    ].slice(0, 80),
+  };
+}
+
+export async function getSalesforceAgentforceConfiguration(input: {
+  instanceUrl: string;
+  accessToken: string;
+}): Promise<AgentforceConfiguration> {
+  const [bots, prompts, functions] = await Promise.all([
+    optionalRestRecords<{
+      DeveloperName?: string;
+      MasterLabel?: string;
+      BotType?: string;
+    }>(input, restQueries.botDefinitions),
+    optionalToolingRecords<{ DeveloperName?: string; MasterLabel?: string }>(
+      input,
+      toolingQueries.genAiPromptTemplates,
+    ),
+    optionalToolingRecords<{ DeveloperName?: string; MasterLabel?: string }>(
+      input,
+      toolingQueries.genAiFunctions,
+    ),
+  ]);
+
+  const items = [
+    ...bots.map((item) => ({
+      name: item.MasterLabel || item.DeveloperName || "Agent",
+      kind: "agent" as const,
+    })),
+    ...prompts.map((item) => ({
+      name: item.MasterLabel || item.DeveloperName || "Prompt template",
+      kind: "prompt_template" as const,
+    })),
+    ...functions.map((item) => ({
+      name: item.MasterLabel || item.DeveloperName || "Action",
+      kind: "action" as const,
+    })),
+  ].slice(0, 40);
+
+  return {
+    available: true,
+    items,
+  };
+}
+
+function endpointHost(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+  try {
+    const url = value.includes("://") ? new URL(value) : new URL(`https://${value}`);
+    return url.hostname || null;
+  } catch {
+    return null;
+  }
+}
+
+function isNoiseApiName(apiName: string) {
+  return /__(Share|History|Feed|Tag|ChangeEvent|hd|x|b|e|mdt)$|(Share|History|Feed|ChangeEvent)$/i.test(
+    apiName,
+  );
 }
 
 function picklistLabels(field: NonNullable<SObjectDescribe["fields"]>[number]) {

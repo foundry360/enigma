@@ -1,56 +1,42 @@
 import type { EnterpriseObject } from "@/modules/enterprise/types";
 import type { ToolCall } from "@/modules/intelligence/types";
-
-const serviceObjects = [
-  "Case",
-  "Account",
-  "Contact",
-  "Knowledge__kav",
-  "KnowledgeArticleVersion",
-  "Task",
-  "WorkOrder",
-  "Incident",
-  "EmailMessage",
-];
-
-const salesObjects = ["Lead", "Opportunity", "Account", "Contact", "Campaign"];
-
-export const catalogObjects = [...new Set([...serviceObjects, ...salesObjects])];
+import { selectWorkObjectsToDescribe } from "@/modules/intelligence/work-objects";
 
 export function initialToolPlan(): ToolCall[] {
   return [{ tool: "get_connection" }, { tool: "list_objects" }];
 }
 
-export function objectCandidates(input: {
+export function followUpMapPlan(): ToolCall[] {
+  return [
+    { tool: "list_automations" },
+    { tool: "list_validation_rules" },
+    { tool: "list_process_controls" },
+  ];
+}
+
+export function followUpContextPlan(): ToolCall[] {
+  return [
+    { tool: "security_summary" },
+    { tool: "knowledge_posture" },
+    { tool: "org_limits" },
+    { tool: "get_integration_map" },
+    { tool: "get_agentforce_configuration" },
+  ];
+}
+
+export function describeObjectPlan(input: {
   projectType: string;
   objective: string;
   outcomes: string[];
-}) {
-  const haystack = [
-    input.projectType,
-    input.objective,
-    ...input.outcomes,
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  const service =
-    /service|case|patient|knowledge|support|deflect/.test(haystack);
-  const sales = /sales|lead|opportun|revenue|pipeline/.test(haystack);
-  const names = new Set<string>();
-
-  if (service || (!service && !sales)) {
-    for (const name of serviceObjects) {
-      names.add(name);
-    }
-  }
-  if (sales || /agentforce|opportunity assessment/.test(haystack)) {
-    for (const name of salesObjects) {
-      names.add(name);
-    }
-  }
-
-  return [...names];
+  objects: EnterpriseObject[];
+  referencedNames?: string[];
+}): ToolCall[] {
+  return selectWorkObjectsToDescribe(input.objects, {
+    projectType: input.projectType,
+    objective: input.objective,
+    outcomes: input.outcomes,
+    referencedNames: input.referencedNames,
+  }).map((apiName) => ({ tool: "describe_object" as const, apiName }));
 }
 
 export function followUpToolPlan(input: {
@@ -58,19 +44,11 @@ export function followUpToolPlan(input: {
   objective: string;
   outcomes: string[];
   objects: EnterpriseObject[];
+  referencedNames?: string[];
 }): ToolCall[] {
-  const present = new Set(input.objects.map((object) => object.apiName));
-  const describes = objectCandidates(input)
-    .filter((apiName) => present.has(apiName))
-    .map((apiName) => ({ tool: "describe_object" as const, apiName }));
-
   return [
-    ...describes,
-    { tool: "list_automations" },
-    { tool: "list_validation_rules" },
-    { tool: "list_process_controls" },
-    { tool: "security_summary" },
-    { tool: "knowledge_posture" },
-    { tool: "org_limits" },
+    ...followUpMapPlan(),
+    ...describeObjectPlan(input),
+    ...followUpContextPlan(),
   ];
 }

@@ -24,17 +24,36 @@ An assessment run is an **agent pass**, not a batch rubric over a describe dump.
 The model may:
 
 - Decide which objects, automations, and knowledge sources matter for a use case
-- Detect and rank opportunities
+- Collect durable work from inventory, then reason over that pool against the project objective. An opportunity is a selected fit, not a use-case catalog pick. More than one work object can be a fit. Objects in the pool can be rejected. If the model is unavailable, rank from metadata and say so.
 - Name gaps, risks, and “what must be true”
 - Write the readiness story, recommended next move, and executive brief
 
-Org Intelligence is an operational model of the connected environment (environment, workload, process, data, knowledge, automation, access, integrations, platform constraints, and findings). Business signals are judgments derived from that model. They are not the whole intelligence layer.
+Org Intelligence is an operational model of the connected environment (environment, workload, process, data, knowledge, automation, access, integrations, existing AI, platform constraints, and findings). Business signals are judgments derived from that model. They are not the whole intelligence layer.
+
+MCP collects evidence. Intelligence normalizes it into that model. The model, not the connector, decides what is operating work. The object inventory is the source of truth for every cloud present in the org. There is no allowlist of Case, Opportunity, or any other product catalog. A queryable custom object is named from inventory. A licensed standard object is named from inventory when it is layoutable and not a platform artifact (Share, History, Feed, ChangeEvent, custom setting, mdt). Catalog presence is not operating work. Treat a standard object as in-use only when metadata shows custom fields, record types, automations, validation rules, assignment, escalation, or approval on that object. Discovery describes a capped set of inventory objects, preferring those this run's automations and rules already name, never the full org dump.
+
+Automation evidence is an object-scoped map (object → automation → trigger), not a flow count. Process intelligence reconstructs entry, work, assignment, activity, escalation, and resolution when those controls are present. Knowledge existence is not usefulness for grounding. Integrations and existing Agentforce configuration are first-class domains; if the tool did not run, the model says they were not observed. Object- and field-level access for an agent identity is not mapped yet and must stay named as a gap.
 
 Every finding and signal must include evidence. Evidence must cite tool results (object present, field missing, Flow active), not ungrounded claims. Volumes, quality percentages, and coverage are never invented. Workload volume, data quality statistics, and external-system integrations stay in the org model as **not observed** until an allowlisted tool reads them. Do not omit those gaps.
 
 The model never receives Salesforce tokens, raw HTTP, or customer records.
 
-Ask Enigma uses Claude (Anthropic Messages API) for MVP conversation. Deployment Justification and Enigma Recommendation are also Claude stories, written on load with number slots so the share slider updates live figures without another model call. Consumption, ROC, and ROA stay calculated. Official Salesforce prices are refused. Without `ANTHROPIC_API_KEY`, Ask and those stories stay on grounded fallback copy.
+The assessment run is:
+
+```
+MCP tools
+  → normalize facts
+    → Org Intelligence (evidence, domains, findings, gaps)
+      → Business Signals
+        → Opportunity Fit (the only model call on the run)
+          → opportunity candidates and stored brief
+```
+
+The Starting Enigma Intelligence modal polls that pass and shows a status bar for understanding the operating environment; mapping work, data, and processes; analyzing knowledge, automation, and access; building organizational intelligence; identifying agent opportunities; and preparing the intelligence brief.
+
+Org Intelligence does not depend on Opportunity Fit. A selected opportunity may be attached to the brief after the model is built; it must not change workload roles, findings, or facts.
+
+The Opportunity Fit pass tries local Llama first (`INFERENCE_URL` / `INFERENCE_MODEL`, Ollama by default), then Claude if Llama is not configured or does not respond. Ask Enigma uses Claude (Anthropic Messages API) for MVP conversation. Deployment Justification and Enigma Recommendation are also Claude stories, written on load with number slots so the share slider updates live figures without another model call. Those stories are rewritten when the promoted opportunity set changes, and they must name every promoted opportunity. Deployment is a forecast inherited from Intelligence, the opportunity, and the saved business case. Scenario math, consumption, value, ROC, and the forecast decision stay calculated. The approved forecast baseline is stored on the business case for later Outcomes comparison. Official Salesforce prices are refused. Without `ANTHROPIC_API_KEY`, Ask and those stories stay on grounded fallback copy.
 
 ## What stays deterministic
 

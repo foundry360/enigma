@@ -4,7 +4,7 @@ import { IntelligencePane } from "@/components/intelligence/intelligence-pane";
 import { ReadinessCategories } from "@/components/intelligence/readiness-categories";
 import { ScoreRing, strengthColors } from "@/components/ui/score-ring";
 import { requireSession } from "@/lib/auth/session";
-import { formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import {
   signalExplainer,
   splitSignalCopy,
@@ -16,7 +16,6 @@ import {
 } from "@/server/services/assessments";
 import { ensureOpportunityCandidates } from "@/server/services/opportunities";
 import { getConnectionOrgProfile } from "@/server/services/connections";
-import { discoveryToolLabel } from "@/modules/mcp/catalog";
 import { getProjectOverview } from "@/server/services/projects";
 
 const stateLabel = {
@@ -70,15 +69,12 @@ export default async function ProjectIntelligencePage({
   const strength = complete
     ? (detail.assessment.summary?.overallScore ?? overallScore(signals))
     : null;
-  const sources = [
-    ...new Set((detail?.traces ?? []).map((trace) => trace.tool)),
-  ];
 
   return (
     <IntelligencePane scroll>
       <section className="overflow-hidden rounded-lg border border-border bg-surface">
         <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:p-6">
-          <div className="flex items-center justify-center gap-5 rounded-md border border-border bg-background px-4 py-6">
+          <div className="flex items-center justify-center gap-5 rounded-md border border-border bg-ask-thread px-4 py-6">
             <ScoreRing score={strength} size="xl" showBadge={false} />
             <div className="min-w-0">
               <p className="text-sm font-semibold">Signal Strength</p>
@@ -103,12 +99,7 @@ export default async function ProjectIntelligencePage({
               {org?.name ?? "Not connected"}
             </MetaRow>
             <MetaRow label="Date">
-              {detail ? formatDateTime(detail.assessment.createdAt) : "—"}
-            </MetaRow>
-            <MetaRow label="Discovery Tools">
-              {sources.length > 0
-                ? sources.map(discoveryToolLabel).join(", ")
-                : "—"}
+              {detail ? formatDate(detail.assessment.createdAt) : "—"}
             </MetaRow>
             <MetaRow label="Facts">{detail?.traces.length ?? 0}</MetaRow>
             <MetaRow label="Signals">{complete ? signals.length : 0}</MetaRow>

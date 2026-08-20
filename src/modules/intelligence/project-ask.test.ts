@@ -191,7 +191,7 @@ describe("project ask", () => {
 
     expect(answer).toContain("Proceed");
     expect(answer).toMatch(/complete|positive|ROC/i);
-    expect(answer).toContain("Deployment");
+    expect(answer).toContain("Forecast");
   });
 
   it("reasons from the weak signal that holds Proceed with Conditions", () => {
@@ -350,6 +350,30 @@ describe("project ask", () => {
     ).toBe(true);
   });
 
+  it("keeps custom object names when asked how many were on the run", () => {
+    const prompt = projectAskPrompt(
+      {
+        intelligence: {
+          ...intelligence,
+          signals: intelligence.signals.map((signal, index) =>
+            index === 0
+              ? {
+                  ...signal,
+                  evidence: [
+                    "Custom objects: One (A__c), Two (B__c), Three (C__c), Four (D__c), Five (E__c), Six (F__c), Seven (G__c).",
+                  ],
+                }
+              : signal,
+          ),
+        },
+        businessCase,
+      },
+      "How many custom objects are in this org run?",
+    );
+
+    expect(prompt).toContain("G__c");
+  });
+
   it("puts process, formulas, evidence, and case math in the model prompt", () => {
     const prompt = projectAskPrompt(briefing, "How is Consumption calculated?");
 
@@ -358,7 +382,7 @@ describe("project ask", () => {
     expect(prompt).toMatch(/Case present/i);
     expect(prompt).toMatch(/Named evidence from this run/i);
     expect(prompt).toContain("$300");
-    expect(prompt).toContain("Confirm the case");
+    expect(prompt).toContain("Forecast inherits the saved case");
     expect(prompt.toLowerCase()).not.toContain("list price");
   });
 

@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   anthropicMessageBody,
   defaultClaudeModel,
+  defaultLlamaModel,
+  llamaChatUrl,
+  ollamaChatBody,
   readAnthropicText,
+  readLlamaText,
   resolveInferenceConfig,
+  resolveLlamaConfig,
   toAnthropicMessages,
 } from "@/modules/inference/config";
 
@@ -36,7 +41,7 @@ describe("inference config", () => {
     expect(config?.model).toBe(defaultClaudeModel);
   });
 
-  it("does not fall back to Llama or OpenAI", () => {
+  it("keeps Ask on Claude even when Llama is configured", () => {
     expect(
       resolveInferenceConfig({
         INFERENCE_URL: "http://127.0.0.1:11434",
@@ -44,6 +49,52 @@ describe("inference config", () => {
         OPENAI_API_KEY: "sk-test",
       }),
     ).toBeNull();
+  });
+
+  it("uses local Ollama for reasoning when Llama env is set", () => {
+    const config = resolveLlamaConfig({
+      INFERENCE_URL: "http://127.0.0.1:11434",
+      INFERENCE_MODEL: "llama3.1",
+    });
+    expect(config).toEqual({
+      provider: "llama",
+      url: "http://127.0.0.1:11434/api/chat",
+      model: "llama3.1",
+      apiKey: "",
+      timeoutMs: 45_000,
+    });
+    expect(llamaChatUrl("http://127.0.0.1:11434")).toBe(
+      "http://127.0.0.1:11434/api/chat",
+    );
+    expect(config?.model).toBe(defaultLlamaModel);
+  });
+
+  it("uses an OpenAI-compatible Llama URL when one is provided", () => {
+    const config = resolveLlamaConfig({
+      INFERENCE_URL: "https://api.groq.com/openai/v1",
+      INFERENCE_MODEL: "llama-3.3-70b-versatile",
+      INFERENCE_API_KEY: "gsk-test",
+    });
+    expect(config?.url).toBe(
+      "https://api.groq.com/openai/v1/chat/completions",
+    );
+    expect(config?.apiKey).toBe("gsk-test");
+  });
+
+  it("reads Ollama and OpenAI-compatible Llama responses", () => {
+    expect(
+      readLlamaText({ message: { content: '{"fits":[]}' } }),
+    ).toBe('{"fits":[]}');
+    expect(
+      readLlamaText({
+        choices: [{ message: { content: '{"fits":[]}' } }],
+      }),
+    ).toBe('{"fits":[]}');
+    expect(ollamaChatBody({
+      model: "llama3.1",
+      messages: [{ role: "user", content: "Rank fits." }],
+      maxTokens: 1400,
+    }).format).toBe("json");
   });
 
   it("returns null when Claude is not configured", () => {

@@ -9,7 +9,7 @@ export const knowledgeCatalog: KnowledgeEntry[] = [
     always: true,
     topics: ["ask", "enigma", "who"],
     content:
-      "You are Ask Enigma, a conversational intelligence partner for this project. Answer the exact question the user asked. If they ask for a recommendation, open with that recommendation. If they ask for a risk, open with that risk. If they ask what a signal is or to explain it, define that signal first, then say what this run found. If they named a signal, opportunity, gap, or risk, speak to that and only that. The brief is labeled source material, not a script to recap. If they ask you to name metadata, name only what Named evidence stored. If you name three or more items, use a short intro and a bullet list. If the run stored a count but not names, say that. If it did not store the answer, say so. Do not refuse a question about this run as out of scope. Do not recap every signal, paste every constraint, dump formulas, or paste a roster of names unless they asked for that.",
+      "You are Ask Enigma, a conversational intelligence partner for this project. Answer the exact question the user asked. If they ask for a recommendation, open with that recommendation. If they ask for a risk, open with that risk. If they ask what a signal is or to explain it, define that signal first, then say what this run found. If they named a signal, opportunity, gap, or risk, speak to that and only that. The brief is labeled source material, not a script to recap. If they ask you to name metadata, name what the org brief and Named evidence stored, including work objects. A brief line that names were not stored is not evidence the org has zero custom objects. If a work object API name ends in __c, it is a custom object. If you name three or more items, use a short intro and a bullet list. If the run stored a count but not names, say the count. If it did not store the answer, say so. Do not refuse a question about this run as out of scope. Do not recap every signal, paste every constraint, dump formulas, or paste a roster of names unless they asked for that.",
   },
   {
     id: "identity.case",
@@ -119,7 +119,7 @@ export const knowledgeCatalog: KnowledgeEntry[] = [
       "A risk is a weak or dangerous signal, constraint, or watch-out.",
       "If they ask what a signal is or to explain it, define that signal first, then say what this run found. If they ask why it scored or what the risk is, lead with this run's evidence for that signal only.",
       "If they asked what gaps and risks block, say what holds the path and what to do next. Do not recite every signal.",
-      "Say what it blocks on the path from Intelligence to Business Case to Deployment, and what would change the recommendation.",
+      "Say what it blocks on the path from Intelligence to Business Case to Forecast, and what would change the recommendation.",
     ].join(" "),
   },
   {
@@ -131,7 +131,7 @@ export const knowledgeCatalog: KnowledgeEntry[] = [
     content: [
       "Intelligence reads connected-environment metadata and emits scored signals and opportunity candidates. It does not pull CRM records.",
       "Business Case turns customer work and rates into calculated Consumption, Value, ROC, ROI, payback, and acceleration.",
-      "Deployment is the path forward after the case is saved: confirm the case, stand up the work, go live.",
+      "Deployment is a forecast of what pursuing the opportunity would entail after the business case is saved. It is not a DevOps or Agentforce configuration tool.",
     ].join(" "),
   },
   {
@@ -141,10 +141,12 @@ export const knowledgeCatalog: KnowledgeEntry[] = [
     surfaces: ["ask"],
     topics: ["deploy", "live", "stand up", "path", "roadmap"],
     content: [
-      "Deployment is not a project plan and not Agentforce automation.",
-      "Confirm The Case uses the saved recommendation.",
-      "Stand Up The Work is one node per promoted opportunity: what must be in place, watch outs, how consumption shows up, where value comes from.",
-      "Go Live uses days with Enigma as time to live.",
+      "Forecast is the deployment forecast, not a project plan and not Agentforce automation.",
+      "It inherits Intelligence, the opportunity, and the saved business case. It does not ask the user to re-enter those numbers.",
+      "Consumption is Impacted Work times Work Item Cost. Annual value is Impacted Work times Hours On Work Item times Labor Cost per Hour.",
+      "Work Item Cost is a customer assumption, not an official Salesforce price. If it is missing, consumption stays blank.",
+      "Scenarios are Conservative, Expected, and Aggressive from the saved share rates. The decision is Favorable, Favorable with Conditions, Requires More Validation, or Not Currently Justified.",
+      "Ask about share, value, consumption, conditions, risks, and what would change the forecast. Do not invent volumes or official prices.",
     ].join(" "),
   },
   {

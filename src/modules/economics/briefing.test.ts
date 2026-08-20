@@ -87,6 +87,30 @@ describe("business case briefing", () => {
     expect(prompt.toLowerCase()).not.toContain("list price");
   });
 
+  it("tells the model to name every promoted opportunity", () => {
+    const prompt = briefingToPrompt({
+      ...briefing,
+      opportunities: [
+        briefing.opportunities[0],
+        {
+          ...briefing.opportunities[0],
+          name: "Credentialing agent",
+          process: "Credentialing",
+          capability: "Credentialing agent",
+        },
+        {
+          ...briefing.opportunities[0],
+          name: "License agent",
+          process: "Licensing",
+          capability: "License agent",
+        },
+      ],
+    });
+    expect(prompt).toContain("Cover every promoted opportunity by name");
+    expect(prompt).toContain("Credentialing agent");
+    expect(prompt).toContain("License agent");
+  });
+
   it("falls back to explainable copy when no model is configured", () => {
     const copy = fallbackNarratives({
       ...briefing,

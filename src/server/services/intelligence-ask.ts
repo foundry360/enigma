@@ -2,7 +2,10 @@ import "server-only";
 
 import { formatAskAnswer } from "@/modules/intelligence/ask-format";
 import { buildIntelligenceBriefing } from "@/modules/intelligence/briefing";
-import { buildOrgIntelligence } from "@/modules/intelligence/org-intelligence";
+import {
+  buildOrgIntelligence,
+  hydrateOrgIntelligence,
+} from "@/modules/intelligence/org-intelligence";
 import { opportunityDefinition } from "@/modules/intelligence/opportunities";
 import { factsFromTraces } from "@/modules/intelligence/summarize";
 import {
@@ -15,6 +18,7 @@ import { getProjectAssessmentDetail } from "@/server/services/assessments";
 import {
   buildCaseBriefing,
   getBusinessCaseDetail,
+  toDeploymentForecast,
 } from "@/server/services/business-case";
 import { getConnectionOrgProfile } from "@/server/services/connections";
 import { completeChat } from "@/server/services/inference";
@@ -70,7 +74,7 @@ export async function askIntelligence(input: {
     factCount: detail.traces.length,
     signals: detail.judgments.filter((item) => item.kind === "dimension"),
     candidates: candidates.map((candidate) => {
-      const definition = opportunityDefinition(candidate.key);
+      const definition = opportunityDefinition(candidate.key, candidate.name);
       return {
         name: candidate.name,
         description: candidate.description,
@@ -89,28 +93,37 @@ export async function askIntelligence(input: {
     }),
   });
 
+  const facts = project
+    ? factsFromTraces(
+        {
+          projectType: project.projectType,
+          objective: project.objective,
+          outcomes: project.outcomes,
+        },
+        detail.traces,
+      )
+    : null;
   const stored = detail.assessment.orgIntelligence;
-  const orgIntelligence =
-    stored?.version === 1
-      ? stored
-      : project
-        ? buildOrgIntelligence(
-            factsFromTraces(
-              {
-                projectType: project.projectType,
-                objective: project.objective,
-                outcomes: project.outcomes,
-              },
-              detail.traces,
-            ),
-            { opportunityName: candidates[0]?.name ?? null },
-          )
-        : null;
+  const rebuilt =
+    facts && stored?.version !== 1
+      ? buildOrgIntelligence(facts, {
+          opportunityName: candidates[0]?.name ?? null,
+        })
+      : null;
+  const orgIntelligence = stored?.version === 1
+    ? hydrateOrgIntelligence(stored, facts)
+    : rebuilt;
 
   const briefing = {
     intelligence,
     businessCase: businessCase ? buildCaseBriefing(businessCase) : null,
     orgIntelligence,
+    forecast: businessCase
+      ? toDeploymentForecast(businessCase, {
+          org: orgIntelligence,
+          environmentName: org?.name ?? orgIntelligence?.environment.orgName ?? null,
+        })
+      : null,
   };
 
   const history = sanitizeHistory(input.history);

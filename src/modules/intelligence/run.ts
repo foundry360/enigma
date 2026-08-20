@@ -4,15 +4,30 @@ import { withSalesforceAccess } from "@/modules/connectors/salesforce";
 import { callMcpTool } from "@/modules/mcp";
 import type { McpToolName } from "@/modules/mcp/catalog";
 import {
-  followUpToolPlan,
+  describeObjectPlan,
+  followUpContextPlan,
+  followUpMapPlan,
   initialToolPlan,
 } from "@/modules/intelligence/plan";
-import { buildOrgIntelligence } from "@/modules/intelligence/org-intelligence";
-import { detectOpportunityCandidates } from "@/modules/intelligence/opportunities";
+import {
+  fallbackOpportunityFits,
+  groundOpportunityFits,
+  opportunityReasonPrompt,
+  parseOpportunityFits,
+  stampOpportunityFits,
+} from "@/modules/intelligence/opportunity-fits";
+import { objectsReferencedByMetadata } from "@/modules/intelligence/work-objects";
+import {
+  attachOpportunityName,
+  buildOrgIntelligence,
+  workFitPoolFromIntelligence,
+} from "@/modules/intelligence/org-intelligence";
 import { normalizeSignals } from "@/modules/intelligence/signals";
 import { overallScore, scoreAssessment } from "@/modules/intelligence/score";
 import { factsFromResults, summarizeToolResult } from "@/modules/intelligence/summarize";
+import { completeReasoningChat } from "@/server/services/inference";
 import type { AssessmentRunResult, ToolCall } from "@/modules/intelligence/types";
+import type { IntelligenceRunStageId } from "@/modules/intelligence/run-progress";
 import {
   getConnectionRefreshToken,
   getPublicConnection,
@@ -27,6 +42,7 @@ export async function runAssessmentPass(input: {
   projectType: string;
   objective: string;
   outcomes: string[];
+  onStage?: (stage: IntelligenceRunStageId) => Promise<void> | void;
 }): Promise<AssessmentRunResult> {
   const scope = {
     tenantId: input.tenantId,
@@ -47,6 +63,8 @@ export async function runAssessmentPass(input: {
     throw new Error("Salesforce is not connected.");
   }
 
+  await input.onStage?.("connect");
+
   const accessToken = await withSalesforceAccess({
     instanceUrl: connection.instanceUrl,
     refreshToken,
@@ -60,18 +78,37 @@ export async function runAssessmentPass(input: {
   });
 
   const first = await callTools(scope, initialToolPlan(), accessToken);
-  const factsAfterInventory = factsFromResults(input, first);
-  const followUp = followUpToolPlan({
-    projectType: input.projectType,
-    objective: input.objective,
-    outcomes: input.outcomes,
-    objects: factsAfterInventory.objects,
-  });
-  const second = await callTools(scope, followUp, accessToken);
-  const results = [...first, ...second];
+  await input.onStage?.("map");
+  const maps = await callTools(scope, followUpMapPlan(), accessToken);
+  const factsAfterMaps = factsFromResults(input, [...first, ...maps]);
+  const describes = await callTools(
+    scope,
+    describeObjectPlan({
+      projectType: input.projectType,
+      objective: input.objective,
+      outcomes: input.outcomes,
+      objects: factsAfterMaps.objects,
+      referencedNames: objectsReferencedByMetadata(factsAfterMaps),
+    }),
+    accessToken,
+  );
+  await input.onStage?.("context");
+  const contextTools = await callTools(
+    scope,
+    followUpContextPlan(),
+    accessToken,
+  );
+  const results = [...first, ...maps, ...describes, ...contextTools];
   const facts = factsFromResults(input, results);
-  const judgments = scoreAssessment(facts);
-  const opportunity = detectOpportunityCandidates(normalizeSignals(facts))[0];
+  await input.onStage?.("model");
+  const orgIntelligence = buildOrgIntelligence(facts);
+  const context = normalizeSignals(facts, orgIntelligence);
+  const pool = workFitPoolFromIntelligence(orgIntelligence, facts).filter(
+    (item) => item.role !== "context",
+  );
+  await input.onStage?.("fit");
+  const fits = await reasonOpportunityFits(input, pool, context, orgIntelligence);
+  const judgments = scoreAssessment(facts, fits, context);
 
   return {
     facts,
@@ -85,10 +122,95 @@ export async function runAssessmentPass(input: {
     })),
     judgments,
     overallScore: overallScore(judgments),
-    orgIntelligence: buildOrgIntelligence(facts, {
-      opportunityName: opportunity?.title ?? null,
-    }),
+    orgIntelligence: attachOpportunityName(
+      orgIntelligence,
+      judgments.find((item) => item.kind === "opportunity")?.title ?? null,
+    ),
   };
+}
+
+async function reasonOpportunityFits(
+  input: {
+    projectType: string;
+    objective: string;
+    outcomes: string[];
+  },
+  pool: ReturnType<typeof workFitPoolFromIntelligence>,
+  context: ReturnType<typeof normalizeSignals>,
+  orgIntelligence: ReturnType<typeof buildOrgIntelligence>,
+) {
+  if (pool.length === 0) {
+    return groundOpportunityFits(
+      fallbackOpportunityFits(pool),
+      orgIntelligence,
+      context.signals,
+    );
+  }
+
+  const prompt = opportunityReasonPrompt({
+    projectType: input.projectType,
+    objective: input.objective,
+    outcomes: input.outcomes,
+    work: pool,
+    signals: context.signals.map((signal) => ({
+      key: signal.key,
+      title: signal.title,
+      strength: signal.strength,
+      score: signal.score,
+      meaning: signal.meaning,
+    })),
+    orgSummary: orgIntelligence.summary,
+    findings: orgIntelligence.findings.map((item) => ({
+      id: item.id,
+      title: item.title,
+      summary: item.summary,
+      domain: item.domain,
+      provenance: item.provenance,
+      confidence: item.confidence,
+    })),
+    gaps: (orgIntelligence.gaps ?? []).map((item) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      impact: item.impact,
+    })),
+  });
+  const completion = await completeReasoningChat({
+    messages: [
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user },
+    ],
+    maxTokens: 1400,
+    timeoutMs: 45_000,
+  });
+
+  if (!completion) {
+    return stampOpportunityFits(
+      groundOpportunityFits(
+        fallbackOpportunityFits(pool),
+        orgIntelligence,
+        context.signals,
+      ),
+      "metadata rank",
+    );
+  }
+
+  const parsed = parseOpportunityFits(completion.text, pool);
+  if (parsed.some((item) => item.selected)) {
+    return stampOpportunityFits(
+      groundOpportunityFits(parsed, orgIntelligence, context.signals),
+      completion.model,
+    );
+  }
+
+  return stampOpportunityFits(
+    groundOpportunityFits(
+      fallbackOpportunityFits(pool),
+      orgIntelligence,
+      context.signals,
+    ),
+    `${completion.model} (no usable fits; metadata rank)`,
+  );
 }
 
 async function callTools(

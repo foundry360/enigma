@@ -16,8 +16,8 @@
   --surface-selected: color-mix(in srgb, var(--ink) 8%, var(--cream));
   --modal: var(--cream);
   --ask: #f6fbfe;
-  --ask-thread: #e7f5fd;
-  --ask-footer: var(--ask);
+  --ask-thread: #e4eef8;
+  --ask-footer: #e4eef8;
   --border: color-mix(in srgb, var(--ink) 16%, var(--cream));
   --muted: color-mix(in srgb, var(--ink) 55%, var(--cream));
   --placeholder: color-mix(in srgb, var(--ink) 32%, var(--cream));
@@ -145,6 +145,21 @@ html.dark *::-webkit-scrollbar-thumb {
 .ask-wave-letter {
   display: inline-block;
   animation: ask-wave 1.15s ease-in-out infinite;
+}
+
+@keyframes run-stage-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.2;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.run-stage-dot {
+  animation: run-stage-dot 1.2s ease-in-out infinite;
 }
 
 .enigma-slider {

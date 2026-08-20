@@ -1,4 +1,5 @@
 import type { CandidateSignalRef } from "@/lib/db/types";
+import { strengthFromSignal } from "@/modules/intelligence/strength";
 
 export function summarizeBusinessContext(input: {
   area: string;
@@ -15,9 +16,16 @@ export function summarizeSupportingSignals(
     return "No supporting signals were inherited on this opportunity.";
   }
 
-  const strong = names(signals, "strong");
-  const mixed = names(signals, "mixed");
-  const weak = names(signals, "weak");
+  const resolved = signals.map((signal) => ({
+    ...signal,
+    strength: strengthFromSignal({
+      strength: signal.strength,
+      score: "score" in signal ? signal.score : undefined,
+    }),
+  }));
+  const strong = names(resolved, "strong");
+  const mixed = names(resolved, "mixed");
+  const weak = names(resolved, "weak");
   const parts: string[] = [];
 
   if (strong.length > 0) {

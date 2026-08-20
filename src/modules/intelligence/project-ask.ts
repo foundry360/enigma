@@ -2,6 +2,10 @@ import {
   explainCaseCalculations,
   type BusinessCaseBriefing,
 } from "@/modules/economics/briefing";
+import {
+  formatForecastBrief,
+  type DeploymentForecast,
+} from "@/modules/economics/forecast";
 import { recommendationLabel, rollUpCase } from "@/modules/economics/model";
 import { formatCurrency, formatCurrencyPrecise } from "@/lib/format";
 import {
@@ -25,6 +29,7 @@ export type ProjectAskBriefing = {
   intelligence: IntelligenceBriefing;
   businessCase: BusinessCaseBriefing | null;
   orgIntelligence?: OrgIntelligence | null;
+  forecast?: DeploymentForecast | null;
 };
 
 export function navigatorInstructions(question?: string) {
@@ -97,7 +102,8 @@ function compactProjectBriefing(
     })
     .join("\n\n");
 
-  const wantsNames = /name|list the|what are the/i.test(question ?? "");
+  const wantsNames =
+    /name|list the|what are the|how many|custom object/i.test(question ?? "");
   const namedEvidence = briefing.intelligence.signals
     .flatMap((signal) =>
       signal.evidence.map((citation) => {
@@ -151,7 +157,9 @@ function compactProjectBriefing(
     briefing.businessCase.gaps.length
       ? `Gaps: ${briefing.businessCase.gaps.join(" ")}`
       : "No listed input gaps.",
-    `Deployment path: Confirm the case (${recommendationLabel[briefing.businessCase.recommendationState]}), stand up the work, then go live.`,
+    briefing.forecast
+      ? formatForecastBrief(briefing.forecast)
+      : `Forecast inherits the saved case. Decision follows the calculated recommendation (${recommendationLabel[briefing.businessCase.recommendationState]}).`,
   );
 
   return parts.filter(Boolean).join("\n\n");
@@ -529,7 +537,7 @@ function reasonAboutRecommendation(briefing: ProjectAskBriefing) {
   return [
     businessCase.recommendationWhy,
     [signalWhy, support].filter(Boolean).join(" "),
-    `${change} After the case is saved, Deployment is confirm the case, stand up the work, then go live.`,
+    `${change} After the case is saved, Forecast is what must be true for those numbers to be realized.`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -569,13 +577,9 @@ export function suggestedProjectAsks(briefing: ProjectAskBriefing) {
   if (briefing.businessCase) {
     asks.push("Why this recommendation, and what would change it?");
     asks.push("Walk me through how consumption and value were calculated.");
-    if (briefing.businessCase.gaps.length > 0 || weakest) {
-      asks.push("What do the gaps and risks block, and what should I do next?");
-    } else if (candidate) {
-      asks.push(
-        `What evidence supports ${candidate.name}, and what must be in place?`,
-      );
-    }
+    asks.push(
+      "What needs to be validated before this forecast can become reality?",
+    );
     return asks.slice(0, 3);
   }
 

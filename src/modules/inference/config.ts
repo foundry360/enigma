@@ -3,13 +3,18 @@ export type InferenceMessage = {
   content: string;
 };
 
+export type InferenceProvider = "anthropic" | "llama";
+
 export type InferenceConfig = {
-  provider: "anthropic";
+  provider: InferenceProvider;
   url: string;
   model: string;
   apiKey: string;
   timeoutMs: number;
 };
+
+export const defaultLlamaModel = "llama3.1";
+export const defaultLlamaUrl = "http://127.0.0.1:11434";
 
 export const defaultClaudeModel = "claude-sonnet-5";
 
@@ -34,6 +39,90 @@ export function resolveInferenceConfig(
     apiKey,
     timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30_000,
   };
+}
+
+export function resolveLlamaConfig(
+  env: Record<string, string | undefined> = {
+    INFERENCE_URL: process.env.INFERENCE_URL,
+    INFERENCE_MODEL: process.env.INFERENCE_MODEL,
+    INFERENCE_API_KEY: process.env.INFERENCE_API_KEY,
+    INFERENCE_TIMEOUT_MS: process.env.INFERENCE_TIMEOUT_MS,
+  },
+): InferenceConfig | null {
+  const url = env.INFERENCE_URL?.trim();
+  const model = env.INFERENCE_MODEL?.trim();
+  if (!url && !model) {
+    return null;
+  }
+
+  const timeoutMs = Number(env.INFERENCE_TIMEOUT_MS);
+  const base = (url || defaultLlamaUrl).replace(/\/$/, "");
+
+  return {
+    provider: "llama",
+    url: llamaChatUrl(base),
+    model: model || defaultLlamaModel,
+    apiKey: env.INFERENCE_API_KEY?.trim() || "",
+    timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 45_000,
+  };
+}
+
+export function llamaChatUrl(base: string) {
+  if (/\/v1\/chat\/completions$/i.test(base) || /\/api\/chat$/i.test(base)) {
+    return base;
+  }
+  if (/\/v1$/i.test(base)) {
+    return `${base}/chat/completions`;
+  }
+  return `${base}/api/chat`;
+}
+
+export function isOpenAiCompatibleUrl(url: string) {
+  return /\/v1\/chat\/completions$/i.test(url);
+}
+
+export function ollamaChatBody(input: {
+  model: string;
+  messages: Array<{ role: string; content: string }>;
+  maxTokens: number;
+}) {
+  return {
+    model: input.model,
+    messages: input.messages,
+    stream: false,
+    format: "json",
+    options: { num_predict: input.maxTokens },
+  };
+}
+
+export function openAiChatBody(input: {
+  model: string;
+  messages: Array<{ role: string; content: string }>;
+  maxTokens: number;
+}) {
+  return {
+    model: input.model,
+    messages: input.messages,
+    max_tokens: input.maxTokens,
+    response_format: { type: "json_object" },
+  };
+}
+
+export function readLlamaText(payload: {
+  message?: { content?: string };
+  choices?: Array<{ message?: { content?: string } }>;
+}) {
+  const ollama = payload.message?.content?.trim();
+  if (ollama) {
+    return ollama;
+  }
+  return (
+    payload.choices
+      ?.map((choice) => choice.message?.content?.trim())
+      .filter(Boolean)
+      .join("\n\n")
+      .trim() || null
+  );
 }
 
 export function anthropicMessageBody(input: {

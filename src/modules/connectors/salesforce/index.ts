@@ -11,6 +11,8 @@ export {
 } from "@/modules/connectors/salesforce/oauth";
 export {
   describeSalesforceObject,
+  getSalesforceAgentforceConfiguration,
+  getSalesforceIntegrationMap,
   getSalesforceKnowledgePosture,
   getSalesforceOrgLimits,
   getSalesforceSecuritySummary,

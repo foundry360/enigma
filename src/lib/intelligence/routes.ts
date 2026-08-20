@@ -2,7 +2,7 @@ export const intelligenceTabs = [
   { id: "overview", label: "Overview", path: "" },
   { id: "opportunities", label: "Opportunities", path: "/opportunities" },
   { id: "business-case", label: "Business Case", path: "/business-case" },
-  { id: "deployment", label: "Deployment", path: "/deployment" },
+  { id: "deployment", label: "Forecast", path: "/deployment" },
   { id: "outcomes", label: "Outcomes", path: "/outcomes" },
 ] as const;
 

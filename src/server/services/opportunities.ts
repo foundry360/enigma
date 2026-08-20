@@ -14,6 +14,13 @@ import { requireTenantId } from "@/lib/tenants/scope";
 import { writeAuditLog } from "@/server/services/audit";
 import { getAssessmentDetail } from "@/server/services/assessments";
 
+async function invalidateCaseStories(tenantId: string, projectId: string) {
+  const { invalidateBusinessCaseStories } = await import(
+    "@/server/services/business-case"
+  );
+  await invalidateBusinessCaseStories(tenantId, projectId);
+}
+
 function asSqlJson(value: unknown) {
   return JSON.parse(JSON.stringify(value ?? null));
 }
@@ -26,18 +33,32 @@ function withUtc<T extends { createdAt: Date; updatedAt?: Date }>(row: T): T {
   };
 }
 
-function withCatalogCopy(row: OpportunityCandidateRow): OpportunityCandidateRow {
-  const definition = opportunityDefinition(row.key);
+function withWorkCopy(row: OpportunityCandidateRow): OpportunityCandidateRow {
+  const definition = opportunityDefinition(row.key, row.name);
   if (!definition) {
     return row;
   }
 
   return {
     ...row,
-    consumptionDrivers: definition.consumptionDrivers,
-    valueDrivers: definition.valueDrivers,
-    constraints: definition.constraints,
-    dependencies: definition.dependencies,
+    name: row.name || definition.title,
+    description: row.description || definition.description,
+    businessArea: row.businessArea || definition.businessArea,
+    businessProcess: row.businessProcess || definition.process,
+    recommendedCapability:
+      row.recommendedCapability || definition.recommendedCapability,
+    consumptionDrivers: row.consumptionDrivers?.length
+      ? row.consumptionDrivers
+      : definition.consumptionDrivers,
+    valueDrivers: row.valueDrivers?.length
+      ? row.valueDrivers
+      : definition.valueDrivers,
+    constraints: row.constraints?.length
+      ? row.constraints
+      : definition.constraints,
+    dependencies: row.dependencies?.length
+      ? row.dependencies
+      : definition.dependencies,
   };
 }
 
@@ -131,7 +152,7 @@ export async function listCandidatesForAssessment(
     where "tenantId" = ${scoped} and "assessmentId" = ${assessmentId}
     order by "createdAt"
   `;
-  return rows.map(withUtc).map(withCatalogCopy);
+  return rows.map(withUtc).map(withWorkCopy);
 }
 
 export async function listProjectCandidates(tenantId: string, projectId: string) {
@@ -142,7 +163,7 @@ export async function listProjectCandidates(tenantId: string, projectId: string)
     where "tenantId" = ${scoped} and "projectId" = ${projectId}
     order by "updatedAt" desc
   `;
-  return rows.map(withUtc).map(withCatalogCopy);
+  return rows.map(withUtc).map(withWorkCopy);
 }
 
 export async function getOpportunityCandidate(
@@ -156,7 +177,7 @@ export async function getOpportunityCandidate(
     where "tenantId" = ${scoped} and id = ${candidateId}
     limit 1
   `;
-  return row ? withCatalogCopy(withUtc(row)) : null;
+  return row ? withWorkCopy(withUtc(row)) : null;
 }
 
 export async function setCandidateLifecycle(input: {
@@ -195,6 +216,7 @@ export async function setCandidateLifecycle(input: {
         reason: input.status,
       },
     });
+    await invalidateCaseStories(input.tenantId, candidate.projectId);
   }
 
   await sql`
@@ -262,6 +284,8 @@ export async function setCandidateLifecycle(input: {
       assessmentId: candidate.assessmentId,
     },
   });
+
+  await invalidateCaseStories(input.tenantId, candidate.projectId);
 
   return {
     candidate,

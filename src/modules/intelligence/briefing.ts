@@ -1,13 +1,11 @@
 import { peelLayerPrefix } from "@/modules/intelligence/evidence-expand";
-import { opportunityCatalog } from "@/modules/intelligence/opportunities";
 import {
   summarizeImplication,
   summarizeSupportingSignals,
 } from "@/modules/intelligence/opportunity-summaries";
 import { signalState } from "@/modules/intelligence/score";
-import { resolveSignalKey, signalAdvice } from "@/modules/intelligence/signal-advice";
+import { signalAdvice } from "@/modules/intelligence/signal-advice";
 import { splitSignalCopy } from "@/modules/intelligence/signals";
-import type { SignalKey } from "@/modules/intelligence/types";
 
 export type IntelligenceBriefing = {
   environment: string;
@@ -602,94 +600,23 @@ export function isOpportunityCountAsk(question: string) {
 
 function explainOpportunityCount(briefing: IntelligenceBriefing) {
   const names = briefing.candidates.map((item) => item.name);
-  const emitted = new Set(names.map((name) => name.toLowerCase()));
-  const blocked = opportunityCatalog.flatMap((definition) => {
-    if (emitted.has(definition.title.toLowerCase())) {
-      return [];
-    }
-
-    const weakRequired = definition.requiredSignals
-      .map((key) => lookupSignal(briefing.signals, key))
-      .filter(
-        (signal): signal is IntelligenceBriefing["signals"][number] =>
-          signal?.strength === "weak",
-      );
-    if (weakRequired.length > 0) {
-      const titles = weakRequired.map((signal) => signal.title);
-      return [
-        `${definition.title} did not appear because ${joinAnd(titles)} ${
-          titles.length === 1 ? "is" : "are"
-        } still weak.`,
-      ];
-    }
-
-    const missing = definition.requiredSignals.filter(
-      (key) => !lookupSignal(briefing.signals, key),
-    );
-    if (missing.length > 0) {
-      const titles = missing.map(requiredSignalTitle);
-      return [
-        `${definition.title} did not appear because ${joinAnd(titles)} ${
-          titles.length === 1 ? "was" : "were"
-        } not mixed or strong on this run.`,
-      ];
-    }
-
-    return [
-      `${definition.title} did not meet the required signal combination.`,
-    ];
-  });
-
-  const qualified = briefing.candidates.map((candidate) => {
-    const definition = opportunityCatalog.find(
-      (item) => item.title.toLowerCase() === candidate.name.toLowerCase(),
-    );
-    if (!definition) {
-      return `${candidate.name} is on this run because its required signals were mixed or strong.`;
-    }
-
-    const required = definition.requiredSignals.map(requiredSignalTitle);
-    return `${candidate.name} is on this run because ${joinAnd(required)} ${
-      required.length === 1 ? "is" : "are"
-    } mixed or strong.`;
-  });
 
   if (briefing.candidates.length === 0) {
-    return [
-      "No opportunities were emitted. An opportunity appears only when every required signal for that hypothesis is mixed or strong.",
-      ...blocked,
-      "That is a signal combination, not a list of every object Enigma found.",
-    ].join("\n\n");
+    return "No opportunities were emitted. An opportunity is the durable work this run found, not a use-case picked from a catalog. This run did not identify a durable work record an agent can sit on.";
   }
 
   if (briefing.candidates.length === 1) {
     return [
-      `You are only seeing ${names[0]} because it is the only hypothesis whose required signals were mixed or strong.`,
-      qualified[0],
-      ...blocked,
+      `You are only seeing ${names[0]} because that is the durable work this run identified.`,
+      `${names[0]} is not a catalog pick. It is the work record an agent would sit on in this org.`,
       "Watch signals that are still weak do not hide this opportunity, but they do keep the write path constrained.",
     ].join("\n\n");
   }
 
   return [
     `This run produced ${briefing.candidates.length} opportunities: ${joinAnd(names)}.`,
-    ...qualified,
-    ...blocked,
-    "Each opportunity is a signal combination, not a list of every object Enigma found.",
+    "Each opportunity is durable work this run found in the org, not a use-case picked from a catalog.",
   ].join("\n\n");
-}
-
-function lookupSignal(
-  signals: IntelligenceBriefing["signals"],
-  key: SignalKey,
-) {
-  return signals.find(
-    (signal) => resolveSignalKey(signal.key, signal.title) === key,
-  );
-}
-
-function requiredSignalTitle(key: SignalKey) {
-  return signalAdvice({ key, title: key }).title;
 }
 
 function supportingRefs(items: string[]) {

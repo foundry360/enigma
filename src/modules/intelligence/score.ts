@@ -1,16 +1,25 @@
+import type { OpportunityFit } from "@/modules/intelligence/opportunity-fits";
 import { detectOpportunityCandidates } from "@/modules/intelligence/opportunities";
 import { normalizeSignals } from "@/modules/intelligence/signals";
+import { signalState } from "@/modules/intelligence/strength";
 import type {
   AssessmentFacts,
   BusinessSignal,
   Judgment,
+  SignalContext,
 } from "@/modules/intelligence/types";
 
-export function scoreAssessment(facts: AssessmentFacts): Judgment[] {
-  const context = normalizeSignals(facts);
+export { signalState };
+
+export function scoreAssessment(
+  facts: AssessmentFacts,
+  fits?: OpportunityFit[],
+  context?: SignalContext,
+): Judgment[] {
+  const resolved = context ?? normalizeSignals(facts);
   return [
-    ...context.signals.map(judgmentFromSignal),
-    ...detectOpportunityCandidates(context),
+    ...resolved.signals.map(judgmentFromSignal),
+    ...detectOpportunityCandidates(resolved, fits),
   ];
 }
 
@@ -100,14 +109,3 @@ function judgmentFromSignal(signal: BusinessSignal): Judgment {
   };
 }
 
-export function signalState(score: number) {
-  if (score >= 75) {
-    return "strong" as const;
-  }
-
-  if (score >= 45) {
-    return "mixed" as const;
-  }
-
-  return "weak" as const;
-}

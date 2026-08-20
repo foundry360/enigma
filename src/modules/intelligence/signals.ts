@@ -1,21 +1,17 @@
+import type { OrgIntelligence } from "@/modules/intelligence/org-model";
 import type {
   AssessmentFacts,
   BusinessSignal,
   Evidence,
   SignalContext,
   SignalKey,
-  WorkKind,
 } from "@/modules/intelligence/types";
-
-export const workCatalog: { apiName: string; kind: WorkKind }[] = [
-  { apiName: "Case", kind: "service" },
-  { apiName: "WorkOrder", kind: "service" },
-  { apiName: "Incident", kind: "service" },
-  { apiName: "Account", kind: "customer" },
-  { apiName: "Contact", kind: "customer" },
-  { apiName: "Lead", kind: "revenue" },
-  { apiName: "Opportunity", kind: "revenue" },
-];
+import { signalState } from "@/modules/intelligence/strength";
+import {
+  durableWorkFromFacts,
+  listedCustomObjects,
+  objectUsedInModel,
+} from "@/modules/intelligence/work-objects";
 
 export const consumptionImplications = [
   "Volume can attach to existing work, not a new system of record.",
@@ -81,28 +77,18 @@ export function signalExplainer(key: string) {
     : undefined;
 }
 
-export function normalizeSignals(facts: AssessmentFacts): SignalContext {
-  const objects = new Map(
-    facts.objects.map((object) => [object.apiName, object]),
-  );
-  const work = workCatalog.flatMap((entry) => {
-    const object = objects.get(entry.apiName);
-    if (!object) {
-      return [];
-    }
-
-    const described = facts.describes[entry.apiName];
-    return [
-      {
-        kind: entry.kind,
-        apiName: entry.apiName,
-        label: object.label,
-        fieldCount: described?.fields.length ?? 0,
-        requiredCount:
-          described?.fields.filter((field) => field.required).length ?? 0,
-      },
-    ];
-  });
+export function normalizeSignals(
+  facts: AssessmentFacts,
+  intelligence?: OrgIntelligence,
+): SignalContext {
+  const work = durableWorkFromFacts(facts).map((item) => ({
+    kind: item.kind,
+    apiName: item.apiName,
+    label: item.label,
+    role: item.role,
+    fieldCount: item.fieldCount,
+    requiredCount: item.requiredCount,
+  }));
 
   const activeAutomations = facts.automations.filter(
     (item) => !item.status || /active/i.test(item.status),
@@ -121,16 +107,33 @@ export function normalizeSignals(facts: AssessmentFacts): SignalContext {
 
   const context: Omit<SignalContext, "signals"> = {
     workKinds: [...new Set(work.map((item) => item.kind))],
-    work: work.map(({ kind, label, fieldCount, requiredCount }) => ({
-      kind,
-      label,
-      fieldCount,
-      requiredCount,
-    })),
+    work: work
+      .filter((item) => item.role !== "context")
+      .map(({ kind, apiName, label, role, fieldCount, requiredCount }) => ({
+        kind,
+        apiName,
+        label,
+        role,
+        fieldCount,
+        requiredCount,
+      })),
+    customObjectNames: listedCustomObjects(facts.objects)
+      .slice(0, 20)
+      .map((item) => `${item.label} (${item.apiName})`),
     groundingLabels,
     activeAutomationCount: activeAutomations,
     writeRuleCount: writeRules,
     permissionEstate,
+    findings: intelligence?.findings.map((item) => ({
+      id: item.id,
+      title: item.title,
+      relatedSignals: item.relatedSignals,
+    })),
+    gaps: intelligence?.gaps?.map((item) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+    })),
   };
 
   return {
@@ -142,21 +145,44 @@ export function normalizeSignals(facts: AssessmentFacts): SignalContext {
       automationCollision(facts, context),
       accessSurface(facts, context),
       writebackControl(facts, context),
-    ],
+    ].map((signal) => withFindingIds(signal, intelligence)),
+  };
+}
+
+function withFindingIds(
+  signal: BusinessSignal,
+  intelligence?: OrgIntelligence,
+): BusinessSignal {
+  if (!intelligence) {
+    return signal;
+  }
+
+  return {
+    ...signal,
+    findingIds: intelligence.findings
+      .filter((item) => item.relatedSignals.includes(signal.key))
+      .map((item) => item.id),
+    gapIds: (intelligence.gaps ?? [])
+      .filter((item) => item.relatedSignals?.includes(signal.key))
+      .map((item) => item.id),
   };
 }
 
 function addressableWork(
   context: Omit<SignalContext, "signals">,
 ): BusinessSignal {
-  const service = context.work.find((item) => item.kind === "service");
-  const customer = context.work.filter((item) => item.kind === "customer");
-  const rich = (service?.fieldCount ?? 0) >= 20;
+  const durable =
+    context.work.find((item) => item.kind === "service") ??
+    context.work.find((item) => item.kind === "revenue") ??
+    context.work[0] ??
+    null;
+  const extras = context.work.filter((item) => item.label !== durable?.label);
+  const rich = (durable?.fieldCount ?? 0) >= 20;
   const score = clamp(
-    (service ? 40 : 0) +
-      (customer.length > 0 ? 20 : 0) +
-      (customer.length > 1 ? 20 : 0) +
-      (rich ? 20 : service && service.fieldCount > 0 ? 10 : 0),
+    (durable ? 40 : 0) +
+      (extras.length > 0 ? 20 : 0) +
+      (extras.length > 1 ? 20 : 0) +
+      (rich ? 20 : durable && durable.fieldCount > 0 ? 10 : 0),
   );
 
   return signal("addressable_work", score, {
@@ -165,29 +191,42 @@ function addressableWork(
         "list_objects",
         context.work.length
           ? `Work objects: ${uniqueLabels(context.work)}.`
-          : "No service, customer, or revenue work objects were found.",
+          : "No durable work objects were found.",
       ),
-      ...(service && service.fieldCount > 0
+      ...(context.customObjectNames.length
+        ? [
+            cite(
+              "list_objects",
+              `Custom objects: ${context.customObjectNames.join(", ")}.`,
+            ),
+          ]
+        : [
+            cite(
+              "list_objects",
+              "No queryable custom objects were named on this run.",
+            ),
+          ]),
+      ...(durable && durable.fieldCount > 0
         ? [
             cite(
               "describe_object",
-              `${service.label} has ${service.fieldCount} fields (${service.requiredCount} required).`,
+              `${durable.label} has ${durable.fieldCount} fields (${durable.requiredCount} required).`,
             ),
           ]
         : []),
     ],
-    meaning: service
-      ? "Service and customer work already lives in durable records, so an agent has structured work to read."
-      : "There is no durable service record, so an agent has little operational work to attach to.",
-    consumption: service
+    meaning: durable
+      ? `${durable.label} is the durable work record an agent can read.`
+      : "There is no durable work record, so an agent has little operational work to attach to.",
+    consumption: durable
       ? "Volume can attach to existing work, not a new system of record."
       : "A consumption forecast would invent the work object first.",
-    risk: service
+    risk: durable
       ? "Field presence is not the same as data quality or requiredness in use."
-      : "Without a work object, Agentforce has nothing durable to act on.",
-    recommendation: service
-      ? "Confirm required fields and record types on the service object before designing a topic."
-      : "Stand up the service object of record before a service agent use case.",
+      : "Without a work object, an agent has nothing durable to act on.",
+    recommendation: durable
+      ? `Confirm required fields and record types on ${durable.label} before designing a topic.`
+      : "Identify the durable work object of record before an agent use case.",
   });
 }
 
@@ -195,14 +234,12 @@ function operatingPath(
   facts: AssessmentFacts,
   context: Omit<SignalContext, "signals">,
 ): BusinessSignal {
-  const service = context.workKinds.includes("service");
-  const revenue = context.workKinds.includes("revenue");
-  const score = clamp((service ? 50 : 0) + (revenue ? 50 : 0));
   const labels = uniqueLabels(
     context.work.filter(
       (item) => item.kind === "service" || item.kind === "revenue",
     ),
   );
+  const score = operatingPathScore(facts, context);
 
   return signal("operating_path", score, {
     evidence: [
@@ -210,22 +247,67 @@ function operatingPath(
         "list_objects",
         labels
           ? `Operating objects: ${labels}.`
-          : "No service or revenue path objects were found.",
+          : "No operating work objects were found.",
       ),
       ...citeProcessPath(facts),
     ],
     meaning:
-      score >= 50
-        ? "A recognizable service or revenue path exists for an agent to follow."
-        : "No clear operating path was found for an agent to start and hand off.",
+      score >= 75
+        ? "A recognizable work path exists for an agent to follow."
+        : score >= 45
+          ? "Durable work exists, but assignment and close are not yet a complete operating path."
+          : "No clear operating path was found for an agent to start and hand off.",
     consumption:
-      score >= 50
+      score >= 75
         ? "Conversations can be counted against a known path instead of an unbounded chat."
-        : "Usage would be unscoped, so a forecast would not stay honest.",
+        : score >= 45
+          ? "Usage can attach to the work object, but handoff volume would still be an assumption."
+          : "Usage would be unscoped, so a forecast would not stay honest.",
     risk: "Object presence is not the same as assignment, SLA, or a documented handoff.",
     recommendation:
       "Map the human handoffs on the primary path before automating them with an agent.",
   });
+}
+
+function operatingPathScore(
+  facts: AssessmentFacts,
+  context: Omit<SignalContext, "signals">,
+) {
+  const operational = context.work.filter(
+    (item) => item.kind === "service" || item.kind === "revenue",
+  );
+  if (operational.length === 0) {
+    return 15;
+  }
+
+  const used = Object.values(facts.describes).filter((item) =>
+    objectUsedInModel(item, facts),
+  );
+  const statuses = used.some((item) =>
+    item.fields.some(
+      (field) =>
+        /^(status|stagename)$/i.test(field.apiName) &&
+        (field.picklistLabels?.length ?? 0) > 0,
+    ),
+  );
+  const assignment = (facts.process?.assignmentRules ?? []).some(
+    (rule) => rule.active,
+  );
+  const queues = (facts.process?.queues ?? []).length > 0;
+  const escalation = (facts.process?.escalationRules ?? []).some(
+    (rule) => rule.active,
+  );
+  const approvals = (facts.process?.approvalProcesses ?? []).some(
+    (rule) => rule.active,
+  );
+
+  return clamp(
+    45 +
+      (statuses ? 20 : 0) +
+      (assignment || queues ? 15 : 0) +
+      (escalation || approvals ? 10 : 0) +
+      (operational.length > 1 ? 10 : 0),
+  );
 }
 
 function groundedAnswers(
@@ -371,7 +453,7 @@ function signal(
     key,
     title: signalTitles[key],
     score: clamp(score),
-    strength: score >= 75 ? "strong" : score >= 45 ? "mixed" : "weak",
+    strength: signalState(score),
     ...rest,
   };
 }
@@ -408,7 +490,9 @@ function citeAutomations(
 }
 
 function citeProcessPath(facts: AssessmentFacts): Evidence[] {
-  const described = Object.values(facts.describes);
+  const described = Object.values(facts.describes).filter((item) =>
+    objectUsedInModel(item, facts),
+  );
   const statuses = described.flatMap((item) => {
     const field = item.fields.find((entry) =>
       /^(status|stagename)$/i.test(entry.apiName),
@@ -509,11 +593,21 @@ function citeWriteRules(
 }
 
 function describeAutomation(item: AssessmentFacts["automations"][number]) {
-  const kind =
-    item.kind === "apex_trigger" || item.kind === "apex"
-      ? "Apex trigger"
-      : "Flow";
-  const on = item.objectApiName ? ` on ${item.objectApiName}` : "";
+  const labels: Record<string, string> = {
+    flow: "Flow",
+    apex: "Apex trigger",
+    apex_trigger: "Apex trigger",
+    workflow: "Workflow",
+    process_builder: "Process Builder",
+    escalation: "Escalation rule",
+    auto_response: "Auto-response rule",
+    approval: "Approval process",
+  };
+  const kind = labels[item.kind] ?? "Automation";
+  const on =
+    item.objectLabel || item.objectApiName
+      ? ` on ${item.objectLabel ?? item.objectApiName}`
+      : "";
   const when = item.triggerType ? `, ${item.triggerType}` : "";
   return `${kind} ${item.name}${on}${when}`;
 }

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import { AssessmentRunForm } from "@/components/assessments/assessment-run-form";
+import { IntelligenceOverviewRunForm } from "@/components/assessments/assessment-run-form";
 import { IntelligenceAsk } from "@/components/intelligence/intelligence-ask";
 import { IntelligenceHeaderActions } from "@/components/intelligence/intelligence-header-actions";
 import { IntelligenceTabs } from "@/components/intelligence/intelligence-tabs";
@@ -60,7 +60,7 @@ export default async function IntelligenceLayout({
             factCount: detail.traces.length,
             signals,
             candidates: candidates.map((candidate) => {
-              const definition = opportunityDefinition(candidate.key);
+              const definition = opportunityDefinition(candidate.key, candidate.name);
               return {
                 name: candidate.name,
                 description: candidate.description,
@@ -94,7 +94,7 @@ export default async function IntelligenceLayout({
             </h1>
             <div className="flex shrink-0 items-center gap-2">
               <IntelligenceHeaderActions />
-              <AssessmentRunForm
+              <IntelligenceOverviewRunForm
                 projectId={id}
                 label={complete ? "Run again" : "Run intelligence"}
               />

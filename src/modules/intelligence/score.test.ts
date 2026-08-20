@@ -64,7 +64,7 @@ describe("assessment scoring", () => {
       true,
     );
     expect(first.some((item) => item.key === "addressable_work")).toBe(true);
-    expect(first.some((item) => item.key === "case_service_agent")).toBe(true);
+    expect(first.some((item) => item.key === "work:Case")).toBe(true);
     expect(first.some((item) => item.title === "Data")).toBe(false);
     expect(scoreAssessment(emptyFacts).map((item) => item.score)).not.toEqual(
       first.map((item) => item.score),

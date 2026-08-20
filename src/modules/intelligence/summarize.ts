@@ -1,8 +1,10 @@
 import type { McpToolName } from "@/modules/mcp/catalog";
 import type {
+  AgentforceConfiguration,
   AutomationSummary,
   ConnectionIdentity,
   EnterpriseObject,
+  IntegrationMap,
   KnowledgePosture,
   ObjectDescribe,
   OrgLimits,
@@ -10,8 +12,12 @@ import type {
   SecuritySummary,
   ValidationRuleSummary,
 } from "@/modules/enterprise/types";
-import { catalogObjects } from "@/modules/intelligence/plan";
+import { visibleFields } from "@/modules/enterprise/fields";
 import type { AssessmentFacts } from "@/modules/intelligence/types";
+import {
+  listedCustomObjects,
+  listedInventoryObjects,
+} from "@/modules/intelligence/work-objects";
 
 const SECRET_KEYS = /token|secret|authorization|bearer|password|cookie/i;
 
@@ -28,15 +34,12 @@ export function summarizeToolResult(
 
   if (tool === "list_objects") {
     const objects = asObjects(data);
+    const custom = listedCustomObjects(objects);
     return {
       count: objects.length,
-      custom: objects.filter((object) => object.custom).length,
-      present: objects
-        .filter(
-          (object) =>
-            object.custom || catalogObjects.includes(object.apiName),
-        )
-        .map((object) => object.apiName),
+      custom: custom.length,
+      customNames: custom.map((object) => `${object.label} (${object.apiName})`),
+      present: listedInventoryObjects(objects).map((object) => object.apiName),
     };
   }
 
@@ -45,7 +48,8 @@ export function summarizeToolResult(
     return {
       apiName: described.apiName ?? apiName,
       label: described.label,
-      fieldCount: described.fields?.length ?? 0,
+      custom: described.custom,
+      fieldCount: visibleFields(described.fields ?? []).length,
       required: (described.fields ?? [])
         .filter((field) => field.required)
         .map((field) => field.apiName),
@@ -55,6 +59,19 @@ export function summarizeToolResult(
       statuses: (described.fields ?? [])
         .filter((field) => /^(status|stagename)$/i.test(field.apiName))
         .flatMap((field) => field.picklistLabels ?? []),
+      formulaFields: (described.fields ?? []).filter((field) => field.formula)
+        .length,
+      lookups: (described.fields ?? []).flatMap((field) =>
+        field.relationshipKind === "lookup" || field.relationshipKind === "master_detail"
+          ? [
+              {
+                field: field.apiName,
+                to: field.referenceTo ?? [],
+                kind: field.relationshipKind,
+              },
+            ]
+          : [],
+      ),
     };
   }
 
@@ -90,21 +107,14 @@ function reconstructTraceData(
   }
 
   if (tool === "list_objects") {
-    const listed = summary as { present?: string[]; count?: number };
-    if (Array.isArray(listed.present)) {
-      return listed.present.map((name) => ({
-        apiName: name,
-        label: name.replace(/([a-z])([A-Z])/g, "$1 $2"),
-        custom: name.endsWith("__c"),
-        queryable: true,
-      }));
-    }
+    return objectsFromListSummary(summary);
   }
 
   if (tool === "describe_object") {
     const described = summary as {
       apiName?: string;
       label?: string;
+      custom?: boolean;
       fieldCount?: number;
       required?: string[];
       recordTypes?: string[];
@@ -135,19 +145,12 @@ function reconstructTraceData(
         custom: false,
       });
     }
-    while (fields.length < (described.fieldCount ?? fields.length)) {
-      fields.push({
-        apiName: `Field${fields.length}`,
-        label: `Field ${fields.length}`,
-        type: "string",
-        required: false,
-        custom: false,
-      });
-    }
     return {
       apiName: described.apiName ?? apiName ?? "Unknown",
       label: described.label ?? described.apiName ?? apiName ?? "Unknown",
-      custom: false,
+      custom:
+        described.custom === true ||
+        /__c$/i.test(described.apiName ?? apiName ?? ""),
       fields,
       recordTypes: (described.recordTypes ?? []).map((name) => ({
         developerName: name,
@@ -181,6 +184,32 @@ export function factsFromResults(
     security: null,
     knowledge: null,
     limits: null,
+    integrations: null,
+    agentforce: null,
+    observed: {
+      automations: results.some(
+        (result) => result.tool === "list_automations" && result.ok,
+      ),
+      validationRules: results.some(
+        (result) => result.tool === "list_validation_rules" && result.ok,
+      ),
+      process: results.some(
+        (result) => result.tool === "list_process_controls" && result.ok,
+      ),
+      security: results.some(
+        (result) => result.tool === "security_summary" && result.ok,
+      ),
+      knowledge: results.some(
+        (result) => result.tool === "knowledge_posture" && result.ok,
+      ),
+      limits: results.some((result) => result.tool === "org_limits" && result.ok),
+      integrations: results.some(
+        (result) => result.tool === "get_integration_map" && result.ok,
+      ),
+      agentforce: results.some(
+        (result) => result.tool === "get_agentforce_configuration" && result.ok,
+      ),
+    },
   };
 
   for (const result of results) {
@@ -215,9 +244,74 @@ export function factsFromResults(
     if (result.tool === "org_limits") {
       facts.limits = result.data as OrgLimits;
     }
+    if (result.tool === "get_integration_map") {
+      facts.integrations = result.data as IntegrationMap;
+    }
+    if (result.tool === "get_agentforce_configuration") {
+      facts.agentforce = result.data as AgentforceConfiguration;
+    }
+  }
+
+  for (const described of Object.values(facts.describes)) {
+    if (facts.objects.some((item) => item.apiName === described.apiName)) {
+      continue;
+    }
+    facts.objects.push({
+      apiName: described.apiName,
+      label: described.label,
+      custom: described.custom || /__c$/i.test(described.apiName),
+      queryable: true,
+    });
   }
 
   return facts;
+}
+
+function objectsFromListSummary(summary: unknown): EnterpriseObject[] {
+  const listed = summary as {
+    present?: string[];
+    customNames?: string[];
+  };
+  const objects = new Map<string, EnterpriseObject>();
+
+  for (const name of listed.present ?? []) {
+    objects.set(name, {
+      apiName: name,
+      label: labelFromApiName(name),
+      custom: /__c$/i.test(name),
+      queryable: true,
+    });
+  }
+
+  for (const named of listed.customNames ?? []) {
+    const parsed = parseNamedObject(named);
+    if (!parsed) {
+      continue;
+    }
+    objects.set(parsed.apiName, {
+      apiName: parsed.apiName,
+      label: parsed.label,
+      custom: true,
+      queryable: true,
+    });
+  }
+
+  return [...objects.values()];
+}
+
+function parseNamedObject(value: string) {
+  const match = value.match(/^(.*) \(([^)]+)\)$/);
+  if (!match) {
+    return null;
+  }
+  return { label: match[1], apiName: match[2] };
+}
+
+function labelFromApiName(apiName: string) {
+  return apiName
+    .replace(/__c$/i, "")
+    .replace(/_/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2");
 }
 
 function asObjects(data: unknown): EnterpriseObject[] {

@@ -13,11 +13,11 @@ describe("consumption posture", () => {
 
   it("proposes a consumption driver without inventing prices", () => {
     const posture = consumptionPosture({
-      key: "case_service_agent",
+      key: "work:Sales_Forecast__c",
       score: 70,
     });
 
-    expect(posture.driver).toMatch(/Service/i);
+    expect(posture.driver).toMatch(/Sales Forecast/i);
     expect(posture.confidence).toBe("medium");
     expect(JSON.stringify(posture)).not.toMatch(/\$\d/);
     expect(JSON.stringify(posture).toLowerCase()).not.toContain("list price");

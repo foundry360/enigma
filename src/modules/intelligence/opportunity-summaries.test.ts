@@ -29,6 +29,18 @@ describe("opportunity summaries", () => {
     expect(copy).not.toMatch(/→/);
   });
 
+  it("uses score when a stored strength disagrees with the overview", () => {
+    const copy = summarizeSupportingSignals([
+      { title: "Addressable work", strength: "strong", score: 80 },
+      { title: "Operating path", strength: "strong", score: 50 },
+      { title: "Grounded answers", strength: "strong", score: 80 },
+    ]);
+
+    expect(copy).toMatch(/Addressable work and Grounded answers are strong/i);
+    expect(copy).toMatch(/Operating path is mixed/i);
+    expect(copy).not.toMatch(/Operating path is strong/i);
+  });
+
   it("writes implication lists as one paragraph", () => {
     expect(
       summarizeImplication("Consumption drivers", [

@@ -18,17 +18,21 @@ Never return access tokens, refresh tokens, client secrets, or raw Salesforce HT
 
 ## MVP catalog
 
+MCP collects evidence. Intelligence interprets it. Tools return maps where the domain needs them, not only counts.
+
 | Tool | Returns | Never returns |
 | --- | --- | --- |
 | `get_connection` | Org id, name, edition/type, connection status | Tokens |
-| `list_objects` | API names, label, custom/standard, queryable flag | Rows |
-| `describe_object` | Fields, types, record types, required flags | Field values |
-| `list_automations` | Flow and Apex **trigger** names, status, object, trigger type | Apex source (unless later allowed) |
+| `list_objects` | API names, label, custom/standard, queryable, layoutable, custom setting | Rows |
+| `describe_object` | Fields the object UI shows (not Id, delete flag, or audit timestamps), types, requiredness, formula/read-only/unique/external ID, relationship kind, record types | Field values |
+| `list_automations` | Automation map: Flow/Apex/Workflow bound to object, trigger, status. Flow object from FlowDefinitionView when available | Apex source, Flow XML, actions when Tooling does not expose them |
 | `list_validation_rules` | Object, rule name, active | Rule formulas that embed customer data |
-| `list_process_controls` | Queue names, assignment rules, business hours | Queue members, user assignments |
-| `security_summary` | Profile and permission-set **names** and counts | User names, emails, session data |
-| `knowledge_posture` | Knowledge article objects and data category **names** | Article bodies |
-| `org_limits` | API and storage limits that inform readiness | Record payloads |
+| `list_process_controls` | Queues (with object when known), assignment, escalation, auto-response, approval processes, business hours | Queue members, user assignments |
+| `security_summary` | Profiles, permission sets, permission set groups, roles, default sharing | User names, emails, object/field CRUD (not yet mapped) |
+| `knowledge_posture` | Knowledge article objects and data category **names** | Article bodies, coverage, freshness |
+| `org_limits` | API and storage limits, installed package names | Record payloads |
+| `get_integration_map` | Named credentials (host only), connected apps, remote sites, external objects, platform events | Secrets, full callback URLs with query strings |
+| `get_agentforce_configuration` | Existing bots/agents, prompt templates, AI functions when the APIs exist | Prompt bodies, customer utterances |
 
 If volume is needed later, add aggregate-count tools only (`count_records` with an allowlisted object list). Do not add a generic query tool in MVP.
 

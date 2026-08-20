@@ -10,6 +10,8 @@ describe("MCP catalog", () => {
     expect(mcpTools).toContain("list_objects");
     expect(mcpTools).toContain("describe_object");
     expect(mcpTools).toContain("list_process_controls");
+    expect(mcpTools).toContain("get_integration_map");
+    expect(mcpTools).toContain("get_agentforce_configuration");
     expect(mcpTools).not.toContain("query_records");
     expect(mcpTools).not.toContain("soql");
   });

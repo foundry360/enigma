@@ -6,6 +6,15 @@ import type {
 } from "@/lib/db/types";
 import { toUtcDate } from "@/lib/format";
 import { runAssessmentPass } from "@/modules/intelligence";
+import {
+  stampOrgIntelligenceRun,
+} from "@/modules/intelligence/org-intelligence";
+import {
+  parseRunProgress,
+  progressForStage,
+  type IntelligenceRunProgress,
+  type IntelligenceRunStageId,
+} from "@/modules/intelligence/run-progress";
 import { requireTenantId, scopedCreate } from "@/lib/tenants/scope";
 import { writeAuditLog } from "@/server/services/audit";
 import { persistOpportunityCandidates } from "@/server/services/opportunities";
@@ -279,6 +288,8 @@ export async function startProjectDiscovery(input: {
     },
   });
 
+  await writeRunProgress(input.tenantId, assessment.id, "connect");
+
   try {
     await sql`
       update "Assessment"
@@ -294,7 +305,11 @@ export async function startProjectDiscovery(input: {
       projectType: project.projectType,
       objective: project.objective,
       outcomes: project.outcomes,
+      onStage: (stage) =>
+        writeRunProgress(input.tenantId, assessment.id, stage),
     });
+
+    await writeRunProgress(input.tenantId, assessment.id, "save");
 
     for (const trace of result.traces) {
       await sql`
@@ -377,7 +392,11 @@ export async function startProjectDiscovery(input: {
         })},
         "orgIntelligence" = ${
           result.orgIntelligence
-            ? sql.json(asSqlJson(result.orgIntelligence))
+            ? sql.json(
+                asSqlJson(
+                  stampOrgIntelligenceRun(result.orgIntelligence, assessment.id),
+                ),
+              )
             : sql`null`
         },
         "updatedAt" = now()
@@ -438,6 +457,53 @@ export async function startProjectDiscovery(input: {
       message,
     };
   }
+}
+
+async function writeRunProgress(
+  tenantId: string,
+  assessmentId: string,
+  stage: IntelligenceRunStageId,
+  done = false,
+) {
+  const scoped = requireTenantId(tenantId);
+  const progress = progressForStage(stage, done);
+  await sql`
+    update "Assessment"
+    set
+      summary = ${sql.json({
+        overallScore: 0,
+        toolCalls: 0,
+        failedTools: 0,
+        progress: {
+          id: stage,
+          stage: progress.stage,
+          index: progress.index,
+          total: progress.total,
+          done: progress.done,
+        },
+      })},
+      "updatedAt" = now()
+    where "tenantId" = ${scoped}
+      and id = ${assessmentId}
+      and status in ('DISCOVERING', 'ANALYZING')
+  `;
+}
+
+export async function getDiscoveryProgress(
+  tenantId: string,
+  projectId: string,
+): Promise<IntelligenceRunProgress> {
+  const assessments = await listProjectAssessments(tenantId, projectId);
+  const running = assessments.find(
+    (assessment) =>
+      assessment.status === "DISCOVERING" || assessment.status === "ANALYZING",
+  );
+
+  if (!running) {
+    return progressForStage("connect");
+  }
+
+  return parseRunProgress(running.summary?.progress) ?? progressForStage("connect");
 }
 
 export async function setOpportunityCandidateStatus(input: {

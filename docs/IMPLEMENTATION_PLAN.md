@@ -58,7 +58,7 @@ Do not start Agentforce deployment automation until that assessment → value wo
 - Assessment agent that calls only allowlisted MCP tools
 - Readiness across data, process, knowledge, automation, security, governance
 - Each dimension: score, evidence (tool citations), reason, risk, recommendation
-- Opportunity detection for a small, credible Agentforce catalog
+- Opportunity detection from durable work in the org, ranked by a model pass over MCP evidence
 - Persist run traces needed for explainability; do not persist tokens or raw Salesforce HTTP
 - No unexplained scores
 

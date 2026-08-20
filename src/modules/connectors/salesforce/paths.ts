@@ -13,8 +13,18 @@ const allowedExactPaths = new Set([
 export const restQueries = {
   organization:
     "SELECT Id, Name, OrganizationType, IsSandbox, InstanceName, NamespacePrefix, CreatedDate, CreatedBy.Name, LastModifiedDate, LastModifiedBy.Name, DefaultLocaleSidKey, LanguageLocaleKey, TimeZoneSidKey FROM Organization LIMIT 1",
-  queues: "SELECT Name, DeveloperName FROM Group WHERE Type = 'Queue' ORDER BY Name",
+  queues:
+    "SELECT Id, Name, DeveloperName FROM Group WHERE Type = 'Queue' ORDER BY Name",
+  queueObjects: "SELECT QueueId, SobjectType FROM QueueSobject",
   businessHours: "SELECT Name, IsActive FROM BusinessHours ORDER BY Name",
+  flowDefinitionView:
+    "SELECT ApiName, Label, ProcessType, TriggerType, TriggerObjectOrEventLabel, IsActive FROM FlowDefinitionView",
+  roles: "SELECT Name FROM UserRole",
+  permissionSetGroups:
+    "SELECT MasterLabel, DeveloperName FROM PermissionSetGroup",
+  namedCredentials: "SELECT DeveloperName, MasterLabel, Endpoint FROM NamedCredential",
+  remoteSites: "SELECT SiteName, EndpointUrl FROM RemoteProxy",
+  botDefinitions: "SELECT DeveloperName, MasterLabel, BotType FROM BotDefinition",
 } as const;
 
 export const toolingQueries = {
@@ -24,6 +34,11 @@ export const toolingQueries = {
   dataCategoryGroups:
     "SELECT DeveloperName, MasterLabel FROM DataCategoryGroup ORDER BY MasterLabel",
   assignmentRules: "SELECT Name, SobjectType, Active FROM AssignmentRule",
+  escalationRules: "SELECT Name, SobjectType, Active FROM EscalationRule",
+  autoResponseRules: "SELECT Name, SobjectType, Active FROM AutoResponseRule",
+  approvalProcesses:
+    "SELECT Name, TableEnumOrId, State, Type FROM ProcessDefinition WHERE Type = 'Approval'",
+  workflowRules: "SELECT Name, TableEnumOrId, Active FROM WorkflowRule",
   flowDefinitions:
     "SELECT Id, DeveloperName, MasterLabel, ActiveVersionId FROM FlowDefinition",
   activeFlows:
@@ -32,6 +47,14 @@ export const toolingQueries = {
     "SELECT Name, TableEnumOrId, Status, NamespacePrefix, UsageBeforeInsert, UsageAfterInsert, UsageBeforeUpdate, UsageAfterUpdate, UsageBeforeDelete, UsageAfterDelete FROM ApexTrigger",
   validationRules:
     "SELECT Id, ValidationName, Active, EntityDefinition.QualifiedApiName FROM ValidationRule",
+  entitySharing:
+    "SELECT QualifiedApiName, InternalSharingModel, ExternalSharingModel FROM EntityDefinition WHERE IsQueryable = true AND IsCustomizable = true",
+  connectedApplications: "SELECT Name FROM ConnectedApplication",
+  installedPackages:
+    "SELECT SubscriberPackage.Name, SubscriberPackage.NamespacePrefix FROM InstalledSubscriberPackage",
+  genAiPromptTemplates:
+    "SELECT DeveloperName, MasterLabel FROM GenAiPromptTemplate",
+  genAiFunctions: "SELECT DeveloperName, MasterLabel FROM GenAiFunction",
 } as const;
 
 export function assertSafeObjectApiName(apiName: string) {

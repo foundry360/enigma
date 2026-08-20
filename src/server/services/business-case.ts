@@ -12,6 +12,13 @@ import { toUtcDate } from "@/lib/format";
 import { toBusinessCaseBriefing } from "@/modules/economics/briefing";
 import type { BusinessCaseDetail, BusinessCaseLineView } from "@/modules/economics/case-view";
 import {
+  baselineFromSnapshot,
+  buildDeploymentForecast,
+  toBaseline,
+  type DeploymentForecast,
+} from "@/modules/economics/forecast";
+import type { OrgIntelligence } from "@/modules/intelligence/org-model";
+import {
   adoptionForScenario,
   defaultAdoption,
   isScenario,
@@ -233,6 +240,12 @@ export async function approveBusinessCase(input: {
         recommendationNarrative: detail.businessCase.recommendationNarrative,
         justificationNarrative: detail.businessCase.justificationNarrative,
         intelligenceNarrative: detail.businessCase.intelligenceNarrative,
+        forecastBaseline: toBaseline(
+          toDeploymentForecast(detail, {
+            org: null,
+            environmentName: null,
+          }).scenarios[detail.businessCase.scenario],
+        ),
       })},
       "updatedAt" = now()
     where "tenantId" = ${scoped} and id = ${detail.businessCase.id}
@@ -255,11 +268,20 @@ export async function persistRecommendation(
   detail: BusinessCaseDetail,
   options?: { force?: boolean },
 ) {
-  const { hasStorySlots } = await import("@/modules/economics/story-slots");
+  const {
+    caseStoryScope,
+    shouldRefreshCaseStories,
+    withStoryScope,
+  } = await import("@/modules/economics/story-slots");
+  const opportunityIds = detail.lines.map((line) => line.opportunityId);
   if (
-    !options?.force &&
-    hasStorySlots(detail.businessCase.justificationNarrative) &&
-    hasStorySlots(detail.businessCase.recommendationNarrative)
+    !shouldRefreshCaseStories({
+      force: options?.force,
+      justification: detail.businessCase.justificationNarrative,
+      recommendation: detail.businessCase.recommendationNarrative,
+      intelligence: detail.businessCase.intelligenceNarrative,
+      opportunityIds,
+    })
   ) {
     return detail;
   }
@@ -268,11 +290,11 @@ export async function persistRecommendation(
     "@/server/services/business-case-ask"
   );
   const explained = await explainBusinessCase(buildCaseBriefing(detail));
-  if (!explained.fromModel && !options?.force) {
-    return detail;
-  }
-
   const scoped = requireTenantId(tenantId);
+  const intelligenceNarrative = withStoryScope(
+    explained.intelligenceNarrative,
+    caseStoryScope(opportunityIds),
+  );
 
   await sql`
     update "BusinessCase"
@@ -280,12 +302,30 @@ export async function persistRecommendation(
       "recommendationState" = ${explained.recommendationState},
       "recommendationNarrative" = ${explained.recommendationNarrative},
       "justificationNarrative" = ${explained.justificationNarrative},
-      "intelligenceNarrative" = ${explained.intelligenceNarrative},
+      "intelligenceNarrative" = ${intelligenceNarrative},
       "updatedAt" = now()
     where "tenantId" = ${scoped} and id = ${detail.businessCase.id}
   `;
 
   return loadBusinessCase(tenantId, detail.businessCase.id);
+}
+
+export async function invalidateBusinessCaseStories(
+  tenantId: string,
+  projectId: string,
+) {
+  const scoped = requireTenantId(tenantId);
+  await sql`
+    update "BusinessCase"
+    set
+      "recommendationNarrative" = null,
+      "justificationNarrative" = null,
+      "intelligenceNarrative" = null,
+      "updatedAt" = now()
+    where "tenantId" = ${scoped}
+      and "projectId" = ${projectId}
+      and status <> 'approved'
+  `;
 }
 
 export async function persistEvidenceExpansions(
@@ -455,6 +495,66 @@ export function buildCaseBriefing(detail: BusinessCaseDetail) {
         .map((signal) => signal.title),
     ),
     confidence: rollupConfidence(detail.lines.map((line) => line.confidence)),
+  });
+}
+
+export function toDeploymentForecast(
+  detail: BusinessCaseDetail | null,
+  input: {
+    org: OrgIntelligence | null;
+    environmentName: string | null;
+  },
+): DeploymentForecast {
+  const line = detail?.lines[0] ?? null;
+  const weakSignals =
+    detail?.lines.flatMap((item) =>
+      item.supportingSignals
+        .filter((signal) => signal.strength === "weak")
+        .map((signal) => signal.title),
+    ) ?? [];
+
+  return buildDeploymentForecast({
+    caseStatus: !detail
+      ? "planning"
+      : detail.businessCase.status === "approved"
+        ? "approved"
+        : detail.rollup.complete
+          ? "saved"
+          : "planning",
+    selectedScenario: detail?.businessCase.scenario ?? "expected",
+    conservativeAdoption: detail?.businessCase.conservativeAdoption ?? null,
+    expectedAdoption: detail?.businessCase.expectedAdoption ?? null,
+    aggressiveAdoption: detail?.businessCase.aggressiveAdoption ?? null,
+    lines:
+      detail?.lines.map((item) => ({
+        annualVolume: item.annualVolume,
+        unitPrice: item.unitPrice,
+        hoursSavedPerUnit: item.hoursSavedPerUnit,
+        hourlyCost: item.hourlyCost,
+        implementationCost: item.implementationCost,
+      })) ?? [],
+    opportunity: line
+      ? {
+          name: line.opportunityName,
+          key: line.candidateKey,
+          finding: line.finding,
+          area: line.businessArea,
+          process: line.businessProcess,
+          capability: line.recommendedCapability,
+          confidence: line.confidence,
+          constraints: line.constraints,
+          dependencies: line.dependencies,
+        }
+      : null,
+    recommendationState: detail?.recommendationState ?? "do_not_proceed",
+    gaps: detail?.gaps ?? [],
+    hasWeakSignals: weakSignals.length > 0,
+    weakSignals,
+    environmentName: input.environmentName,
+    org: input.org,
+    storedBaseline: baselineFromSnapshot(
+      detail?.businessCase.predictedSnapshot ?? null,
+    ),
   });
 }
 

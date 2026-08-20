@@ -8,6 +8,8 @@ export const mcpTools = [
   "security_summary",
   "knowledge_posture",
   "org_limits",
+  "get_integration_map",
+  "get_agentforce_configuration",
 ] as const;
 
 export type McpToolName = (typeof mcpTools)[number];

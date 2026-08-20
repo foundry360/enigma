@@ -34,7 +34,7 @@ export function presentOpportunities(
       key: item.key,
       score: item.score,
     });
-    const definition = opportunityDefinition(item.key);
+    const definition = opportunityDefinition(item.key, judgment.title);
 
     return [
       {

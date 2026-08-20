@@ -144,6 +144,13 @@ export type AssessmentRow = {
     toolCalls: number;
     failedTools: number;
     error?: string;
+    progress?: {
+      id: string;
+      stage: string;
+      index: number;
+      total: number;
+      done?: boolean;
+    };
     candidates?: Record<
       string,
       "candidate" | "validated" | "rejected" | "promoted"

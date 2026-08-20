@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
 import { intelligenceHref } from "@/lib/intelligence/routes";
 import {
+  getDiscoveryProgress,
   setOpportunityCandidateStatus,
   startProjectDiscovery,
 } from "@/server/services/assessments";
@@ -28,7 +29,16 @@ export async function startDiscoveryAction(formData: FormData) {
     redirect(`/projects/${projectId}/connections?salesforce=expired`);
   }
 
-  redirect(`/projects/${projectId}/intelligence`);
+  return { ok: true as const, projectId };
+}
+
+export async function getDiscoveryProgressAction(projectId: string) {
+  const session = await requireSession();
+  if (!projectId) {
+    return null;
+  }
+
+  return getDiscoveryProgress(session.tenantId, projectId);
 }
 
 export async function setCandidateStatusAction(formData: FormData) {

@@ -32,13 +32,10 @@ describe("opportunity candidates", () => {
       }),
     );
 
-    expect(serviceOnly.map((item) => item.key)).not.toContain(
-      "case_service_agent",
-    );
-    expect(serviceOnly.map((item) => item.key)).not.toContain("knowledge_assist");
+    expect(serviceOnly.map((item) => item.key)).toEqual([]);
   });
 
-  it("emits service agent when work, path, and grounding are present", () => {
+  it("names the opportunity from the durable work object, not a catalog", () => {
     const candidates = detectOpportunityCandidates(
       normalizeSignals({
         ...emptyFacts,
@@ -73,15 +70,59 @@ describe("opportunity candidates", () => {
       }),
     );
 
-    expect(candidates.map((item) => item.key)).toEqual([
-      "case_service_agent",
-      "knowledge_assist",
-      "guided_case_flow",
-    ]);
+    expect(candidates.map((item) => item.key)).toEqual(["work:Case"]);
+    expect(candidates[0]?.title).toBe("Case agent");
     expect(JSON.stringify(candidates)).not.toMatch(/\$\d/);
+    expect(candidates[0]?.reason).toMatch(/Operating path[\s\S]*mixed/i);
+    expect(candidates[0]?.reason).not.toMatch(/Operating path is strong/i);
   });
 
-  it("hydrates catalog context from stored judgments", () => {
+  it("names a custom work object as the opportunity", () => {
+    const candidates = detectOpportunityCandidates(
+      normalizeSignals({
+        ...emptyFacts,
+        objects: [
+          { apiName: "Case", label: "Case", custom: false, queryable: true },
+          {
+            apiName: "Sales_Forecast__c",
+            label: "Sales Forecast",
+            custom: true,
+            queryable: true,
+          },
+        ],
+        describes: {
+          Sales_Forecast__c: {
+            apiName: "Sales_Forecast__c",
+            label: "Sales Forecast",
+            custom: true,
+            fields: [
+              {
+                apiName: "Name",
+                label: "Sales Forecast Name",
+                type: "string",
+                required: true,
+                custom: false,
+              },
+              {
+                apiName: "Forecast_Owner__c",
+                label: "Forecast Owner",
+                type: "reference",
+                required: true,
+                custom: true,
+              },
+            ],
+            recordTypes: [],
+          },
+        },
+      }),
+    );
+
+    expect(candidates[0]?.key).toBe("work:Sales_Forecast__c");
+    expect(candidates[0]?.title).toBe("Sales Forecast agent");
+    expect(candidates.map((item) => item.title)).not.toContain("Service agent");
+  });
+
+  it("hydrates a work opportunity from stored judgments", () => {
     const facts = normalizeSignals({
       ...emptyFacts,
       objects: [

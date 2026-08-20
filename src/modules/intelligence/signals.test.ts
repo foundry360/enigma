@@ -70,7 +70,7 @@ describe("business signals", () => {
       true,
     );
 
-    expect(context.workKinds).toEqual(["service", "customer"]);
+    expect(context.workKinds).toEqual(["service"]);
     expect(context.signals).toHaveLength(6);
     expect(context.signals.map((item) => item.title)).toEqual([
       "Addressable work",
@@ -88,6 +88,65 @@ describe("business signals", () => {
       normalizeSignals(emptyFacts).signals.find((item) => item.key === "addressable_work")
         ?.score ?? 0,
     );
+    const path = context.signals.find((item) => item.key === "operating_path");
+    expect(path?.strength).toBe("mixed");
+  });
+
+  it("scores operating path strong only when statuses and assignment exist", () => {
+    const mixed = normalizeSignals({
+      ...emptyFacts,
+      objects: [
+        { apiName: "Case", label: "Case", custom: false, queryable: true },
+      ],
+      validationRules: [
+        { name: "Require_Origin", objectApiName: "Case", active: true },
+      ],
+    });
+    const strong = normalizeSignals({
+      ...emptyFacts,
+      objects: [
+        { apiName: "Case", label: "Case", custom: false, queryable: true },
+      ],
+      describes: {
+        Case: {
+          apiName: "Case",
+          label: "Case",
+          custom: false,
+          fields: [
+            {
+              apiName: "Status",
+              label: "Status",
+              type: "picklist",
+              required: false,
+              custom: false,
+              picklistLabels: ["New", "Working", "Closed"],
+            },
+            {
+              apiName: "Reason__c",
+              label: "Reason",
+              type: "string",
+              required: false,
+              custom: true,
+            },
+          ],
+          recordTypes: [],
+        },
+      },
+      process: {
+        queues: [{ name: "Tier 1", objectApiName: "Case" }],
+        assignmentRules: [
+          { name: "Case Routing", objectApiName: "Case", active: true },
+        ],
+        businessHours: [],
+      },
+    });
+
+    expect(
+      mixed.signals.find((item) => item.key === "operating_path")?.strength,
+    ).toBe("mixed");
+    expect(
+      strong.signals.find((item) => item.key === "operating_path")?.strength,
+    ).toBe("strong");
   });
 
   it("cites path statuses, queues, and profile names when tools returned them", () => {
@@ -155,6 +214,49 @@ describe("business signals", () => {
     expect(access?.evidence.some((entry) => /Case Agent/.test(entry.citation))).toBe(
       true,
     );
+  });
+
+  it("cites a custom durable work object when that is the operational record", () => {
+    const context = normalizeSignals({
+      ...emptyFacts,
+      projectType: "AI Opportunity Assessment",
+      objective: "Provider credentialing",
+      outcomes: ["Faster credentialing decisions"],
+      objects: [
+        { apiName: "Case", label: "Case", custom: false, queryable: true },
+        {
+          apiName: "Credentialing__c",
+          label: "Credentialing",
+          custom: true,
+          queryable: true,
+        },
+      ],
+      describes: {
+        Credentialing__c: {
+          apiName: "Credentialing__c",
+          label: "Credentialing",
+          custom: true,
+          fields: Array.from({ length: 22 }, (_, index) => ({
+            apiName: index === 0 ? "Status" : `Field${index}`,
+            label: index === 0 ? "Status" : `Field ${index}`,
+            type: index === 0 ? "picklist" : "string",
+            required: false,
+            custom: true,
+            picklistLabels: index === 0 ? ["Submitted", "Approved"] : undefined,
+          })),
+          recordTypes: [],
+        },
+      },
+    });
+
+    const work = context.signals.find((item) => item.key === "addressable_work");
+    expect(work?.meaning).toMatch(/Credentialing is the durable work record/);
+    expect(work?.evidence.some((entry) => /Credentialing/.test(entry.citation))).toBe(
+      true,
+    );
+    expect(
+      work?.evidence.some((entry) => /Custom objects:.*Credentialing/.test(entry.citation)),
+    ).toBe(true);
   });
 
   it("does not emit hygiene category names or Salesforce prices", () => {
