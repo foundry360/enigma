@@ -177,6 +177,7 @@ export function factsFromResults(
     describes: {},
     automations: [],
     validationRules: [],
+    process: null,
     security: null,
     knowledge: null,
     limits: null,
@@ -202,10 +203,10 @@ export function factsFromResults(
     if (result.tool === "list_validation_rules") {
       facts.validationRules = result.data as ValidationRuleSummary[];
     }
-    if (result.tool === "security_summary") {
     if (result.tool === "list_process_controls") {
       facts.process = result.data as ProcessControls;
     }
+    if (result.tool === "security_summary") {
       facts.security = result.data as SecuritySummary;
     }
     if (result.tool === "knowledge_posture") {
