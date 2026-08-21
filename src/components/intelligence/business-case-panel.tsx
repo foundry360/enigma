@@ -85,6 +85,7 @@ export function BusinessCasePanel({
   const [showingJustification, setShowingJustification] = useState(false);
   const [showingRecommendation, setShowingRecommendation] = useState(false);
   const [showingEvidence, setShowingEvidence] = useState(false);
+  const [openEvidenceLineIds, setOpenEvidenceLineIds] = useState<string[]>([]);
   const [showingGaps, setShowingGaps] = useState(false);
   const scenarioRates = useMemo(
     () =>
@@ -322,6 +323,31 @@ export function BusinessCasePanel({
     return line.evidence.map((entry) => entry.citation);
   }
 
+  function toggleEvidenceLine(id: string) {
+    setOpenEvidenceLineIds((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
+  }
+
+  function evidenceFlow(line: (typeof detail.lines)[number]) {
+    return (
+      <OpportunityFlow
+        area={line.businessArea}
+        process={line.businessProcess}
+        capability={line.recommendedCapability}
+        signals={line.supportingSignals}
+        evidence={evidenceNodes(line)}
+        reasoning={line.finding}
+        consumptionDrivers={line.consumptionDrivers}
+        valueDrivers={line.valueDrivers}
+        constraints={line.constraints}
+        dependencies={line.dependencies}
+      />
+    );
+  }
+
   async function persist(refreshRecommendation = false) {
     if (dirty) {
       setPending(true);
@@ -556,23 +582,27 @@ export function BusinessCasePanel({
             open={showingEvidence}
             onToggle={() => setShowingEvidence((open) => !open)}
           >
-            <div className="space-y-6">
-              {detail.lines.map((line) => (
-                <OpportunityFlow
-                  key={line.id}
-                  area={line.businessArea}
-                  process={line.businessProcess}
-                  capability={line.recommendedCapability}
-                  signals={line.supportingSignals}
-                  evidence={evidenceNodes(line)}
-                  reasoning={line.finding}
-                  consumptionDrivers={line.consumptionDrivers}
-                  valueDrivers={line.valueDrivers}
-                  constraints={line.constraints}
-                  dependencies={line.dependencies}
-                />
-              ))}
-            </div>
+            {detail.lines.length > 1 ? (
+              <div className="space-y-3">
+                {detail.lines.map((line) => (
+                  <FoldCard
+                    key={line.id}
+                    title={line.opportunityName}
+                    open={openEvidenceLineIds.includes(line.id)}
+                    onToggle={() => toggleEvidenceLine(line.id)}
+                    inset
+                  >
+                    {evidenceFlow(line)}
+                  </FoldCard>
+                ))}
+              </div>
+            ) : detail.lines[0] ? (
+              evidenceFlow(detail.lines[0])
+            ) : (
+              <p className="text-sm text-muted">
+                No promoted opportunities have supporting evidence on this case.
+              </p>
+            )}
           </FoldCard>
           <FoldCard
             title="Gaps / Risks"
@@ -747,24 +777,28 @@ function FoldCard({
   open,
   onToggle,
   children,
+  inset = false,
 }: {
   title: string;
   open: boolean;
   onToggle: () => void;
   children: ReactNode;
+  inset?: boolean;
 }) {
   return (
-    <div className="overflow-hidden rounded-md border border-border bg-surface-2">
+    <div
+      className={`overflow-hidden rounded-md border border-border ${inset ? "bg-background" : "bg-surface-2"}`}
+    >
       <button
         type="button"
         className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
         onClick={onToggle}
         aria-expanded={open}
       >
-        <span className="text-base font-semibold">{title}</span>
+        <span className="min-w-0 truncate text-base font-semibold">{title}</span>
         <span
           aria-hidden="true"
-          className="flex size-8 items-center justify-center rounded-full bg-accent text-lg font-semibold leading-none text-accent-fg"
+          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-lg font-semibold leading-none text-accent-fg"
         >
           {open ? "-" : "+"}
         </span>

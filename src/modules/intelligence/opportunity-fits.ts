@@ -132,10 +132,14 @@ export function parseOpportunityFits(
   pool: Pick<WorkFitPoolItem, "apiName" | "label">[],
 ): OpportunityFit[] {
   const parsed = extractJson(raw);
+  const nested =
+    parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as { fits?: unknown }).fits
+      : null;
   const rows = Array.isArray(parsed)
     ? parsed
-    : parsed && typeof parsed === "object" && Array.isArray(parsed.fits)
-      ? parsed.fits
+    : Array.isArray(nested)
+      ? nested
       : [];
   const allowed = new Map(pool.map((item) => [item.apiName, item]));
   const fits: OpportunityFit[] = [];
@@ -196,7 +200,7 @@ export function groundOpportunityFits(
   signals: BusinessSignal[],
 ): OpportunityFit[] {
   const findingIds = new Set(intelligence.findings.map((item) => item.id));
-  const signalIds = new Set(signals.map((item) => item.key));
+  const signalIds = new Set<string>(signals.map((item) => item.key));
 
   return fits.map((fit) => {
     const fromModel = defaultSupportingFindings(fit, intelligence);
