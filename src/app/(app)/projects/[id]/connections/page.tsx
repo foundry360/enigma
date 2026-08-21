@@ -28,7 +28,7 @@ export default async function ProjectConnectionsPage({
   );
   const connections = await Promise.all(
     overview.connections.map(async (connection) => {
-      let status = connection.status;
+      let status: string = connection.status;
       if (
         connection.platformType === "SALESFORCE" &&
         connection.status === "CONNECTED"

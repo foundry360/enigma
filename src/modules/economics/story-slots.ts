@@ -389,7 +389,7 @@ export function fallbackRecommendationStory(input: {
 function namedOpportunities(
   opportunities: CaseStoryOpportunity[] | undefined,
   names?: string[],
-) {
+): CaseStoryOpportunity[] {
   const listed = (opportunities ?? []).filter(
     (item) => typeof item.name === "string" && item.name.trim(),
   );
@@ -523,7 +523,7 @@ function storyFinding(item: CaseStoryOpportunity, name: string) {
     .trim();
   return ensureSentence(
     alignReasonToOpportunity(
-      scrubFitReason(cleaned, item.signals ?? []),
+      scrubFitReason(cleaned, uniqueSignals(item.signals ?? [])),
       name,
     ),
   );

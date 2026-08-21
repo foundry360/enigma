@@ -64,21 +64,22 @@ export async function runAssessmentPass(input: {
   }
 
   const instanceUrl = connection.instanceUrl;
+  let liveRefreshToken = refreshToken;
   await input.onStage?.("connect");
 
-  const refreshAccess = () =>
+  const refreshAccess = (): Promise<string> =>
     withSalesforceAccess({
       instanceUrl,
-      refreshToken,
+      refreshToken: liveRefreshToken,
       onRotatedRefreshToken: async (nextToken) => {
-        refreshToken = nextToken;
+        liveRefreshToken = nextToken;
         await persistConnectionRefreshToken(
           input.tenantId,
           input.connectionId,
           nextToken,
         );
       },
-      run: async (next) => next,
+      run: async (accessToken) => accessToken,
     });
   const token = { accessToken: await refreshAccess() };
 
