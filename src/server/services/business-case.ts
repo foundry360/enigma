@@ -58,6 +58,7 @@ type LineJoinRow = BusinessCaseLineRow & {
   businessProcess: string;
   recommendedCapability: string;
   candidateKey: string;
+  candidateAssessmentId: string;
   confidence: CandidateConfidence;
   finding: string;
   supportingSignals: CandidateSignalRef[];
@@ -281,6 +282,7 @@ export async function persistRecommendation(
       recommendation: detail.businessCase.recommendationNarrative,
       intelligence: detail.businessCase.intelligenceNarrative,
       opportunityIds,
+      assessmentId: detail.sourceAssessmentId,
     })
   ) {
     return detail;
@@ -293,7 +295,7 @@ export async function persistRecommendation(
   const scoped = requireTenantId(tenantId);
   const intelligenceNarrative = withStoryScope(
     explained.intelligenceNarrative,
-    caseStoryScope(opportunityIds),
+    caseStoryScope(opportunityIds, detail.sourceAssessmentId),
   );
 
   await sql`
@@ -694,9 +696,18 @@ async function loadBusinessCase(
   }
 
   const businessCase = withCase(row);
-  const [employeeRange, project] = await Promise.all([
+  const [employeeRange, project, sourceAssessment] = await Promise.all([
     employeeRangeForProject(tenantId, businessCase.projectId),
     getProject(tenantId, businessCase.projectId),
+    sql<{ id: string }[]>`
+      select id
+      from "Assessment"
+      where "tenantId" = ${scoped}
+        and "projectId" = ${businessCase.projectId}
+        and status = 'COMPLETE'
+      order by "createdAt" desc
+      limit 1
+    `,
   ]);
   const rows = await sql<LineJoinRow[]>`
     select
@@ -707,6 +718,7 @@ async function loadBusinessCase(
       o."recommendedCapability",
       o.confidence,
       c.key as "candidateKey",
+      c."assessmentId" as "candidateAssessmentId",
       c.finding,
       c."supportingSignals",
       c.evidence,
@@ -723,7 +735,15 @@ async function loadBusinessCase(
     order by o."createdAt"
   `;
 
-  const lines = rows.map((joined) => {
+  const latestId = sourceAssessment[0]?.id ?? null;
+  const currentRows = latestId
+    ? rows.filter((row) => row.candidateAssessmentId === latestId)
+    : [];
+  const usableRows = dedupeCaseLines(
+    currentRows.length > 0 ? currentRows : rows.filter(isCurrentWorkLine),
+  );
+
+  const lines = usableRows.map((joined) => {
     const definition = opportunityDefinition(joined.candidateKey);
     const {
       opportunityName,
@@ -731,6 +751,7 @@ async function loadBusinessCase(
       businessProcess,
       recommendedCapability,
       candidateKey,
+      candidateAssessmentId: _candidateAssessmentId,
       confidence,
       finding,
       supportingSignals,
@@ -807,6 +828,7 @@ async function loadBusinessCase(
     rollup: summary.rollup,
     gaps: summary.gaps,
     recommendationState: summary.recommendationState,
+    sourceAssessmentId: sourceAssessment[0]?.id ?? null,
     proposedCase: proposeCaseTiming({
       confidence: rollupConfidence(lines.map((line) => line.confidence)),
       signals: lines.flatMap((line) => line.supportingSignals),
@@ -816,6 +838,21 @@ async function loadBusinessCase(
       ),
     }),
   };
+}
+
+function isCurrentWorkLine(row: LineJoinRow) {
+  return row.candidateKey.startsWith("work:");
+}
+
+function dedupeCaseLines(rows: LineJoinRow[]) {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    if (seen.has(row.candidateKey)) {
+      return false;
+    }
+    seen.add(row.candidateKey);
+    return true;
+  });
 }
 
 function rollupConfidence(values: CandidateConfidence[]) {

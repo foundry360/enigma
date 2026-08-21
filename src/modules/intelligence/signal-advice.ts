@@ -27,10 +27,10 @@ const advice: Record<
     next: "Name one start, one handoff, and where the agent should stop.",
   },
   grounded_answers: {
-    meaning: "Approved content is what keeps answers retrieved instead of invented.",
-    risk: "Thin or stale articles show up as confident wrong answers.",
+    meaning: "A knowledge base is what an agent can read to provide responses instead of inventing them.",
+    risk: "Without a knowledge base, answers are guessed. Thin or stale articles still show up as confident wrong answers.",
     consumption: "Q&A consumption would be ungrounded and would overstate value.",
-    next: "Pick one high-volume reason and approve the content that grounds it.",
+    next: "Confirm there is a knowledge base that covers one high-volume question before treating retrieval as ready.",
   },
   automation_collision: {
     meaning: "Existing automations may already write the same work an agent would touch.",
@@ -93,5 +93,5 @@ export function describeWeakSignal(input: {
 }) {
   const copy = signalAdvice(input);
 
-  return `${copy.title} is still weak. ${copy.explainer} ${copy.meaning} ${copy.risk} ${copy.consumption} ${copy.next}`;
+  return `${copy.title} is still weak. ${copy.risk} ${copy.next}`;
 }

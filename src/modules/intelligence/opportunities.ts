@@ -1,6 +1,6 @@
 import type { OpportunityFit } from "@/modules/intelligence/opportunity-fits";
 import { forecastConfidence } from "@/modules/intelligence/consumption";
-import { summarizeSupportingSignals } from "@/modules/intelligence/opportunity-summaries";
+import { alignReasonToOpportunity, summarizeSupportingSignals, scrubFitReason } from "@/modules/intelligence/opportunity-summaries";
 import { signalState } from "@/modules/intelligence/strength";
 import type {
   Evidence,
@@ -104,25 +104,29 @@ export function draftOpportunityCandidates(
   fits?: OpportunityFit[],
 ): CandidateDraft[] {
   const work = context.work.filter((item) => item.role !== "context");
+  const fitByApi = new Map((fits ?? []).map((fit) => [fit.apiName, fit]));
   const selected = (fits ?? [])
     .filter((item) => item.selected)
     .sort((left, right) => left.rank - right.rank);
-  const chosen = selected.length
-    ? selected.flatMap((fit) => {
-        const item = work.find((entry) => entry.apiName === fit.apiName);
-        return item ? [{ item, fit }] : [];
-      })
-    : work.map((item) => ({ item, fit: undefined }));
+  const selectedNames = new Set(selected.map((item) => item.apiName));
+  const ordered = [
+    ...selected.flatMap((fit) => {
+      const item = work.find((entry) => entry.apiName === fit.apiName);
+      return item ? [item] : [];
+    }),
+    ...work.filter((item) => !selectedNames.has(item.apiName)),
+  ];
 
-  return chosen.map(({ item, fit }) => {
+  return ordered.map((item) => {
     const draft = draftForWork(item, context);
+    const fit = fitByApi.get(item.apiName);
     if (!fit?.reason) {
       return draft;
     }
     return {
       ...draft,
-      finding: `${opportunityFinding(draft.supportingSignals, fit.reason)}`,
-      reason: `${opportunityFinding(draft.supportingSignals, fit.reason)}`,
+      finding: `${opportunityFinding(draft.supportingSignals, fit.reason, draft.title)}`,
+      reason: `${opportunityFinding(draft.supportingSignals, fit.reason, draft.title)}`,
       risk: fit.risk || draft.risk,
       recommendation: fit.recommendation || draft.recommendation,
     };
@@ -156,6 +160,14 @@ export function hydrateCandidateDrafts(
       return signal ? [signal] : [];
     });
 
+    const supportingSignals = supporting.map((signal) => ({
+      key: signal.key as SignalKey,
+      title: signal.title,
+      strength: signalState(signal.score),
+      score: signal.score,
+    }));
+    const finding = judgment.reason;
+
     return [
       {
         key: judgment.key,
@@ -166,20 +178,15 @@ export function hydrateCandidateDrafts(
         businessArea: definition.businessArea,
         businessProcess: definition.process,
         recommendedCapability: definition.recommendedCapability,
-        supportingSignals: supporting.map((signal) => ({
-          key: signal.key as SignalKey,
-          title: signal.title,
-          strength: signalState(signal.score),
-          score: signal.score,
-        })),
+        supportingSignals,
         evidence: (judgment.evidence ?? []) as Evidence[],
-        finding: judgment.reason,
+        finding,
         confidence: forecastConfidence(judgment.score),
         consumptionDrivers: definition.consumptionDrivers,
         valueDrivers: definition.valueDrivers,
         constraints: definition.constraints,
         dependencies: definition.dependencies,
-        reason: judgment.reason,
+        reason: finding,
         risk: judgment.risk || definition.risk,
         recommendation: judgment.recommendation || definition.recommendation,
       },
@@ -226,13 +233,13 @@ function draftForWork(
         supporting.map((signal) => signal.key),
       ),
     ],
-    finding: opportunityFinding(supporting, definition.reason),
+    finding: opportunityFinding(supporting, definition.reason, definition.title),
     confidence: forecastConfidence(score),
     consumptionDrivers: definition.consumptionDrivers,
     valueDrivers: definition.valueDrivers,
     constraints: definition.constraints,
     dependencies: definition.dependencies,
-    reason: opportunityFinding(supporting, definition.reason),
+    reason: opportunityFinding(supporting, definition.reason, definition.title),
     risk: definition.risk,
     recommendation: definition.recommendation,
   };
@@ -304,10 +311,16 @@ function labelFromApiName(apiName: string) {
 }
 
 function opportunityFinding(
-  signals: Array<{ title: string; strength: SignalStrength; score: number }>,
+  signals: Array<{
+    key?: string;
+    title: string;
+    strength: SignalStrength;
+    score: number;
+  }>,
   reason: string,
+  opportunityName: string,
 ) {
-  return `${summarizeSupportingSignals(signals)} ${reason}`;
+  return `${summarizeSupportingSignals(signals)} ${alignReasonToOpportunity(scrubFitReason(reason, signals), opportunityName)}`.trim();
 }
 
 function evidenceFromSignals(

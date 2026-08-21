@@ -190,21 +190,33 @@ describe("org intelligence scenarios", () => {
     expect(broad.gaps?.some((item) => item.id === "gap-agent-access")).toBe(true);
   });
 
-  it("distinguishes knowledge present from knowledge sufficient and from unknown", () => {
+  it("distinguishes published knowledge content from empty content and from unknown", () => {
     const present = buildOrgIntelligence({
       ...base,
-      knowledge: { enabled: true, articleObjects: ["Knowledge__kav"], dataCategories: [] },
+      knowledge: {
+        enabled: true,
+        articleObjects: ["Knowledge__kav"],
+        dataCategories: [],
+        articleCountsKnown: true,
+        articles: { draft: 0, published: 4, archived: 0 },
+      },
     });
     const none = buildOrgIntelligence({
       ...base,
-      knowledge: { enabled: false, articleObjects: [], dataCategories: [] },
+      knowledge: {
+        enabled: false,
+        articleObjects: ["Knowledge__kav"],
+        dataCategories: [],
+        articleCountsKnown: true,
+        articles: { draft: 0, published: 0, archived: 0 },
+      },
       observed: { knowledge: true },
     });
     const unknown = buildOrgIntelligence({ ...base, knowledge: null });
 
     expect(present.findings.some((item) => item.id === "knowledge-present")).toBe(true);
     expect(present.knowledge.coverageKnown).toBe(false);
-    expect(none.findings.some((item) => item.id === "knowledge-missing")).toBe(true);
+    expect(none.findings.some((item) => item.id === "knowledge-empty")).toBe(true);
     expect(unknown.findings.some((item) => item.id === "knowledge-unknown")).toBe(true);
   });
 

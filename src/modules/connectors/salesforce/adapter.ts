@@ -15,6 +15,7 @@ import type {
 } from "@/modules/enterprise/types";
 import { salesforceRequest } from "@/modules/connectors/salesforce/http";
 import {
+  articleCountQuery,
   restQueries,
   salesforcePath,
   toolingQueries,
@@ -25,6 +26,11 @@ import {
   type SalesforceIdentity,
 } from "@/modules/connectors/salesforce/oauth";
 import { isPlatformSystemField } from "@/modules/enterprise/fields";
+import {
+  articleCountTargets,
+  isArticleSource,
+  type ArticleCounts,
+} from "@/modules/enterprise/knowledge-sources";
 import type { OrgProfile } from "@/modules/enterprise/types";
 
 type SObjectList = {
@@ -478,23 +484,138 @@ export async function getSalesforceKnowledgePosture(input: {
   instanceUrl: string;
   accessToken: string;
 }): Promise<KnowledgePosture> {
-  const objects = await listSalesforceObjects(input);
+  const objects = await optionalSalesforceObjects(input);
   const articleObjects = objects
-    .filter((object) => /knowledge|ka__kav|kav$/i.test(object.apiName))
+    .filter((object) => isArticleSource(object.apiName))
     .map((object) => object.apiName);
   const categories = await optionalToolingRecords<{
     DeveloperName?: string;
     MasterLabel?: string;
   }>(input, toolingQueries.dataCategoryGroups);
+  const articles = await countKnowledgeArticles(input, objects);
 
   return {
-    enabled: articleObjects.length > 0,
+    enabled: Boolean(articles && articles.published > 0),
     articleObjects,
     dataCategories: uniqueNames(
       categories.map((item) => item.MasterLabel || item.DeveloperName),
     ),
     usefulnessKnown: false,
+    articleCountsKnown: articles != null,
+    articles: articles ?? undefined,
   };
+}
+
+async function optionalSalesforceObjects(input: {
+  instanceUrl: string;
+  accessToken: string;
+}) {
+  try {
+    return await listSalesforceObjects(input);
+  } catch {
+    return [];
+  }
+}
+
+const articleCountFallbacks = ["Knowledge__kav", "KnowledgeArticleVersion"];
+
+async function countKnowledgeArticles(
+  input: { instanceUrl: string; accessToken: string },
+  objects: EnterpriseObject[],
+) {
+  const names = objects
+    .filter((object) => object.queryable !== false)
+    .map((object) => object.apiName);
+  const preferred = articleCountTargets(names);
+  const counted = await sumArticleCounts(input, preferred);
+  if (counted) {
+    return counted;
+  }
+
+  const fallback = [
+    ...names.filter(
+      (name) =>
+        /^KnowledgeArticleVersion$/i.test(name) && !preferred.includes(name),
+    ),
+    ...articleCountFallbacks.filter(
+      (name) => !preferred.includes(name) && !names.includes(name),
+    ),
+  ];
+  return sumArticleCounts(input, fallback);
+}
+
+async function sumArticleCounts(
+  input: { instanceUrl: string; accessToken: string },
+  apiNames: string[],
+) {
+  const totals: ArticleCounts = { draft: 0, published: 0, archived: 0 };
+  let counted = false;
+
+  for (const apiName of apiNames) {
+    const next = await countArticlesOnObjectWithLocale(input, apiName);
+    if (!next) {
+      continue;
+    }
+
+    counted = true;
+    totals.draft += next.draft;
+    totals.published += next.published;
+    totals.archived += next.archived;
+  }
+
+  return counted ? totals : null;
+}
+
+async function countArticlesOnObject(
+  input: { instanceUrl: string; accessToken: string },
+  apiName: string,
+  language?: string,
+): Promise<ArticleCounts | null> {
+  const draft = await optionalRestCount(
+    input,
+    articleCountQuery(apiName, "Draft", language),
+  );
+  const published = await optionalRestCount(
+    input,
+    articleCountQuery(apiName, "Online", language),
+  );
+  const archived = await optionalRestCount(
+    input,
+    articleCountQuery(apiName, "Archived", language),
+  );
+
+  if (draft == null || published == null || archived == null) {
+    return null;
+  }
+
+  return { draft, published, archived };
+}
+
+async function countArticlesOnObjectWithLocale(
+  input: { instanceUrl: string; accessToken: string },
+  apiName: string,
+) {
+  const unfiltered = await countArticlesOnObject(input, apiName);
+  if (unfiltered) {
+    return unfiltered;
+  }
+
+  const language = await knowledgeLanguage(input);
+  return language ? countArticlesOnObject(input, apiName, language) : null;
+}
+
+async function knowledgeLanguage(input: {
+  instanceUrl: string;
+  accessToken: string;
+}) {
+  const records = await optionalRestRecords<{ LanguageLocaleKey?: string }>(
+    input,
+    restQueries.organization,
+  );
+  const language = records[0]?.LanguageLocaleKey?.trim();
+  return language && /^[A-Za-z]{2}(_[A-Za-z]{2,4})?$/.test(language)
+    ? language
+    : "en_US";
 }
 
 export async function listSalesforceProcessControls(input: {
@@ -749,6 +870,22 @@ async function optionalToolingRecords<T>(
     return data.records ?? [];
   } catch {
     return [];
+  }
+}
+
+async function optionalRestCount(
+  input: { instanceUrl: string; accessToken: string },
+  query: string,
+) {
+  try {
+    const data = await salesforceRequest<ToolingCount>({
+      instanceUrl: input.instanceUrl,
+      accessToken: input.accessToken,
+      path: salesforcePath("query", query),
+    });
+    return data.totalSize;
+  } catch {
+    return null;
   }
 }
 

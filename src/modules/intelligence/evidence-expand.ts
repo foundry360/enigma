@@ -32,6 +32,12 @@ const customerNames = new Set(["account", "contact", "person account"]);
 const revenueNames = new Set(["lead", "opportunity", "quote", "order", "contract"]);
 
 export function peelLayerPrefix(citation: string): { label: string; fact: string } {
+  if (
+    /Published articles:\s*\d+\.\s*Draft:\s*\d+\.\s*Archived:\s*\d+/i.test(citation)
+  ) {
+    return { label: "Grounded answers", fact: citation };
+  }
+
   for (const title of layerTitles) {
     const prefix = `${title}: `;
     if (citation.toLowerCase().startsWith(prefix.toLowerCase())) {
@@ -163,7 +169,7 @@ function summarizeLayer(label: string, facts: string[], signals: EvidenceSignal[
   if (/operating/i.test(label)) {
     return summarizeOperating(unique);
   }
-  if (/grounded|approved content/i.test(label)) {
+  if (/grounded|approved content|knowledge|published articles/i.test(label)) {
     return summarizeKnowledge(unique);
   }
   if (/access/i.test(label)) {
@@ -238,15 +244,43 @@ function summarizeOperating(facts: string[]) {
 }
 
 function summarizeKnowledge(facts: string[]) {
-  const sources = facts
-    .map((fact) => fact.match(/^Approved content sources:\s*(.+)$/i)?.[1])
+  const joined = facts.join(" ");
+  const counts = facts
+    .map((fact) =>
+      fact.match(
+        /(?:Published articles:\s*)?(\d+)\.\s*Draft:\s*(\d+)\.\s*Archived:\s*(\d+)/i,
+      ),
+    )
     .find(Boolean);
-  if (!sources || /no approved knowledge/i.test(facts.join(" "))) {
-    return "The run did not find an approved content source, so answers would be invented or pulled from outside the org.";
+
+  if (counts) {
+    const published = Number(counts[1]);
+    const draft = Number(counts[2]);
+    const archived = Number(counts[3]);
+    if (published > 0) {
+      return `The run counted ${published} published ${
+        published === 1 ? "article" : "articles"
+      } (${draft} draft, ${archived} archived), so an agent could retrieve those answers. Counts are not coverage or freshness.`;
+    }
+    if (draft + archived > 0) {
+      return `The run counted no published articles (${draft} draft, ${archived} archived), so there is no live knowledge base to retrieve from.`;
+    }
+    return "The run counted no draft, published, or archived articles, so an agent would invent answers or look outside the org.";
   }
 
-  const names = splitNames(sources);
-  return `Approved content is present in ${joinAnd(names)}, so answers can be retrieved instead of invented. Presence is not the same as coverage or freshness.`;
+  if (
+    /article content was not observed|article counts were not observed/i.test(
+      joined,
+    )
+  ) {
+    return "Article content was not observed, so grounded answers cannot be judged.";
+  }
+
+  if (/no knowledge base|no approved knowledge|no knowledge articles/i.test(joined)) {
+    return "The run did not find knowledge articles, so an agent would invent answers or look outside the org.";
+  }
+
+  return "Article content was not observed, so grounded answers cannot be judged.";
 }
 
 function summarizeAutomations(facts: string[]) {
@@ -368,7 +402,7 @@ function inferLayer(citation: string) {
   if (/operating objects/i.test(citation)) {
     return "Operating path";
   }
-  if (/approved content|knowledge source/i.test(citation)) {
+  if (/approved content|knowledge source|knowledge base|knowledge article types|article counts were not observed|published articles|article content was not observed/i.test(citation)) {
     return "Grounded answers";
   }
   if (/automation|apex trigger|^flow /i.test(citation)) {

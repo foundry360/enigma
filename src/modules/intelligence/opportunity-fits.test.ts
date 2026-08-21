@@ -85,7 +85,7 @@ describe("opportunity fits", () => {
     expect(fits[0]?.reason).toMatch(/model pass was not available/);
   });
 
-  it("emits only the selected fits as opportunities", () => {
+  it("keeps the durable work pool when the model selects a subset", () => {
     const facts: AssessmentFacts = {
       projectType: "AI Opportunity Assessment",
       objective: "Improve sales forecast submission",
@@ -168,7 +168,10 @@ describe("opportunity fits", () => {
       },
     ]);
 
-    expect(selected.map((item) => item.key)).toEqual(["work:Sales_Forecast__c"]);
+    expect(selected.map((item) => item.key)).toEqual([
+      "work:Sales_Forecast__c",
+      "work:Case",
+    ]);
     expect(selected[0]?.reason).toMatch(/Forecast is the work/);
   });
 
@@ -244,5 +247,55 @@ describe("opportunity fits", () => {
     expect(fits[0]?.supportingFindingIds).toEqual(["work-primary"]);
     expect(fits[0]?.supportingSignalIds).toEqual(["addressable_work"]);
     expect(fits[0]?.confidence).toBe("high");
+  });
+
+  it("does not keep high confidence when grounded answers is weak", () => {
+    const fits = groundOpportunityFits(
+      [
+        {
+          apiName: "Sales_Forecast__c",
+          label: "Sales Forecast",
+          selected: true,
+          rank: 1,
+          reason: "Work, path, and grounding are present.",
+          risk: "Thin fields.",
+          recommendation: "Pilot one topic.",
+          supportingSignalIds: ["addressable_work"],
+          confidence: "high",
+        },
+      ],
+      {
+        findings: [],
+        gaps: [],
+        workload: { primary: [], secondary: [], context: [], volumeAvailable: false, volumeGap: null },
+      } as never,
+      [
+        {
+          key: "addressable_work",
+          title: "Addressable work",
+          score: 80,
+          strength: "strong",
+          evidence: [],
+          meaning: "Forecast is durable work.",
+          consumption: "Volume can attach to existing work.",
+          risk: "Quality unknown.",
+          recommendation: "Validate fields.",
+        },
+        {
+          key: "grounded_answers",
+          title: "Grounded answers",
+          score: 25,
+          strength: "weak",
+          evidence: [],
+          meaning: "Article content was not observed, so grounded answers cannot be judged.",
+          consumption: "Q&A consumption would be ungrounded.",
+          risk: "Ungrounded answers create hallucination risk.",
+          recommendation: "Re-run intelligence to count articles.",
+        },
+      ],
+    );
+
+    expect(fits[0]?.supportingSignalIds).toContain("grounded_answers");
+    expect(fits[0]?.confidence).toBe("low");
   });
 });

@@ -1,4 +1,5 @@
 import type { CandidateSignalRef } from "@/lib/db/types";
+import { resolveSignalKey } from "@/modules/intelligence/signal-advice";
 import { strengthFromSignal } from "@/modules/intelligence/strength";
 
 export function summarizeBusinessContext(input: {
@@ -45,6 +46,66 @@ export function summarizeSupportingSignals(
   }
 
   return ensureSentence(parts.join(". "));
+}
+
+export function scrubFitReason(
+  reason: string,
+  signals: Array<{
+    key?: string;
+    title: string;
+    strength: string;
+    score?: number;
+  }>,
+) {
+  let next = reason.trim();
+  if (!next) {
+    return "";
+  }
+
+  for (const signal of signals) {
+    const strength = strengthFromSignal({
+      strength: signal.strength as CandidateSignalRef["strength"],
+      score: signal.score,
+    });
+    if (strength === "strong") {
+      continue;
+    }
+
+    const key = resolveSignalKey(signal.key, signal.title);
+    if (key === "grounded_answers") {
+      next = next
+        .replace(/\bwork, path, and grounding support/gi, "work and path support")
+        .replace(/\bwork, path, and grounding are present/gi, "work and path are in view")
+        .replace(/\bpath, and grounding are present/gi, "path is in view")
+        .replace(/\band grounding\b/gi, "")
+        .replace(/\bgrounding (are|is) present\b/gi, "")
+        .replace(/\bgrounding support[s]?\b/gi, "")
+        .replace(/\bwith grounding\b/gi, "")
+        .replace(/\bgrounded answers is strong\b/gi, "grounded answers is still weak");
+    }
+  }
+
+  return next.replace(/\s{2,}/g, " ").replace(/\s+([.,])/g, "$1").trim();
+}
+
+export function alignReasonToOpportunity(
+  reason: string,
+  opportunityName?: string | null,
+) {
+  const name = opportunityName?.trim();
+  const next = reason.trim();
+  if (!name || !next) {
+    return next;
+  }
+
+  if (/\bservice agent\b/i.test(name)) {
+    return next;
+  }
+
+  return next
+    .replace(/\bthe service agent\b/gi, name)
+    .replace(/\ba service agent\b/gi, name)
+    .replace(/\bservice agent\b/gi, name);
 }
 
 export function summarizeImplication(title: string, items: string[]) {

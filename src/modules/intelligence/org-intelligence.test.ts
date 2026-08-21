@@ -81,7 +81,7 @@ const facts: AssessmentFacts = {
     businessHours: [{ name: "Default", active: true }],
   },
   security: { profileCount: 44, permissionSetCount: 179 },
-  knowledge: { enabled: true, articleObjects: ["KnowledgeableUser"], dataCategories: [] },
+  knowledge: { enabled: true, articleObjects: ["Knowledge__kav"], dataCategories: [] },
   limits: {
     dailyApiRequests: { max: 100000, remaining: 90000 },
     dataStorageMb: { max: 10000, remaining: 8000 },
@@ -441,6 +441,68 @@ describe("org intelligence", () => {
     expect(model.gaps?.some((item) => item.id === "gap-volume")).toBe(true);
   });
 
+  it("does not treat an expert-user object as a knowledge base", () => {
+    const model = buildOrgIntelligence({
+      ...facts,
+      knowledge: {
+        enabled: true,
+        articleObjects: ["KnowledgeableUser", "KnowledgeArticleViewStat"],
+        dataCategories: [],
+      },
+      observed: { knowledge: true },
+    });
+
+    expect(model.knowledge.enabled).toBe(false);
+    expect(model.knowledge.sources).toEqual([]);
+    expect(model.findings.some((item) => item.id === "knowledge-empty")).toBe(
+      false,
+    );
+    expect(model.findings.some((item) => item.id === "knowledge-present")).toBe(
+      false,
+    );
+    expect(model.findings.some((item) => item.id === "knowledge-content-unknown")).toBe(
+      true,
+    );
+  });
+
+  it("judges knowledge from article counts, not object types", () => {
+    const empty = buildOrgIntelligence({
+      ...facts,
+      knowledge: {
+        enabled: false,
+        articleObjects: ["Knowledge__kav"],
+        dataCategories: [],
+        articleCountsKnown: true,
+        articles: { draft: 0, published: 0, archived: 0 },
+      },
+    });
+    const published = buildOrgIntelligence({
+      ...facts,
+      knowledge: {
+        enabled: true,
+        articleObjects: ["Knowledge__kav"],
+        dataCategories: [],
+        articleCountsKnown: true,
+        articles: { draft: 0, published: 8, archived: 0 },
+      },
+    });
+
+    expect(empty.knowledge.enabled).toBe(false);
+    expect(empty.environment.knowledgePosture).toBe("absent");
+    expect(empty.findings.some((item) => item.id === "knowledge-empty")).toBe(true);
+    expect(empty.findings.find((item) => item.id === "knowledge-empty")?.summary).toMatch(
+      /No draft, published, or archived articles/i,
+    );
+    expect(published.knowledge.enabled).toBe(true);
+    expect(published.environment.knowledgePosture).toBe("present");
+    expect(published.findings.some((item) => item.id === "knowledge-present")).toBe(
+      true,
+    );
+    expect(published.findings.find((item) => item.id === "knowledge-present")?.summary).toMatch(
+      /Published articles: 8/,
+    );
+  });
+
   it("treats missing knowledge evidence as unknown, not as no knowledge", () => {
     const unknown = buildOrgIntelligence({ ...facts, knowledge: null });
     const absent = buildOrgIntelligence({
@@ -452,10 +514,10 @@ describe("org intelligence", () => {
     expect(unknown.findings.some((item) => item.id === "knowledge-unknown")).toBe(
       true,
     );
-    expect(unknown.findings.some((item) => item.id === "knowledge-missing")).toBe(
+    expect(unknown.findings.some((item) => item.id === "knowledge-empty")).toBe(
       false,
     );
-    expect(absent.findings.some((item) => item.id === "knowledge-missing")).toBe(
+    expect(absent.findings.some((item) => item.id === "knowledge-content-unknown")).toBe(
       true,
     );
     expect(absent.findings.some((item) => item.id === "knowledge-unknown")).toBe(
@@ -468,7 +530,13 @@ describe("org intelligence", () => {
     const second = stampOrgIntelligenceRun(
       buildOrgIntelligence({
         ...facts,
-        knowledge: { enabled: false, articleObjects: [], dataCategories: [] },
+        knowledge: {
+          enabled: false,
+          articleObjects: ["Knowledge__kav"],
+          dataCategories: [],
+          articleCountsKnown: true,
+          articles: { draft: 0, published: 0, archived: 0 },
+        },
         observed: { knowledge: true },
       }),
       "run-2",
@@ -476,10 +544,10 @@ describe("org intelligence", () => {
 
     expect(first.runId).toBe("run-1");
     expect(second.runId).toBe("run-2");
-    expect(first.findings.some((item) => item.id === "knowledge-present")).toBe(
+    expect(first.findings.some((item) => item.id === "knowledge-content-unknown")).toBe(
       true,
     );
-    expect(second.findings.some((item) => item.id === "knowledge-missing")).toBe(
+    expect(second.findings.some((item) => item.id === "knowledge-empty")).toBe(
       true,
     );
     expect(first.findings).not.toEqual(second.findings);

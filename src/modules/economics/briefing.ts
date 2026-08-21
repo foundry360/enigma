@@ -5,6 +5,7 @@ import {
 } from "@/modules/intelligence/evidence-expand";
 import {
   explainRecommendation,
+  hasSharedWorkAssumptions,
   recommendationLabel,
   type CaseRollup,
   type RecommendationState,
@@ -121,38 +122,7 @@ export function toBusinessCaseBriefing(input: {
             : String(input.implementation),
         source: input.implementation == null ? "Needed" : "Customer Provided",
       },
-      ...input.opportunities.flatMap((item) => [
-        {
-          label: `${item.name} work per year`,
-          value:
-            item.annualVolume == null
-              ? "Insufficient data"
-              : String(item.annualVolume),
-          source: item.annualVolume == null ? "Needed" : "Customer Provided",
-        },
-        {
-          label: `${item.name} work item cost`,
-          value:
-            item.unitPrice == null ? "Not provided" : String(item.unitPrice),
-          source: item.unitPrice == null ? "Optional" : "Customer Provided",
-        },
-        {
-          label: `${item.name} hours on work item`,
-          value:
-            item.hoursSavedPerUnit == null
-              ? "Insufficient data"
-              : String(item.hoursSavedPerUnit),
-          source: item.hoursSavedPerUnit == null ? "Needed" : "Customer Provided",
-        },
-        {
-          label: `${item.name} labor cost per hour`,
-          value:
-            item.hourlyCost == null
-              ? "Insufficient data"
-              : String(item.hourlyCost),
-          source: item.hourlyCost == null ? "Needed" : "Customer Provided",
-        },
-      ]),
+      ...workAssumptionRows(input.opportunities),
     ],
     calculations: explainCaseCalculations({
       opportunities: input.opportunities,
@@ -190,35 +160,47 @@ export function explainCaseCalculations(input: {
   adoption: number | null;
   rollup: CaseRollup;
 }) {
-  const lines = input.opportunities.map((item) => {
-    if (
-      item.annualVolume == null ||
-      input.adoption == null ||
-      item.hoursSavedPerUnit == null ||
-      item.hourlyCost == null
-    ) {
-      return `${item.name}: insufficient data. Need work per year, share, hours on one today, and labor cost.`;
-    }
+  const shared = hasSharedWorkAssumptions(
+    input.opportunities.map((item) => ({
+      annualVolume: item.annualVolume,
+      unitPrice: item.unitPrice,
+      hoursSavedPerUnit: item.hoursSavedPerUnit ?? null,
+      hourlyCost: item.hourlyCost ?? null,
+      implementationCost: null,
+    })),
+  );
 
-    const impacted = item.annualVolume * input.adoption;
-    const consumption =
-      item.unitPrice == null ? null : impacted * item.unitPrice;
-    const value = impacted * item.hoursSavedPerUnit * item.hourlyCost;
-    return [
-      `On ${item.name}, Impacted is ${impacted}, from ${item.annualVolume} work per year at a ${input.adoption} share.`,
-      consumption == null
-        ? `Consumption is blank because work item cost is not provided.`
-        : `Consumption is ${formatCurrency(consumption)}, from that impacted work times a ${formatCurrencyPrecise(item.unitPrice)} work item cost.`,
-      `Value is ${formatCurrency(value)}, from the same impacted work times ${item.hoursSavedPerUnit} hours given back at ${formatCurrency(item.hourlyCost)} an hour.`,
-    ].join(" ");
-  });
+  const lines = shared
+    ? [sharedWorkCalculation(input)]
+    : input.opportunities.map((item) => {
+        if (
+          item.annualVolume == null ||
+          input.adoption == null ||
+          item.hoursSavedPerUnit == null ||
+          item.hourlyCost == null
+        ) {
+          return `${item.name}: insufficient data. Need work per year, share, hours on one today, and labor cost.`;
+        }
+
+        const impacted = item.annualVolume * input.adoption;
+        const consumption =
+          item.unitPrice == null ? null : impacted * item.unitPrice;
+        const value = impacted * item.hoursSavedPerUnit * item.hourlyCost;
+        return [
+          `On ${item.name}, Impacted is ${impacted}, from ${item.annualVolume} work per year at a ${input.adoption} share.`,
+          consumption == null
+            ? `Consumption is blank because work item cost is not provided.`
+            : `Consumption is ${formatCurrency(consumption)}, from that impacted work times a ${formatCurrencyPrecise(item.unitPrice)} work item cost.`,
+          `Value is ${formatCurrency(value)}, from the same impacted work times ${item.hoursSavedPerUnit} hours given back at ${formatCurrency(item.hourlyCost)} an hour.`,
+        ].join(" ");
+      });
 
   if (!input.rollup.complete) {
     return [...lines, "Case totals are blank until at least one line is complete."];
   }
 
   return [
-    ...lines,
+    ...lines.filter(Boolean),
     [
       `Rolled up, Impacted is ${input.rollup.impacted}.`,
       `Consumption is ${input.rollup.consumption == null ? "blank" : formatCurrency(input.rollup.consumption)}.`,
@@ -230,6 +212,133 @@ export function explainCaseCalculations(input: {
       `Accelerated value is ${input.rollup.roa == null ? "blank" : formatCurrency(input.rollup.roa)}.`,
     ].join(" "),
   ];
+}
+
+function workAssumptionRows(
+  opportunities: Array<{
+    name: string;
+    annualVolume: number | null;
+    unitPrice: number | null;
+    hoursSavedPerUnit?: number | null;
+    hourlyCost?: number | null;
+  }>,
+) {
+  const first = opportunities[0];
+  if (
+    first &&
+    hasSharedWorkAssumptions(
+      opportunities.map((item) => ({
+        annualVolume: item.annualVolume,
+        unitPrice: item.unitPrice,
+        hoursSavedPerUnit: item.hoursSavedPerUnit ?? null,
+        hourlyCost: item.hourlyCost ?? null,
+        implementationCost: null,
+      })),
+    )
+  ) {
+    return [
+      {
+        label: "Work per year",
+        value:
+          first.annualVolume == null
+            ? "Insufficient data"
+            : String(first.annualVolume),
+        source: first.annualVolume == null ? "Needed" : "Customer Provided",
+      },
+      {
+        label: "Work item cost",
+        value: first.unitPrice == null ? "Not provided" : String(first.unitPrice),
+        source: first.unitPrice == null ? "Optional" : "Customer Provided",
+      },
+      {
+        label: "Hours on work item",
+        value:
+          first.hoursSavedPerUnit == null
+            ? "Insufficient data"
+            : String(first.hoursSavedPerUnit),
+        source: first.hoursSavedPerUnit == null ? "Needed" : "Customer Provided",
+      },
+      {
+        label: "Labor cost per hour",
+        value:
+          first.hourlyCost == null
+            ? "Insufficient data"
+            : String(first.hourlyCost),
+        source: first.hourlyCost == null ? "Needed" : "Customer Provided",
+      },
+    ];
+  }
+
+  return opportunities.flatMap((item) => [
+    {
+      label: `${item.name} work per year`,
+      value:
+        item.annualVolume == null
+          ? "Insufficient data"
+          : String(item.annualVolume),
+      source: item.annualVolume == null ? "Needed" : "Customer Provided",
+    },
+    {
+      label: `${item.name} work item cost`,
+      value: item.unitPrice == null ? "Not provided" : String(item.unitPrice),
+      source: item.unitPrice == null ? "Optional" : "Customer Provided",
+    },
+    {
+      label: `${item.name} hours on work item`,
+      value:
+        item.hoursSavedPerUnit == null
+          ? "Insufficient data"
+          : String(item.hoursSavedPerUnit),
+      source: item.hoursSavedPerUnit == null ? "Needed" : "Customer Provided",
+    },
+    {
+      label: `${item.name} labor cost per hour`,
+      value:
+        item.hourlyCost == null ? "Insufficient data" : String(item.hourlyCost),
+      source: item.hourlyCost == null ? "Needed" : "Customer Provided",
+    },
+  ]);
+}
+
+function sharedWorkCalculation(input: {
+  opportunities: Array<{
+    name: string;
+    annualVolume: number | null;
+    unitPrice: number | null;
+    hoursSavedPerUnit?: number | null;
+    hourlyCost?: number | null;
+  }>;
+  adoption: number | null;
+}) {
+  const first = input.opportunities[0];
+  const names = input.opportunities.map((item) => item.name);
+  if (
+    !first ||
+    first.annualVolume == null ||
+    input.adoption == null ||
+    first.hoursSavedPerUnit == null ||
+    first.hourlyCost == null
+  ) {
+    return "Work per year, share, hours on one today, and labor cost are shared across these opportunities and are not yet complete.";
+  }
+
+  const impacted = first.annualVolume * input.adoption;
+  const consumption =
+    first.unitPrice == null ? null : impacted * first.unitPrice;
+  const value = impacted * first.hoursSavedPerUnit * first.hourlyCost;
+  const roster =
+    names.length > 1
+      ? `across ${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`
+      : `on ${names[0]}`;
+
+  return [
+    `Work per year is ${first.annualVolume} ${roster}. That volume is counted once, not once per opportunity.`,
+    `Impacted is ${impacted}, from that work at a ${input.adoption} share.`,
+    consumption == null
+      ? `Consumption is blank because work item cost is not provided.`
+      : `Consumption is ${formatCurrency(consumption)}, from that impacted work times a ${formatCurrencyPrecise(first.unitPrice)} work item cost.`,
+    `Value is ${formatCurrency(value)}, from the same impacted work times ${first.hoursSavedPerUnit} hours given back at ${formatCurrency(first.hourlyCost)} an hour.`,
+  ].join(" ");
 }
 
 export function briefingToPrompt(briefing: BusinessCaseBriefing) {

@@ -51,6 +51,7 @@ import {
 } from "@/modules/economics/story-slots";
 import {
   adoptionForScenario,
+  caseWorkVolume,
   defaultAdoption,
   normalizeAdoption,
   recommendationLabel,
@@ -167,10 +168,7 @@ export function BusinessCasePanel({
     ],
   );
 
-  const volume = draft.lines.reduce(
-    (sum, line) => sum + (line.annualVolume ?? 0),
-    0,
-  );
+  const volume = caseWorkVolume(draft.lines);
   const adoption = liveAdoption;
 
   function persistDraft(): BusinessCaseDraft {
@@ -211,6 +209,15 @@ export function BusinessCasePanel({
   const workTaken = live.rollup.impacted;
   const opportunityIds = detail.lines.map((line) => line.opportunityId);
   const opportunityNames = detail.lines.map((line) => line.opportunityName);
+  const storyOpportunities = detail.lines.map((line) => ({
+    name: line.opportunityName,
+    process: line.businessProcess,
+    capability: line.recommendedCapability,
+    confidence: line.confidence,
+    finding: line.finding,
+    signals: line.supportingSignals,
+    evidence: line.evidence,
+  }));
   const liveStory = storyValues({
     volume: volume || null,
     share: adoption,
@@ -229,29 +236,41 @@ export function BusinessCasePanel({
     recommendation: detail.businessCase.recommendationNarrative,
     intelligence: detail.businessCase.intelligenceNarrative,
     opportunityIds,
+    assessmentId: detail.sourceAssessmentId,
   });
-  const justificationTemplate = refreshStories
-    ? fallbackJustificationStory({
-        complete: live.rollup.complete,
-        process: detail.lines[0]?.businessProcess ?? null,
-        area: detail.lines[0]?.businessArea ?? null,
-        capability: detail.lines[0]?.recommendedCapability ?? null,
-        opportunityNames,
-        valueDrivers: detail.lines[0]?.valueDrivers ?? [],
-        consumptionDrivers: detail.lines[0]?.consumptionDrivers ?? [],
-        constraints: detail.lines[0]?.constraints ?? [],
-      })
-    : detail.businessCase.justificationNarrative!;
-  const recommendationTemplate = refreshStories
-    ? fallbackRecommendationStory(live.rollup.complete, opportunityNames)
-    : detail.businessCase.recommendationNarrative!;
+  const justificationTemplate =
+    detail.businessCase.justificationNarrative ||
+    fallbackJustificationStory({
+      complete: live.rollup.complete,
+      process: detail.lines[0]?.businessProcess ?? null,
+      area: detail.lines[0]?.businessArea ?? null,
+      capability: detail.lines[0]?.recommendedCapability ?? null,
+      opportunityNames,
+      opportunities: storyOpportunities,
+      valueDrivers: detail.lines.flatMap((line) => line.valueDrivers ?? []),
+      consumptionDrivers: detail.lines.flatMap(
+        (line) => line.consumptionDrivers ?? [],
+      ),
+      constraints: detail.lines.flatMap((line) => line.constraints ?? []),
+    });
+  const recommendationTemplate =
+    detail.businessCase.recommendationNarrative ||
+    fallbackRecommendationStory({
+      complete: live.rollup.complete,
+      opportunityNames,
+      opportunities: storyOpportunities,
+      constraints: detail.lines.flatMap((line) => line.constraints ?? []),
+      recommendationState: live.recommendationState,
+    });
   const justificationNarrative = fillStorySlots(
     justificationTemplate,
     liveStory,
+    opportunityNames,
   );
   const recommendationNarrative = fillStorySlots(
     recommendationTemplate,
     liveStory,
+    opportunityNames,
   );
 
   useEffect(() => {
@@ -274,6 +293,7 @@ export function BusinessCasePanel({
     detail.businessCase.intelligenceNarrative,
     detail.businessCase.justificationNarrative,
     detail.businessCase.recommendationNarrative,
+    detail.sourceAssessmentId,
     locked,
     projectId,
     refreshStories,
@@ -462,7 +482,7 @@ export function BusinessCasePanel({
               placeholder="e.g. 12000"
               value={numberValue(draft.lines[0]?.annualVolume ?? null)}
               onChange={(event) =>
-                updateLine(setDraft, 0, {
+                updateSharedWork(setDraft, {
                   annualVolume: readNumber(event.target.value),
                 })
               }
@@ -482,7 +502,7 @@ export function BusinessCasePanel({
               placeholder="e.g. 1.25"
               value={numberValue(draft.lines[0]?.unitPrice ?? null)}
               onChange={(event) =>
-                updateLine(setDraft, 0, {
+                updateSharedWork(setDraft, {
                   unitPrice: readNumber(event.target.value),
                 })
               }
@@ -536,17 +556,17 @@ export function BusinessCasePanel({
         <h2 className="text-lg font-semibold">How to Proceed</h2>
         <div className="mt-3 space-y-3">
           <FoldCard
-            title="Deployment Justification"
+            title="Deployment Rationale"
             open={showingJustification}
             onToggle={() => setShowingJustification((open) => !open)}
           >
             <div className="space-y-2.5 text-sm leading-relaxed">
               {justificationNarrative
-                .split(/\n+/)
+                .split(/\n\s*\n/)
                 .map((paragraph) => paragraph.trim())
                 .filter(Boolean)
                 .map((paragraph, index) => (
-                  <p key={index}>{paragraph}</p>
+                  <CitedParagraph key={index} text={paragraph} />
                 ))}
             </div>
           </FoldCard>
@@ -562,7 +582,7 @@ export function BusinessCasePanel({
                     {recommendationLabel[live.recommendationState]}
                   </p>
                   {recommendationNarrative
-                    .split(/\n+/)
+                    .split(/\n\s*\n/)
                     .map((paragraph) => paragraph.trim())
                     .filter(Boolean)
                     .map((paragraph, index) => (
@@ -605,7 +625,7 @@ export function BusinessCasePanel({
             )}
           </FoldCard>
           <FoldCard
-            title="Gaps / Risks"
+            title="Considerations & Risks"
             open={showingGaps}
             onToggle={() => setShowingGaps((open) => !open)}
           >
@@ -936,16 +956,13 @@ function toDraft(detail: BusinessCaseDetail): BusinessCaseDraft {
   };
 }
 
-function updateLine(
+function updateSharedWork(
   setDraft: Dispatch<SetStateAction<BusinessCaseDraft>>,
-  index: number,
   patch: Partial<BusinessCaseDraft["lines"][number]>,
 ) {
   setDraft((current) => ({
     ...current,
-    lines: current.lines.map((line, lineIndex) =>
-      lineIndex === index ? { ...line, ...patch } : line,
-    ),
+    lines: current.lines.map((line) => ({ ...line, ...patch })),
   }));
 }
 

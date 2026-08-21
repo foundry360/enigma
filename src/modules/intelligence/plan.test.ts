@@ -47,6 +47,11 @@ describe("assessment tool plan", () => {
     expect(followUp.some((call) => call.tool === "list_process_controls")).toBe(
       true,
     );
+    const tools = followUp.map((call) => call.tool);
+    expect(tools.indexOf("knowledge_posture")).toBeGreaterThan(-1);
+    expect(tools.indexOf("knowledge_posture")).toBeLessThan(
+      tools.indexOf("describe_object"),
+    );
   });
 
   it("describes listed custom objects and skips share and history artifacts", () => {

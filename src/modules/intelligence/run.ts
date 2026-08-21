@@ -24,7 +24,7 @@ import {
 } from "@/modules/intelligence/org-intelligence";
 import { normalizeSignals } from "@/modules/intelligence/signals";
 import { overallScore, scoreAssessment } from "@/modules/intelligence/score";
-import { factsFromResults, summarizeToolResult } from "@/modules/intelligence/summarize";
+import { factsFromResults, discoveryCoverage, summarizeToolResult } from "@/modules/intelligence/summarize";
 import { completeReasoningChat } from "@/server/services/inference";
 import type { AssessmentRunResult, ToolCall } from "@/modules/intelligence/types";
 import type { IntelligenceRunStageId } from "@/modules/intelligence/run-progress";
@@ -55,7 +55,7 @@ export async function runAssessmentPass(input: {
     input.tenantId,
     input.connectionId,
   );
-  const refreshToken = connection?.instanceUrl
+  let refreshToken = connection?.instanceUrl
     ? await getConnectionRefreshToken(input.tenantId, input.connectionId)
     : null;
 
@@ -63,23 +63,28 @@ export async function runAssessmentPass(input: {
     throw new Error("Salesforce is not connected.");
   }
 
+  const instanceUrl = connection.instanceUrl;
   await input.onStage?.("connect");
 
-  const accessToken = await withSalesforceAccess({
-    instanceUrl: connection.instanceUrl,
-    refreshToken,
-    onRotatedRefreshToken: (nextToken) =>
-      persistConnectionRefreshToken(
-        input.tenantId,
-        input.connectionId,
-        nextToken,
-      ),
-    run: async (token) => token,
-  });
+  const refreshAccess = () =>
+    withSalesforceAccess({
+      instanceUrl,
+      refreshToken,
+      onRotatedRefreshToken: async (nextToken) => {
+        refreshToken = nextToken;
+        await persistConnectionRefreshToken(
+          input.tenantId,
+          input.connectionId,
+          nextToken,
+        );
+      },
+      run: async (next) => next,
+    });
+  const token = { accessToken: await refreshAccess() };
 
-  const first = await callTools(scope, initialToolPlan(), accessToken);
+  const first = await callTools(scope, initialToolPlan(), token, refreshAccess);
   await input.onStage?.("map");
-  const maps = await callTools(scope, followUpMapPlan(), accessToken);
+  const maps = await callTools(scope, followUpMapPlan(), token, refreshAccess);
   const factsAfterMaps = factsFromResults(input, [...first, ...maps]);
   const describes = await callTools(
     scope,
@@ -90,15 +95,23 @@ export async function runAssessmentPass(input: {
       objects: factsAfterMaps.objects,
       referencedNames: objectsReferencedByMetadata(factsAfterMaps),
     }),
-    accessToken,
+    token,
+    refreshAccess,
   );
   await input.onStage?.("context");
+  token.accessToken = await refreshAccess();
   const contextTools = await callTools(
     scope,
     followUpContextPlan(),
-    accessToken,
+    token,
+    refreshAccess,
   );
   const results = [...first, ...maps, ...describes, ...contextTools];
+  if (!discoveryCoverage(results).complete) {
+    throw new Error(
+      "Discovery was incomplete. Salesforce metadata was only partially read.",
+    );
+  }
   const facts = factsFromResults(input, results);
   await input.onStage?.("model");
   const orgIntelligence = buildOrgIntelligence(facts);
@@ -221,7 +234,8 @@ async function callTools(
     userId?: string;
   },
   plan: ToolCall[],
-  accessToken: string,
+  token: { accessToken: string },
+  refreshAccess: () => Promise<string>,
 ) {
   const results: {
     tool: McpToolName;
@@ -232,12 +246,26 @@ async function callTools(
   }[] = [];
 
   for (const call of plan) {
-    const result = await callMcpTool({
+    let result = await callMcpTool({
       ...scope,
       tool: call.tool,
       apiName: call.apiName,
-      accessToken,
+      accessToken: token.accessToken,
     });
+
+    if (!result.ok) {
+      try {
+        token.accessToken = await refreshAccess();
+        result = await callMcpTool({
+          ...scope,
+          tool: call.tool,
+          apiName: call.apiName,
+          accessToken: token.accessToken,
+        });
+      } catch {
+        // Keep the original failed result.
+      }
+    }
 
     results.push({
       tool: call.tool,

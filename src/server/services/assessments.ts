@@ -6,6 +6,7 @@ import type {
 } from "@/lib/db/types";
 import { toUtcDate } from "@/lib/format";
 import { runAssessmentPass } from "@/modules/intelligence";
+import { isRevokedSalesforceGrant } from "@/modules/connectors/salesforce/session";
 import {
   stampOrgIntelligenceRun,
 } from "@/modules/intelligence/org-intelligence";
@@ -17,7 +18,7 @@ import {
 } from "@/modules/intelligence/run-progress";
 import { requireTenantId, scopedCreate } from "@/lib/tenants/scope";
 import { writeAuditLog } from "@/server/services/audit";
-import { persistOpportunityCandidates } from "@/server/services/opportunities";
+import { adoptLatestPromotedOpportunities, persistOpportunityCandidates } from "@/server/services/opportunities";
 import { probeSalesforceConnection } from "@/server/services/connections";
 import { getProject } from "@/server/services/projects";
 
@@ -78,6 +79,16 @@ export async function getLatestProjectAssessment(
   return assessment ?? null;
 }
 
+export async function getLatestCompleteProjectAssessment(
+  tenantId: string,
+  projectId: string,
+) {
+  const assessments = await listProjectAssessments(tenantId, projectId);
+  return (
+    assessments.find((assessment) => assessment.status === "COMPLETE") ?? null
+  );
+}
+
 export async function getAssessmentDetail(
   tenantId: string,
   assessmentId: string,
@@ -120,7 +131,9 @@ export async function getLatestAssessmentDetail(
   tenantId: string,
   projectId: string,
 ) {
-  const latest = await getLatestProjectAssessment(tenantId, projectId);
+  const latest =
+    (await getLatestCompleteProjectAssessment(tenantId, projectId)) ??
+    (await getLatestProjectAssessment(tenantId, projectId));
   if (!latest) {
     return null;
   }
@@ -176,39 +189,76 @@ async function resolveAssessmentConnection(
   projectId: string,
 ) {
   const scoped = requireTenantId(tenantId);
-  const [attached] = await sql<
+  const attached = await sql<
     { id: string; organizationId: string }[]
   >`
     select c.id, c."organizationId"
     from "ProjectEnvironmentScope" e
     join "PlatformConnection" c
       on c.id = e."connectionId" and c."tenantId" = e."tenantId"
+    left join "ConnectionSecret" s
+      on s."connectionId" = c.id and s."tenantId" = c."tenantId"
     where
       e."tenantId" = ${scoped}
       and e."projectId" = ${projectId}
+      and c."platformType" = 'SALESFORCE'
       and c.status = 'CONNECTED'
-      and c."instanceUrl" is not null
-    order by e."createdAt" desc
-    limit 1
+      and nullif(c."instanceUrl", '') is not null
+    order by (s."connectionId" is not null) desc, c."updatedAt" desc
   `;
 
-  if (attached) {
+  if (attached.length > 0) {
     return attached;
   }
 
-  const [fallback] = await sql<{ id: string; organizationId: string }[]>`
-    select id, "organizationId"
-    from "PlatformConnection"
+  return sql<{ id: string; organizationId: string }[]>`
+    select c.id, c."organizationId"
+    from "PlatformConnection" c
+    left join "ConnectionSecret" s
+      on s."connectionId" = c.id and s."tenantId" = c."tenantId"
     where
-      "tenantId" = ${scoped}
-      and "organizationId" = ${organizationId}
-      and status = 'CONNECTED'
-      and "instanceUrl" is not null
-    order by "updatedAt" desc
-    limit 1
+      c."tenantId" = ${scoped}
+      and c."organizationId" = ${organizationId}
+      and c."platformType" = 'SALESFORCE'
+      and c.status = 'CONNECTED'
+      and nullif(c."instanceUrl", '') is not null
+    order by (s."connectionId" is not null) desc, c."updatedAt" desc
   `;
+}
 
-  return fallback ?? null;
+async function resolveLiveAssessmentConnection(
+  tenantId: string,
+  organizationId: string,
+  projectId: string,
+) {
+  const candidates = await resolveAssessmentConnection(
+    tenantId,
+    organizationId,
+    projectId,
+  );
+
+  if (candidates.length === 0) {
+    return { error: "needs-connection" as const };
+  }
+
+  let expiredMessage: string | null = null;
+
+  for (const candidate of candidates) {
+    const session = await probeSalesforceConnection(tenantId, candidate.id);
+    if (session.ok) {
+      return { connection: candidate };
+    }
+    if (session.expired) {
+      expiredMessage = session.message;
+      continue;
+    }
+  }
+
+  return {
+    error: (expiredMessage ? "expired" : "failed") as "expired" | "failed",
+    message:
+      expiredMessage ?? "Salesforce could not be reached for this project.",
+  };
 }
 
 export async function startProjectDiscovery(input: {
@@ -222,23 +272,17 @@ export async function startProjectDiscovery(input: {
     return { error: "not-found" as const };
   }
 
-  const connection = await resolveAssessmentConnection(
+  const live = await resolveLiveAssessmentConnection(
     input.tenantId,
     project.organizationId,
     project.id,
   );
 
-  if (!connection) {
-    return { error: "needs-connection" as const };
+  if ("error" in live) {
+    return live;
   }
 
-  const session = await probeSalesforceConnection(input.tenantId, connection.id);
-  if (!session.ok) {
-    return {
-      error: session.expired ? ("expired" as const) : ("failed" as const),
-      message: session.message,
-    };
-  }
+  const connection = live.connection;
 
   const latest = await getLatestProjectAssessment(input.tenantId, project.id);
   if (
@@ -377,6 +421,18 @@ export async function startProjectDiscovery(input: {
         assessmentId: assessment.id,
         judgments: storedJudgments,
       });
+      try {
+        await adoptLatestPromotedOpportunities({
+          tenantId: input.tenantId,
+          projectId: project.id,
+          assessmentId: assessment.id,
+        });
+      } catch {
+        const { invalidateBusinessCaseStories } = await import(
+          "@/server/services/business-case"
+        );
+        await invalidateBusinessCaseStories(input.tenantId, project.id);
+      }
     }
 
     const failedTools = result.traces.filter((trace) => !trace.ok).length;
@@ -450,7 +506,7 @@ export async function startProjectDiscovery(input: {
     });
 
     return {
-      error: /expired|invalid_grant/i.test(message)
+      error: isRevokedSalesforceGrant(message)
         ? ("expired" as const)
         : ("failed" as const),
       assessment,

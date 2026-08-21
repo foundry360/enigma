@@ -1,5 +1,9 @@
 export { isSalesforceConfigured } from "@/modules/connectors/salesforce/env";
 export {
+  isExpiredSalesforceSession,
+  isRevokedSalesforceGrant,
+} from "@/modules/connectors/salesforce/session";
+export {
   buildAuthorizeUrl,
   createOAuthState,
   exchangeAuthorizationCode,

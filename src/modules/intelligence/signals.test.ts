@@ -259,6 +259,55 @@ describe("business signals", () => {
     ).toBe(true);
   });
 
+  it("scores grounded answers from published article content", () => {
+    const none = normalizeSignals({
+      ...emptyFacts,
+      knowledge: {
+        enabled: false,
+        articleObjects: ["KnowledgeableUser"],
+        dataCategories: [],
+      },
+    }).signals.find((item) => item.key === "grounded_answers");
+    const empty = normalizeSignals({
+      ...emptyFacts,
+      knowledge: {
+        enabled: false,
+        articleObjects: ["Knowledge__kav"],
+        dataCategories: [],
+        articleCountsKnown: true,
+        articles: { draft: 0, published: 0, archived: 0 },
+      },
+    }).signals.find((item) => item.key === "grounded_answers");
+    const published = normalizeSignals({
+      ...emptyFacts,
+      knowledge: {
+        enabled: true,
+        articleObjects: ["Knowledge__kav"],
+        dataCategories: [],
+        articleCountsKnown: true,
+        articles: { draft: 1, published: 12, archived: 0 },
+      },
+    }).signals.find((item) => item.key === "grounded_answers");
+
+    expect(none?.score).toBe(25);
+    expect(none?.evidence.some((entry) => /Article content was not observed/.test(entry.citation))).toBe(
+      true,
+    );
+    expect(empty?.score).toBe(25);
+    expect(
+      empty?.evidence.some((entry) =>
+        /Published articles: 0\. Draft: 0\. Archived: 0/.test(entry.citation),
+      ),
+    ).toBe(true);
+    expect(empty?.meaning).toMatch(/No draft, published, or archived articles/i);
+    expect(published?.score).toBe(80);
+    expect(
+      published?.evidence.some((entry) =>
+        /Published articles: 12/.test(entry.citation),
+      ),
+    ).toBe(true);
+  });
+
   it("does not emit hygiene category names or Salesforce prices", () => {
     const text = JSON.stringify(normalizeSignals(emptyFacts));
     expect(text).not.toContain('"Data"');

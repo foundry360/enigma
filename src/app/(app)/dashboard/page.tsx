@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ProjectViews } from "@/components/projects/project-views";
 import { requireSession } from "@/lib/auth/session";
+import { serializeDate } from "@/lib/format";
 import { getAccountSelection } from "@/server/services/accounts";
 import { listRecentProjectUpdates } from "@/server/services/audit";
 import { listProjects } from "@/server/services/projects";
@@ -30,11 +31,14 @@ export default async function DashboardPage() {
         platformType: project.platformType,
         status: project.status,
         priority: project.priority,
-        createdAt: project.createdAt,
+        createdAt: serializeDate(project.createdAt),
       }))}
       updates={
         updates.length > 0
-          ? updates
+          ? updates.map((update) => ({
+              ...update,
+              at: serializeDate(update.at),
+            }))
           : projects
               .filter((project) => {
                 const at = new Date(project.updatedAt).getTime();
@@ -46,7 +50,7 @@ export default async function DashboardPage() {
                 projectId: project.id,
                 projectName: project.name,
                 label: "Project updated",
-                at: project.updatedAt,
+                at: serializeDate(project.updatedAt),
               }))
       }
     />

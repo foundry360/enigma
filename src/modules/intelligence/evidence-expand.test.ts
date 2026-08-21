@@ -42,6 +42,38 @@ describe("summarizeEvidenceLayers", () => {
     expect(automation?.paragraph).toMatch(/CaseTrigger/i);
     expect(automation?.paragraph).not.toMatch(/Automation collision/i);
   });
+
+  it("does not call KnowledgeableUser a knowledge base", () => {
+    const layers = summarizeEvidenceLayers({
+      citations: ["Approved content sources: KnowledgeableUser."],
+      signals: [
+        { key: "grounded_answers", title: "Grounded answers", strength: "strong" },
+      ],
+    });
+
+    expect(layers[0]?.paragraph).toMatch(/did not find knowledge articles|article content was not observed/i);
+    expect(layers[0]?.paragraph).not.toMatch(/KnowledgeableUser/i);
+  });
+
+  it("judges grounded answers from article counts", () => {
+    const empty = summarizeEvidenceLayers({
+      citations: ["Published articles: 0. Draft: 0. Archived: 0."],
+      signals: [
+        { key: "grounded_answers", title: "Grounded answers", strength: "weak" },
+      ],
+    });
+    const published = summarizeEvidenceLayers({
+      citations: ["Published articles: 12. Draft: 1. Archived: 0."],
+      signals: [
+        { key: "grounded_answers", title: "Grounded answers", strength: "strong" },
+      ],
+    });
+
+    expect(empty[0]?.paragraph).toMatch(/no draft, published, or archived articles/i);
+    expect(empty[0]?.paragraph).not.toMatch(/could retrieve/i);
+    expect(published[0]?.paragraph).toMatch(/12 published articles/i);
+    expect(published[0]?.paragraph).toMatch(/could retrieve/i);
+  });
 });
 
 describe("peelLayerPrefix", () => {

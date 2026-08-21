@@ -29,12 +29,12 @@ MCP collects evidence. Intelligence interprets it. Tools return maps where the d
 | `list_validation_rules` | Object, rule name, active | Rule formulas that embed customer data |
 | `list_process_controls` | Queues (with object when known), assignment, escalation, auto-response, approval processes, business hours | Queue members, user assignments |
 | `security_summary` | Profiles, permission sets, permission set groups, roles, default sharing | User names, emails, object/field CRUD (not yet mapped) |
-| `knowledge_posture` | Knowledge article objects and data category **names** | Article bodies, coverage, freshness |
+| `knowledge_posture` | Draft, published, and archived **article counts**; data category **names** | Article bodies, titles, coverage, freshness |
 | `org_limits` | API and storage limits, installed package names | Record payloads |
 | `get_integration_map` | Named credentials (host only), connected apps, remote sites, external objects, platform events | Secrets, full callback URLs with query strings |
 | `get_agentforce_configuration` | Existing bots/agents, prompt templates, AI functions when the APIs exist | Prompt bodies, customer utterances |
 
-If volume is needed later, add aggregate-count tools only (`count_records` with an allowlisted object list). Do not add a generic query tool in MVP.
+If volume is needed later, add aggregate-count tools only (`count_records` with an allowlisted object list). Do not add a generic query tool. `knowledge_posture` already returns allowlisted article counts by publish status.
 
 ## Implementation notes
 

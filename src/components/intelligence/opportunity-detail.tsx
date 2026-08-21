@@ -5,7 +5,7 @@ import type {
   OpportunityCandidateRow,
   ProjectOpportunityRow,
 } from "@/lib/db/types";
-import { formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 export function OpportunityDetail({
   opportunity,
@@ -47,7 +47,7 @@ export function OpportunityDetail({
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
         <p className="text-xs text-muted">
-          Promoted {formatDateTime(opportunity.createdAt)}
+          Promoted {formatDate(opportunity.createdAt)}
         </p>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <form action={updateCandidateAction}>

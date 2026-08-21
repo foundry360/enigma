@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   formatCurrency,
   formatDate,
+  formatDateTime,
+  formatLastActivity,
   formatTimeAgo,
   toUtcDate,
 } from "@/lib/format";
@@ -15,8 +17,24 @@ describe("toUtcDate", () => {
 });
 
 describe("formatDate", () => {
-  it("prints calendar dates as dd/mm/yyyy", () => {
-    expect(formatDate("2026-08-19")).toBe("19/08/2026");
+  it("prints calendar dates as mm/dd/yyyy", () => {
+    expect(formatDate("2026-08-19")).toBe("08/19/2026");
+    expect(formatDate("2026-08-20T18:11:32.000Z")).toBe("08/20/2026");
+    expect(formatDate(new Date("2026-08-20T23:15:00.000Z"))).toBe("08/20/2026");
+    expect(formatDate("2026-08-20 22:15:43.123+00")).toBe("08/20/2026");
+  });
+});
+
+describe("formatDateTime", () => {
+  it("prints the same mm/dd/yyyy calendar date without a time", () => {
+    expect(formatDateTime("2026-08-19T15:04:00Z")).toBe("08/19/2026");
+  });
+});
+
+describe("formatLastActivity", () => {
+  it("prints mm/dd/yyyy even for activity from today", () => {
+    expect(formatLastActivity("2026-08-20T18:11:32.000Z")).toBe("08/20/2026");
+    expect(formatLastActivity(new Date())).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
   });
 });
 

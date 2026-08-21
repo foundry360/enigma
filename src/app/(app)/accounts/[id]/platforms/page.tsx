@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { SalesforceConnections } from "@/components/accounts/salesforce-connections";
 import { PageFrame } from "@/components/ui/page-frame";
 import { requireSession } from "@/lib/auth/session";
+import { serializeDate } from "@/lib/format";
 import { isSalesforceConfigured } from "@/modules/connectors/salesforce";
 import { getOrganizationOverview } from "@/server/services/organization-overview";
 
@@ -32,7 +33,7 @@ export default async function OrganizationPlatformsPage({
           status: connection.status,
           externalOrgId: connection.externalOrgId,
           externalOrgName: connection.externalOrgName,
-          updatedAt: connection.updatedAt,
+          updatedAt: serializeDate(connection.updatedAt),
         }))}
       />
     </PageFrame>

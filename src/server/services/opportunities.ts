@@ -116,6 +116,63 @@ export async function persistOpportunityCandidates(input: {
   }
 }
 
+export async function adoptLatestPromotedOpportunities(input: {
+  tenantId: string;
+  projectId: string;
+  assessmentId: string;
+}) {
+  const scoped = requireTenantId(input.tenantId);
+  const promoted = await sql<
+    { id: string; candidateId: string; key: string }[]
+  >`
+    select o.id, o."candidateId", c.key
+    from "ProjectOpportunity" o
+    join "OpportunityCandidate" c
+      on c.id = o."candidateId" and c."tenantId" = o."tenantId"
+    where o."tenantId" = ${scoped} and o."projectId" = ${input.projectId}
+  `;
+  const latest = await listCandidatesForAssessment(
+    input.tenantId,
+    input.assessmentId,
+  );
+  const byKey = new Map(latest.map((candidate) => [candidate.key, candidate]));
+  let changed = false;
+
+  for (const row of promoted) {
+    const next = byKey.get(row.key);
+    if (!next || next.id === row.candidateId) {
+      continue;
+    }
+
+    changed = true;
+    await sql`
+      update "OpportunityCandidate"
+      set
+        status = 'promoted',
+        "promotedAt" = now(),
+        "updatedAt" = now()
+      where "tenantId" = ${scoped} and id = ${next.id}
+    `;
+    await sql`
+      update "ProjectOpportunity"
+      set
+        "candidateId" = ${next.id},
+        "assessmentId" = ${input.assessmentId},
+        name = ${next.name},
+        description = ${next.description},
+        "businessArea" = ${next.businessArea},
+        "businessProcess" = ${next.businessProcess},
+        "recommendedCapability" = ${next.recommendedCapability},
+        confidence = ${next.confidence},
+        "updatedAt" = now()
+      where "tenantId" = ${scoped} and id = ${row.id}
+    `;
+  }
+
+  await invalidateCaseStories(input.tenantId, input.projectId);
+  return changed;
+}
+
 export async function ensureOpportunityCandidates(
   tenantId: string,
   assessmentId: string,

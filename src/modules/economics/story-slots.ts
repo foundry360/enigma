@@ -5,6 +5,11 @@ import {
   formatPercent,
 } from "@/lib/format";
 import { recommendationLabel, type RecommendationState } from "@/modules/economics/model";
+import { alignReasonToOpportunity, scrubFitReason } from "@/modules/intelligence/opportunity-summaries";
+import {
+  describeWeakSignal,
+  signalAdvice,
+} from "@/modules/intelligence/signal-advice";
 
 export const storySlotKeys = [
   "volume",
@@ -36,8 +41,15 @@ export function hasStorySlots(text: string | null | undefined) {
   return storySlotKeys.some((slot) => text.includes(`{{${slot}}}`));
 }
 
-export function caseStoryScope(opportunityIds: string[]) {
-  return [...opportunityIds].filter(Boolean).sort().join(",");
+const storyScopeVersion = "10";
+
+export function caseStoryScope(
+  opportunityIds: string[],
+  assessmentId?: string | null,
+) {
+  const opportunities = [...opportunityIds].filter(Boolean).sort().join(",");
+  const body = assessmentId ? `${assessmentId}:${opportunities}` : opportunities;
+  return `${storyScopeVersion}:${body}`;
 }
 
 export function readStoryScope(text: string | null | undefined) {
@@ -59,6 +71,7 @@ export function shouldRefreshCaseStories(input: {
   recommendation: string | null | undefined;
   intelligence: string | null | undefined;
   opportunityIds: string[];
+  assessmentId?: string | null;
 }) {
   if (input.force) {
     return true;
@@ -71,7 +84,10 @@ export function shouldRefreshCaseStories(input: {
     return true;
   }
 
-  return readStoryScope(input.intelligence) !== caseStoryScope(input.opportunityIds);
+  return (
+    readStoryScope(input.intelligence) !==
+    caseStoryScope(input.opportunityIds, input.assessmentId)
+  );
 }
 
 export function storiesCoverOpportunities(
@@ -80,11 +96,61 @@ export function storiesCoverOpportunities(
 ) {
   const expected = uniqueNames(names);
   if (expected.length <= 1) {
-    return true;
+    return storiesStayOnRoster(text, names);
   }
 
   const haystack = (text ?? "").toLowerCase();
-  return expected.every((name) => haystack.includes(name.toLowerCase()));
+  return (
+    expected.every((name) => haystack.includes(name.toLowerCase())) &&
+    storiesStayOnRoster(text, names)
+  );
+}
+
+export function storiesStayOnRoster(
+  text: string | null | undefined,
+  names: string[],
+) {
+  return offRosterAgents(text, names).length === 0;
+}
+
+export function alignStoriesToRoster(
+  text: string,
+  names: Array<string | null | undefined> | undefined,
+) {
+  const roster = uniqueNames(names);
+  const replacement = roster[0] ?? "this opportunity";
+  let next = text;
+  for (const name of offRosterAgents(next, roster)) {
+    next = next.replace(new RegExp(`\\b${escapeRegExp(name)}\\b`, "gi"), replacement);
+  }
+  if (!roster.some((name) => /\bservice agent\b/i.test(name))) {
+    next = next
+      .replace(/\bthe service agent\b/gi, replacement)
+      .replace(/\ba service agent\b/gi, replacement)
+      .replace(/\bservice agent\b/gi, replacement);
+  }
+  return next;
+}
+
+function offRosterAgents(
+  text: string | null | undefined,
+  names: Array<string | null | undefined> | undefined,
+) {
+  const roster = new Set(uniqueNames(names).map((name) => name.toLowerCase()));
+  const found = new Set<string>();
+  for (const match of (text ?? "").matchAll(
+    /\b([A-Z][A-Za-z0-9]*(?:[ /&][A-Z][A-Za-z0-9]*)* agent)\b/g,
+  )) {
+    found.add(match[1]);
+  }
+  if (/\bservice agent\b/i.test(text ?? "")) {
+    found.add("Service agent");
+  }
+  return [...found].filter((name) => !roster.has(name.toLowerCase()));
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export function stripEmDashes(text: string) {
@@ -96,7 +162,7 @@ const DECIMAL = "\u0000";
 
 export function formatStoryText(text: string) {
   const tokens: string[] = [];
-  let value = stripEmDashes(text)
+  let value = stripEmDashes(stripSourceMarks(text))
     .replace(/\r\n/g, "\n")
     .replace(/\\n/g, "\n")
     .replace(/\{\{[a-zA-Z]+\}\}/g, (token) => {
@@ -126,8 +192,11 @@ export function formatStoryText(text: string) {
 export function fillStorySlots(
   text: string,
   values: Partial<StorySlotValues>,
+  opportunityNames?: Array<string | null | undefined>,
 ) {
-  return formatStoryText(text).replace(slotPattern, (match, key: string) => {
+  const names = uniqueNames(opportunityNames);
+  const formatted = alignStoriesToRoster(formatStoryText(stripStoryScope(text)), names);
+  return formatted.replace(slotPattern, (match, key: string) => {
     if (!isStorySlot(key)) {
       return match;
     }
@@ -176,15 +245,30 @@ export function storyValues(input: {
   };
 }
 
+export type CaseStoryOpportunity = {
+  name?: string | null;
+  process?: string | null;
+  capability?: string | null;
+  confidence?: string | null;
+  finding?: string | null;
+  signals?: Array<{
+    key?: string;
+    title?: string | null;
+    strength?: string | null;
+  }>;
+  evidence?: Array<string | { citation?: string | null; tool?: string | null }>;
+};
+
 export function fallbackJustificationStory(input: {
   complete: boolean;
   process: string | null;
   area: string | null;
   capability: string | null;
   opportunityNames?: string[];
-  valueDrivers: string[];
-  consumptionDrivers: string[];
-  constraints: string[];
+  opportunities?: CaseStoryOpportunity[];
+  valueDrivers?: Array<string | null | undefined>;
+  consumptionDrivers?: Array<string | null | undefined>;
+  constraints?: Array<string | null | undefined>;
 }) {
   if (!input.complete) {
     return formatStoryText(
@@ -196,47 +280,58 @@ export function fallbackJustificationStory(input: {
     );
   }
 
-  const named = uniqueNames(input.opportunityNames);
+  const opportunities = namedOpportunities(
+    input.opportunities,
+    input.opportunityNames,
+  );
+  const many = opportunities.length > 1;
   const namedWork = input.process
-    ? uncapitalize(input.process)
+    ? input.process.trim().toLowerCase()
     : "this work";
-  const inArea = input.area ? ` in ${input.area}` : "";
-  const capability = input.capability
-    ? `${article(input.capability)} ${uncapitalize(input.capability)}`
-    : "an agent";
-  const inView =
-    named.length > 1
-      ? `What is in view is ${joinAnd(named)}.`
-      : `What is in view is ${capability} on ${namedWork}${inArea}.`;
+  const workPhrase = many ? "work across these opportunities" : namedWork;
+  const inArea = !many && input.area ? ` in ${input.area}` : "";
+  const value = uniqueNames(input.valueDrivers).slice(0, 3);
+  const consumed = uniqueNames(input.consumptionDrivers).slice(0, 3);
+  const holds = uniqueNames(input.constraints).slice(0, 4);
+  const picture = caseSignalPicture(opportunities);
+  const roster = opportunities
+    .map((item) => opportunityJustification(item))
+    .filter(Boolean);
 
   return formatStoryText(
     [
-      `About {{volume}} of this ${namedWork} happens a year${inArea}. At {{share}}, an agent would take {{impacted}} of it.`,
-      `Keeping people on that work costs {{value}}. That is {{impacted}} at {{hours}} each, at {{labor}} an hour. That is the human cost of leaving the work where it is.`,
-      `Taking the same work costs {{consumption}} to run, at {{workItemCost}} each time. That rate is not a wage and not an official Salesforce price. It is the operating cost they will stand behind. After paying to run it, {{net}} stays on the table, and every dollar spent to run it returns {{roc}} of that human value.`,
+      `About {{volume}} of ${workPhrase} happens a year${inArea}. At {{share}}, an agent would take {{impacted}} of it. Keeping people on that work costs {{value}}, which is {{impacted}} at {{hours}} each, at {{labor}} an hour.`,
+      `Running the same work costs {{consumption}}, at {{workItemCost}} each time. That rate is not a wage and not an official Salesforce price. After paying to run it, {{net}} stays on the table, and every dollar spent returns {{roc}} of that human value.`,
+      ...picture,
+      ...roster,
       [
-        inView,
-        input.valueDrivers[0]
-          ? `The value they are after is ${uncapitalize(input.valueDrivers[0])}.`
+        value.length
+          ? `The value they are after is ${joinAnd(value.map((item) => item.trim().toLowerCase()))}.`
           : null,
-        input.consumptionDrivers[0]
-          ? `What would be consumed is ${uncapitalize(input.consumptionDrivers[0])}.`
+        consumed.length
+          ? `What would be consumed is ${joinAnd(consumed.map((item) => item.trim().toLowerCase()))}.`
           : null,
-        input.constraints[0]
-          ? `One thing already on this opportunity: ${uncapitalize(input.constraints[0])}.`
+        holds.length
+          ? `Already on this case: ${joinAnd(holds.map((item) => item.trim().toLowerCase()))}.`
           : null,
       ]
         .filter(Boolean)
         .join(" "),
-    ].join("\n\n"),
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
   );
 }
 
-export function fallbackRecommendationStory(
-  complete: boolean,
-  opportunityNames: string[] = [],
-) {
-  if (!complete) {
+export function fallbackRecommendationStory(input: {
+  complete: boolean;
+  opportunityNames?: string[];
+  opportunities?: CaseStoryOpportunity[];
+  constraints?: Array<string | null | undefined>;
+  recommendationState?: RecommendationState | string | null;
+  recommendationWhy?: string | null;
+}) {
+  if (!input.complete) {
     return formatStoryText(
       [
         "Do not proceed until work per year, hours on one today, and labor cost are present on at least one opportunity.",
@@ -245,21 +340,239 @@ export function fallbackRecommendationStory(
     );
   }
 
-  const named = uniqueNames(opportunityNames);
-  const roster =
-    named.length > 1
-      ? `This case covers ${joinAnd(named)}. Use each of them as named.`
-      : named.length === 1
-        ? `Use ${named[0]} as it is named on this case.`
-        : "Use the opportunity as it is named on this case.";
+  const opportunities = namedOpportunities(
+    input.opportunities,
+    input.opportunityNames,
+  );
+  const weak = uniqueSignals(
+    opportunities.flatMap((item) =>
+      (item.signals ?? []).filter((signal) => signal.strength === "weak"),
+    ),
+  );
+  const mixed = uniqueSignals(
+    opportunities.flatMap((item) =>
+      (item.signals ?? []).filter((signal) => signal.strength === "mixed"),
+    ),
+  );
+  const weakNames = uniqueNames(
+    weak.map((signal) => signalAdvice({ key: signal.key, title: signal.title }).title),
+  );
+  const holds = uniqueNames(input.constraints).slice(0, 4);
+  const next =
+    weakNames.length > 0
+      ? `Confirm the case, but do not treat go-live as unconstrained until ${joinAnd(weakNames)} ${weakNames.length === 1 ? "strengthens" : "strengthen"}. Close those readiness holds, and the recommendation can move off {{state}}.`
+      : input.recommendationWhy?.trim() ||
+        "Do not treat go-live as unconstrained until the readiness holds on this case close.";
 
   return formatStoryText(
     [
-      "The recommendation is {{state}}.",
-      `At {{share}} share, an agent would take {{impacted}} of {{volume}} work this year. People cost is {{value}}. Cost to run that work is {{consumption}}. After that, net is {{net}} and ROC is {{roc}}.`,
-      `${roster} Do not treat go-live as unconstrained until the holds on this case close.`,
-    ].join("\n\n"),
+      recommendationOpening(input.recommendationState),
+      opportunityRoster(opportunities),
+      ...mixed.map((signal) => mixedSignalHold(signal)),
+      ...weak.map((signal) =>
+        describeWeakSignal({
+          key: signal.key,
+          title: signal.title,
+          strength: signal.strength,
+        }),
+      ),
+      holds.length
+        ? `Keep these constraints in view as you stand up the work: ${joinAnd(holds.map((item) => item.trim().toLowerCase()))}.`
+        : "",
+      next,
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
   );
+}
+
+function namedOpportunities(
+  opportunities: CaseStoryOpportunity[] | undefined,
+  names?: string[],
+) {
+  const listed = (opportunities ?? []).filter(
+    (item) => typeof item.name === "string" && item.name.trim(),
+  );
+  const unique: CaseStoryOpportunity[] = [];
+  const seen = new Set<string>();
+  for (const item of listed) {
+    const key = item.name!.trim().toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    unique.push(item);
+  }
+  if (unique.length > 0) {
+    return unique;
+  }
+
+  return uniqueNames(names).map((name) => ({ name }));
+}
+
+function opportunityJustification(item: CaseStoryOpportunity) {
+  const name = item.name!.trim();
+  const process = item.process?.trim()
+    ? item.process.trim().toLowerCase()
+    : null;
+  const confidence = item.confidence?.trim() || null;
+  const finding = distinctFinding(item, name);
+  const lead = process
+    ? `${name} sits on ${process}${confidence ? ` as a ${confidence}-confidence opportunity` : ""}`
+    : `${name} is on this case${confidence ? ` as a ${confidence}-confidence opportunity` : ""}`;
+
+  return ensureSentence(
+    `${lead}${finding ? `. ${stripLeadingCap(finding)}` : ""}`,
+  );
+}
+
+function opportunityRoster(opportunities: CaseStoryOpportunity[]) {
+  if (opportunities.length === 0) {
+    return "";
+  }
+
+  const sentences = opportunities.map((item) => {
+    const name = item.name!.trim();
+    const process = item.process?.trim()
+      ? item.process.trim().toLowerCase()
+      : null;
+    const confidence = item.confidence?.trim() || null;
+    if (process && confidence) {
+      return `${name} covers ${process} at ${confidence} confidence.`;
+    }
+    if (process) {
+      return `${name} covers ${process}.`;
+    }
+    return `${name} stays on this case.`;
+  });
+
+  return sentences.join(" ");
+}
+
+function caseSignalPicture(opportunities: CaseStoryOpportunity[]) {
+  const signals = uniqueSignals(
+    opportunities.flatMap((item) => item.signals ?? []),
+  );
+  if (signals.length === 0) {
+    return [];
+  }
+
+  const strong: string[] = [];
+  const mixed: string[] = [];
+  const weak: string[] = [];
+  for (const signal of signals) {
+    const copy = signalAdvice({ key: signal.key, title: signal.title });
+    if (signal.strength === "strong") {
+      strong.push(`${copy.title} is strong. ${copy.meaning}`);
+      continue;
+    }
+    if (signal.strength === "mixed") {
+      mixed.push(`${copy.title} is mixed. ${copy.meaning} ${copy.risk}`);
+      continue;
+    }
+    weak.push(`${copy.title} is still weak. ${copy.meaning} ${copy.risk}`);
+  }
+
+  return [strong.join(" "), mixed.join(" "), weak.join(" ")].filter(Boolean);
+}
+
+function mixedSignalHold(signal: {
+  key?: string;
+  title?: string | null;
+  strength?: string | null;
+}) {
+  const copy = signalAdvice({
+    key: signal.key,
+    title: signal.title ?? "This signal",
+  });
+  return `${copy.title} is mixed. ${copy.risk} ${copy.next}`;
+}
+
+function distinctFinding(item: CaseStoryOpportunity, name: string) {
+  const sentences = splitSentences(storyFinding(item, name)).filter(
+    (sentence) => !isSharedSignalSentence(sentence),
+  );
+  return sentences.join(" ").trim();
+}
+
+function isSharedSignalSentence(sentence: string) {
+  const trimmed = sentence.trim();
+  return (
+    /^(addressable work|operating path|grounded answers|write-back control|automation collision|access control)\b/i.test(
+      trimmed,
+    ) ||
+    /path is supported but not unconstrained/i.test(trimmed) ||
+    /no supporting signals were inherited/i.test(trimmed)
+  );
+}
+
+function stripLeadingCap(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  return trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
+}
+
+function storyFinding(item: CaseStoryOpportunity, name: string) {
+  const cleaned = (item.finding ?? "")
+    .replace(/\s*Fit judged by[^.]*\./gi, " ")
+    .replace(/Ranked from metadata on this run[^.]*\./gi, " ")
+    .replace(/A model pass was not available[^.]*\./gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return ensureSentence(
+    alignReasonToOpportunity(
+      scrubFitReason(cleaned, item.signals ?? []),
+      name,
+    ),
+  );
+}
+
+function recommendationOpening(state?: RecommendationState | string | null) {
+  if (state === "proceed_with_conditions") {
+    return "The numbers support moving forward. ROC is {{roc}} and annual net is {{net}}. The hold is readiness, not the arithmetic.";
+  }
+
+  if (state === "proceed") {
+    return "The case is ready to proceed. ROC is {{roc}} and annual net is {{net}}.";
+  }
+
+  return "The recommendation stays at {{state}}. ROC is {{roc}} and annual net is {{net}}.";
+}
+
+function uniqueSignals(
+  signals: Array<{ key?: string; title?: string | null; strength?: string | null }>,
+) {
+  const seen = new Set<string>();
+  const next: Array<{ key?: string; title: string; strength: string }> = [];
+  for (const signal of signals) {
+    const title = signal.title?.trim();
+    if (!title || !signal.strength) {
+      continue;
+    }
+    const id = `${signal.key ?? ""}:${title}:${signal.strength}`;
+    if (seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    next.push({ key: signal.key, title, strength: signal.strength });
+  }
+  return next;
+}
+
+function stripSourceMarks(text: string) {
+  return text.replace(/\s*⟦[^⟦⟧]*⟧/g, "");
+}
+
+function ensureSentence(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const body = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  return /[.!?]$/.test(body) ? body : `${body}.`;
 }
 
 export function acceptCaseStories(
@@ -327,22 +640,42 @@ function parseStoryJson(raw: string | null) {
 
 function toStoryParagraphs(text: string) {
   const blocks = text
-    .split(/\n+/)
-    .map((block) => block.replace(/[ \t]+/g, " ").trim())
+    .split(/\n\s*\n/)
+    .map((block) =>
+      block.replace(/[ \t]*\n[ \t]*/g, " ").replace(/[ \t]+/g, " ").trim(),
+    )
     .filter(Boolean);
 
-  if (blocks.length === 0) {
-    return [];
-  }
+  const paragraphs: string[] = [];
+  let pending: string[] = [];
 
-  if (blocks.length === 1) {
-    return groupSentences(splitSentences(blocks[0]));
-  }
+  const flush = () => {
+    if (pending.length === 0) {
+      return;
+    }
+    paragraphs.push(pending.join(" "));
+    pending = [];
+  };
 
-  return blocks.flatMap((block) => {
+  for (const block of blocks) {
     const sentences = splitSentences(block);
-    return sentences.length > 5 ? groupSentences(sentences) : [block];
-  });
+    if (sentences.length > 5) {
+      flush();
+      paragraphs.push(...groupSentences(sentences));
+      continue;
+    }
+    if (sentences.length >= 2) {
+      flush();
+      paragraphs.push(sentences.join(" "));
+      continue;
+    }
+    pending.push(...(sentences.length > 0 ? sentences : [block]));
+    if (pending.length >= 3) {
+      flush();
+    }
+  }
+  flush();
+  return paragraphs;
 }
 
 function splitSentences(text: string) {
@@ -413,18 +746,13 @@ function isStorySlot(value: string): value is StorySlot {
   return storySlotKeys.includes(value as StorySlot);
 }
 
-function article(value: string) {
-  return /^[aeiou]/i.test(value) ? "an" : "a";
-}
-
-function uncapitalize(value: string) {
-  return value.charAt(0).toLowerCase() + value.slice(1);
-}
-
-function uniqueNames(values: string[] | undefined) {
+function uniqueNames(values: Array<string | null | undefined> | undefined) {
   const seen = new Set<string>();
   const names: string[] = [];
   for (const value of values ?? []) {
+    if (typeof value !== "string") {
+      continue;
+    }
     const name = value.trim();
     if (!name || seen.has(name)) {
       continue;

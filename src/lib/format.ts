@@ -6,6 +6,14 @@ export function titleCase(value: string) {
     .join(" ");
 }
 
+export function serializeDate(value: Date | string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  return value instanceof Date ? value.toISOString() : value;
+}
+
 export function dateInputValue(value: Date | string | null | undefined) {
   if (!value) {
     return "";
@@ -42,7 +50,7 @@ export function toUtcDate(value: Date | string) {
 }
 
 function parseTimestamp(value: string) {
-  if (/(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(value) || value.includes("T")) {
+  if (/(?:[zZ]|[+-]\d{2}(?::?\d{2})?)$/.test(value) || value.includes("T")) {
     return new Date(value.replace(" ", "T"));
   }
 
@@ -53,12 +61,46 @@ function parseTimestamp(value: string) {
   return new Date(`${value.replace(" ", "T")}Z`);
 }
 
+function padDatePart(value: number | string) {
+  return String(value).padStart(2, "0");
+}
+
+function civilDate(value: Date | string) {
+  const raw =
+    value instanceof Date ? value.toISOString() : value.trim();
+  const iso = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    return { year: iso[1], month: iso[2], day: iso[3] };
+  }
+
+  const mdy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\b|$)/);
+  if (mdy) {
+    return {
+      month: padDatePart(mdy[1]),
+      day: padDatePart(mdy[2]),
+      year: mdy[3],
+    };
+  }
+
+  const date = value instanceof Date ? value : parseTimestamp(raw);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return {
+    year: String(date.getUTCFullYear()),
+    month: padDatePart(date.getUTCMonth() + 1),
+    day: padDatePart(date.getUTCDate()),
+  };
+}
+
 export function formatDate(value: Date | string) {
-  const date = toUtcDate(value);
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const year = String(date.getUTCFullYear());
-  return `${day}/${month}/${year}`;
+  const parts = civilDate(value);
+  if (!parts) {
+    return "—";
+  }
+
+  return `${parts.month}/${parts.day}/${parts.year}`;
 }
 
 export function formatDateTime(value: Date | string | null | undefined) {
@@ -66,15 +108,7 @@ export function formatDateTime(value: Date | string | null | undefined) {
     return "—";
   }
 
-  const date = toUtcDate(value);
-  const time = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  }).format(date);
-
-  return `${formatDate(date)} ${time}`;
+  return formatDate(value);
 }
 
 export function formatTimeAgo(value: Date | string | null | undefined) {
@@ -194,12 +228,5 @@ export function formatLastActivity(value: Date | string | null) {
     return "No activity yet";
   }
 
-  const date = new Date(value);
-  const today = new Date();
-  const sameDay =
-    date.getFullYear() === today.getFullYear() &&
-    date.getMonth() === today.getMonth() &&
-    date.getDate() === today.getDate();
-
-  return sameDay ? "Today" : formatDate(date);
+  return formatDate(value);
 }

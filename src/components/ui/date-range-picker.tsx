@@ -25,7 +25,7 @@ function parseDayKey(key: string) {
 
 function formatShort(key: string) {
   const [year, month, day] = key.split("-");
-  return `${day}/${month}/${year}`;
+  return `${pad(Number(month))}/${pad(Number(day))}/${year}`;
 }
 
 function monthLabel(year: number, month: number) {

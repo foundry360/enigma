@@ -47,6 +47,7 @@ export function Field({
               : "border-border focus:border-foreground"
           }`}
           {...props}
+          lang={props.type === "date" ? "en-US" : props.lang}
         />
         {hint ? <div className="mt-1.5 text-xs text-muted">{hint}</div> : null}
         {message ? (

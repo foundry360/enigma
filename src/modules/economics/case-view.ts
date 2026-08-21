@@ -32,4 +32,5 @@ export type BusinessCaseDetail = {
   gaps: string[];
   recommendationState: RecommendationState;
   proposedCase: ProposedCaseTiming;
+  sourceAssessmentId: string | null;
 };

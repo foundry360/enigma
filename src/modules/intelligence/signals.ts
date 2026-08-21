@@ -1,3 +1,8 @@
+import {
+  articleContentState,
+  articleSources,
+  formatArticleCounts,
+} from "@/modules/enterprise/knowledge-sources";
 import type { OrgIntelligence } from "@/modules/intelligence/org-model";
 import type {
   AssessmentFacts,
@@ -62,7 +67,7 @@ export const signalExplainers: Record<SignalKey, string> = {
   operating_path:
     "Whether a recognizable service or revenue path exists to start and hand off.",
   grounded_answers:
-    "Whether approved content exists so answers can be retrieved instead of invented.",
+    "Whether a knowledge base exists that an agent could read to provide responses.",
   automation_collision:
     "How many automations already handle this work, and whether an agent would fight them.",
   access_surface:
@@ -101,9 +106,9 @@ export function normalizeSignals(
     : profileCount + permissionSetCount > 80
       ? ("sprawling" as const)
       : ("focused" as const);
-  const groundingLabels = facts.knowledge?.enabled
-    ? (facts.knowledge.articleObjects ?? []).map(humanizeName)
-    : [];
+  const groundingLabels = articleSources(facts.knowledge?.articleObjects).map(
+    humanizeName,
+  );
 
   const context: Omit<SignalContext, "signals"> = {
     workKinds: [...new Set(work.map((item) => item.kind))],
@@ -312,41 +317,42 @@ function operatingPathScore(
 
 function groundedAnswers(
   facts: AssessmentFacts,
-  context: Omit<SignalContext, "signals">,
+  _context: Omit<SignalContext, "signals">,
 ): BusinessSignal {
-  const grounded = context.groundingLabels.length > 0;
-  const score = grounded ? 80 : 25;
-  const categories = facts.knowledge?.dataCategories ?? [];
+  const state = articleContentState(facts.knowledge ?? {});
+  const counts = facts.knowledge?.articles;
+  const score =
+    state === "published" ? 80 : state === "unpublished" ? 40 : 25;
+  const countCitation = counts
+    ? formatArticleCounts(counts)
+    : "Article content was not observed.";
 
   return signal("grounded_answers", score, {
-    evidence: [
-      cite(
-        "knowledge_posture",
-        grounded
-          ? `Approved content sources: ${context.groundingLabels.join(", ")}.`
-          : "No approved knowledge source was found.",
-      ),
-      ...(categories.length > 0
-        ? [
-            cite(
-              "knowledge_posture",
-              `Data categories: ${categories.join(", ")}.`,
-            ),
-          ]
-        : []),
-    ],
-    meaning: grounded
-      ? "Approved content exists, so answers can be grounded instead of invented."
-      : "There is no approved content source, so an agent would invent or reach outside the org.",
-    consumption: grounded
-      ? "Retrieval turns can be forecast against published answers."
-      : "Q&A consumption would be ungrounded and the forecast would overstate value.",
-    risk: grounded
-      ? "Source presence is not coverage, freshness, or category depth."
-      : "Ungrounded answers create compliance and hallucination risk.",
-    recommendation: grounded
-      ? "Use retrieval on one high-volume reason before any write-back."
-      : "Stand up an approved content source before a customer-facing Q&A agent.",
+    evidence: [cite("knowledge_posture", countCitation)],
+    meaning:
+      state === "published"
+        ? "Published articles exist, so an agent could retrieve those answers instead of inventing them."
+        : state === "unpublished"
+          ? "No published articles were found. Draft and archived articles are not a live knowledge base."
+          : state === "empty"
+            ? "No draft, published, or archived articles were found, so an agent would invent answers or look outside the org."
+            : "Article content was not observed, so grounded answers cannot be judged.",
+    consumption:
+      state === "published"
+        ? "Retrieval turns can be forecast against published answers."
+        : "Q&A consumption would be ungrounded and the forecast would overstate value.",
+    risk:
+      state === "published"
+        ? "Article counts are not coverage or freshness."
+        : "Ungrounded answers create compliance and hallucination risk.",
+    recommendation:
+      state === "published"
+        ? "Use retrieval on one high-volume reason before any write-back."
+        : state === "unpublished"
+          ? "Publish the articles that should ground answers before a customer-facing Q&A agent."
+          : state === "empty"
+            ? "Create and publish the articles an agent would retrieve before a customer-facing Q&A agent."
+            : "Re-run intelligence to count draft, published, and archived articles.",
   });
 }
 

@@ -6,6 +6,10 @@ import {
   salesforcePath,
   toolingQueries,
 } from "@/modules/connectors/salesforce/paths";
+import {
+  isExpiredSalesforceSession,
+  isRevokedSalesforceGrant,
+} from "@/modules/connectors/salesforce/session";
 
 describe("Salesforce path allowlist", () => {
   it("allows describe for a valid object API name", () => {
@@ -70,9 +74,56 @@ describe("Salesforce path allowlist", () => {
       salesforcePath("query", "SELECT Id, Name FROM Account LIMIT 1"),
     ).toThrow();
     expect(() =>
+      salesforcePath("query", "SELECT COUNT() FROM Account WHERE PublishStatus = 'Online'"),
+    ).toThrow();
+    expect(() =>
+      salesforcePath(
+        "query",
+        "SELECT COUNT() FROM Knowledge__kav WHERE PublishStatus = 'Online'",
+      ),
+    ).not.toThrow();
+    expect(() =>
+      salesforcePath(
+        "query",
+        "SELECT COUNT() FROM Knowledge__kav WHERE PublishStatus = 'Online' AND Language = 'en_US'",
+      ),
+    ).not.toThrow();
+    expect(() =>
       assertAllowedSalesforcePath(
-        `/services/data/v61.0/query?q=${encodeURIComponent("SELECT Id, Name FROM Account")}`,
+        `/services/data/v61.0/query?q=${encodeURIComponent(
+          "SELECT COUNT() FROM Knowledge__kav WHERE PublishStatus = 'Draft'",
+        )}`,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      assertAllowedSalesforcePath(
+        `/services/data/v61.0/query?q=${encodeURIComponent(
+          "SELECT Id, Title FROM Knowledge__kav WHERE PublishStatus = 'Online'",
+        )}`,
       ),
     ).toThrow();
+  });
+
+  it("detects an expired Salesforce session", () => {
+    expect(
+      isExpiredSalesforceSession(
+        "Salesforce request failed (INVALID_SESSION_ID: Session expired or invalid).",
+      ),
+    ).toBe(true);
+    expect(isExpiredSalesforceSession("NOT_FOUND")).toBe(false);
+  });
+
+  it("does not treat a dead access token as a revoked refresh grant", () => {
+    expect(
+      isRevokedSalesforceGrant(
+        "Salesforce request failed (INVALID_SESSION_ID: Session expired or invalid).",
+      ),
+    ).toBe(false);
+    expect(
+      isRevokedSalesforceGrant(
+        "Salesforce request failed (invalid_grant: expired access/refresh token).",
+      ),
+    ).toBe(true);
+    expect(isRevokedSalesforceGrant("NOT_FOUND")).toBe(false);
   });
 });

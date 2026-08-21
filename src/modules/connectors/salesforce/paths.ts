@@ -1,3 +1,5 @@
+import { isArticleCountObject } from "@/modules/enterprise/knowledge-sources";
+
 const API_VERSION = "v61.0";
 
 const objectNamePattern = /^[A-Za-z][A-Za-z0-9_]{0,79}$/;
@@ -65,6 +67,42 @@ export function assertSafeObjectApiName(apiName: string) {
   return apiName;
 }
 
+export const articlePublishStatuses = ["Draft", "Online", "Archived"] as const;
+
+export type ArticlePublishStatus = (typeof articlePublishStatuses)[number];
+
+export function articleCountQuery(
+  apiName: string,
+  status: ArticlePublishStatus,
+  language?: string,
+) {
+  const name = assertSafeObjectApiName(apiName);
+  if (!isArticleCountObject(name) || !articlePublishStatuses.includes(status)) {
+    throw new Error("Salesforce query is not allowlisted.");
+  }
+
+  const locale = language ? assertSafeKnowledgeLanguage(language) : null;
+  return locale
+    ? `SELECT COUNT() FROM ${name} WHERE PublishStatus = '${status}' AND Language = '${locale}'`
+    : `SELECT COUNT() FROM ${name} WHERE PublishStatus = '${status}'`;
+}
+
+function assertSafeKnowledgeLanguage(language: string) {
+  if (!/^[A-Za-z]{2}(_[A-Za-z]{2,4})?$/.test(language)) {
+    throw new Error("Salesforce query is not allowlisted.");
+  }
+
+  return language;
+}
+
+function isAllowedArticleCountQuery(query: string) {
+  const match =
+    /^SELECT COUNT\(\) FROM ([A-Za-z][A-Za-z0-9_]{0,79}) WHERE PublishStatus = '(Draft|Online|Archived)'(?: AND Language = '([A-Za-z]{2}(?:_[A-Za-z]{2,4})?)')?$/.exec(
+      query,
+    );
+  return Boolean(match && isArticleCountObject(match[1]));
+}
+
 export function salesforcePath(
   kind:
     | "userinfo"
@@ -103,7 +141,9 @@ export function salesforcePath(
       ? (Object.values(restQueries) as string[])
       : (Object.values(toolingQueries) as string[]);
 
-  if (!allowed.includes(query)) {
+  if (
+    !(allowed.includes(query) || (kind === "query" && isAllowedArticleCountQuery(query)))
+  ) {
     throw new Error(
       kind === "query"
         ? "Salesforce query is not allowlisted."
@@ -140,7 +180,8 @@ export function assertAllowedSalesforcePath(pathWithSearch: string) {
   if (
     pathname === `/services/data/${API_VERSION}/query` &&
     query &&
-    (Object.values(restQueries) as string[]).includes(query)
+    ((Object.values(restQueries) as string[]).includes(query) ||
+      isAllowedArticleCountQuery(query))
   ) {
     return;
   }

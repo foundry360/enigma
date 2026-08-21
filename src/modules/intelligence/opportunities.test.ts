@@ -75,6 +75,8 @@ describe("opportunity candidates", () => {
     expect(JSON.stringify(candidates)).not.toMatch(/\$\d/);
     expect(candidates[0]?.reason).toMatch(/Operating path[\s\S]*mixed/i);
     expect(candidates[0]?.reason).not.toMatch(/Operating path is strong/i);
+    expect(candidates[0]?.reason).toMatch(/Grounded answers[\s\S]*weak/i);
+    expect(candidates[0]?.reason).not.toMatch(/grounding are present/i);
   });
 
   it("names a custom work object as the opportunity", () => {

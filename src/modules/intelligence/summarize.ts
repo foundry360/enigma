@@ -267,6 +267,25 @@ export function factsFromResults(
   return facts;
 }
 
+export function discoveryCoverage(
+  results: { tool: string; ok: boolean }[],
+) {
+  const objectsListed = results.some(
+    (result) => result.tool === "list_objects" && result.ok,
+  );
+  const describes = results.filter((result) => result.tool === "describe_object");
+  const describesOk = describes.filter((result) => result.ok).length;
+  const describeRatio =
+    describes.length === 0 ? 1 : describesOk / describes.length;
+
+  return {
+    objectsListed,
+    describeCount: describes.length,
+    describesOk,
+    complete: objectsListed && describeRatio >= 0.6,
+  };
+}
+
 function objectsFromListSummary(summary: unknown): EnterpriseObject[] {
   const listed = summary as {
     present?: string[];

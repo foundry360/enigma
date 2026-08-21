@@ -7,6 +7,7 @@ import {
   mapSalesforceOrgProfile,
   withSalesforceAccess,
 } from "@/modules/connectors/salesforce";
+import { isRevokedSalesforceGrant } from "@/modules/connectors/salesforce/session";
 import type { OrgProfile } from "@/modules/enterprise/types";
 import { writeAuditLog } from "@/server/services/audit";
 
@@ -201,29 +202,46 @@ export async function probeSalesforceConnection(
 ) {
   const scoped = requireTenantId(tenantId);
   const connection = await getPublicConnection(scoped, connectionId);
-  const refreshToken = connection?.instanceUrl
+  let refreshToken = connection?.instanceUrl
     ? await getConnectionRefreshToken(scoped, connection.id)
     : null;
 
   if (!connection?.instanceUrl || !refreshToken) {
-    return { ok: false as const, expired: true, message: "Salesforce is not connected." };
+    return {
+      ok: false as const,
+      expired: true,
+      message: "Salesforce is not connected.",
+    };
   }
 
-  try {
-    await withSalesforceAccess({
-      instanceUrl: connection.instanceUrl,
-      refreshToken,
+  const tryRefresh = (token: string) =>
+    withSalesforceAccess({
+      instanceUrl: connection.instanceUrl as string,
+      refreshToken: token,
       onRotatedRefreshToken: (nextToken) =>
         persistConnectionRefreshToken(scoped, connection.id, nextToken),
       run: async () => undefined,
     });
+
+  try {
+    await tryRefresh(refreshToken);
     return { ok: true as const };
   } catch (error) {
+    const latest = await getConnectionRefreshToken(scoped, connection.id);
+    if (latest && latest !== refreshToken) {
+      try {
+        await tryRefresh(latest);
+        return { ok: true as const };
+      } catch {
+        // Fall through to the original error.
+      }
+    }
+
     const message =
       error instanceof Error ? error.message : "Salesforce request failed.";
     return {
       ok: false as const,
-      expired: /expired|invalid_grant|invalid token/i.test(message),
+      expired: isRevokedSalesforceGrant(message),
       message,
     };
   }

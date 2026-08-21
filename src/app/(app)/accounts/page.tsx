@@ -1,5 +1,6 @@
 import { OrganizationViews } from "@/components/accounts/organization-views";
 import { requireSession } from "@/lib/auth/session";
+import { serializeDate } from "@/lib/format";
 import { listAccounts } from "@/server/services/accounts";
 
 export default async function AccountsPage() {
@@ -17,7 +18,7 @@ export default async function AccountsPage() {
     environmentCount: account.connections.length,
     projectCount: account.projectCount,
     assessmentStatus: account.assessments[0]?.status ?? "None",
-    updatedAt: account.updatedAt,
+    updatedAt: serializeDate(account.updatedAt),
   }));
 
   return <OrganizationViews organizations={organizations} />;

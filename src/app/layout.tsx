@@ -47,7 +47,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 
   return (
     <html
-      lang="en"
+      lang="en-US"
       suppressHydrationWarning
       className={`${sans.variable} ${display.variable} ${mono.variable} h-full antialiased${dark ? " dark" : ""}${sidebarClass}`}
       style={{ colorScheme: dark ? "dark" : "light" }}

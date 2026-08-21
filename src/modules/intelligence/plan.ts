@@ -11,13 +11,13 @@ export function followUpMapPlan(): ToolCall[] {
     { tool: "list_automations" },
     { tool: "list_validation_rules" },
     { tool: "list_process_controls" },
+    { tool: "knowledge_posture" },
   ];
 }
 
 export function followUpContextPlan(): ToolCall[] {
   return [
     { tool: "security_summary" },
-    { tool: "knowledge_posture" },
     { tool: "org_limits" },
     { tool: "get_integration_map" },
     { tool: "get_agentforce_configuration" },

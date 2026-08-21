@@ -82,7 +82,7 @@ export type EnvironmentProfile = {
   activeAutomationCount?: number | null;
   profileCount?: number | null;
   permissionSetCount?: number | null;
-  knowledgePosture?: "present" | "absent" | "unknown";
+  knowledgePosture?: "present" | "unpublished" | "absent" | "unknown";
   integrationPosture?: "present" | "absent" | "unknown";
   agentforcePosture?: "present" | "absent" | "unknown";
 };
@@ -182,6 +182,10 @@ export type KnowledgeInsight = {
   coverageKnown: boolean;
   freshnessKnown: boolean;
   usefulnessKnown: boolean;
+  articleCountsKnown: boolean;
+  draftCount: number | null;
+  publishedCount: number | null;
+  archivedCount: number | null;
 };
 
 export type AutomationBinding = {

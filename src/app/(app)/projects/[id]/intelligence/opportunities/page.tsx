@@ -165,7 +165,9 @@ export default async function IntelligenceOpportunitiesPage({
         </div>
       ) : (
         <p className="flex h-full items-center justify-center rounded-lg border border-border bg-surface px-4 py-8 text-center text-sm text-muted">
-          Run intelligence to generate opportunity candidates.
+          {latest?.assessment.status === "COMPLETE"
+            ? "This run did not identify opportunity candidates."
+            : "Run intelligence to generate opportunity candidates."}
         </p>
       )}
     </IntelligencePane>

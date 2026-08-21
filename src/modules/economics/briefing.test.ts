@@ -111,6 +111,34 @@ describe("business case briefing", () => {
     expect(prompt).toContain("License agent");
   });
 
+  it("counts shared work per year once in the briefing", () => {
+    const built = toBusinessCaseBriefing({
+      opportunities: [
+        briefing.opportunities[0],
+        { ...briefing.opportunities[0], name: "Order agent" },
+      ],
+      scenario: "expected",
+      adoption: 0.15,
+      rollup: briefing.rollup,
+      gaps: [],
+      recommendationState: "proceed",
+    });
+    const volumes = built.assumptions.filter((item) =>
+      /work per year/i.test(item.label),
+    );
+    expect(volumes).toEqual([
+      {
+        label: "Work per year",
+        value: "1000",
+        source: "Customer Provided",
+      },
+    ]);
+    expect(built.calculations.join(" ")).toContain("counted once");
+    expect(built.calculations.join(" ")).not.toContain(
+      "On Order agent, Impacted",
+    );
+  });
+
   it("falls back to explainable copy when no model is configured", () => {
     const copy = fallbackNarratives({
       ...briefing,

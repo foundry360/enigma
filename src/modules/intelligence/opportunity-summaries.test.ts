@@ -3,6 +3,8 @@ import {
   summarizeBusinessContext,
   summarizeImplication,
   summarizeSupportingSignals,
+  scrubFitReason,
+  alignReasonToOpportunity,
 } from "@/modules/intelligence/opportunity-summaries";
 
 describe("opportunity summaries", () => {
@@ -39,6 +41,30 @@ describe("opportunity summaries", () => {
     expect(copy).toMatch(/Addressable work and Grounded answers are strong/i);
     expect(copy).toMatch(/Operating path is mixed/i);
     expect(copy).not.toMatch(/Operating path is strong/i);
+  });
+
+  it("does not leave a grounding-present claim when grounded answers is weak", () => {
+    expect(
+      scrubFitReason("Work, path, and grounding are present.", [
+        { title: "Grounded answers", strength: "weak", key: "grounded_answers" },
+      ]),
+    ).toMatch(/^work and path are in view\.?$/i);
+    expect(
+      scrubFitReason("Work, path, and grounding support a service agent.", [
+        {
+          title: "Grounded answers",
+          strength: "weak",
+          score: 25,
+          key: "grounded_answers",
+        },
+      ]),
+    ).not.toMatch(/grounding/i);
+    expect(
+      alignReasonToOpportunity(
+        "work and path support a service agent.",
+        "Sales Forecast agent",
+      ),
+    ).toBe("work and path support Sales Forecast agent.");
   });
 
   it("writes implication lists as one paragraph", () => {

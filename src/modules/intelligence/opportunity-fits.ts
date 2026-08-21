@@ -103,10 +103,12 @@ export function opportunityReasonPrompt(input: {
       "Judge which opportunities best fit this organization's observed conditions and this project's objective.",
       "You may select, rank, reject, explain, name opportunity-specific risk, and recommend next validation.",
       "You may select more than one object when more than one is a real fit.",
+      "If several durable work objects are in use, select every object that is a real fit for this project. Do not collapse a large pool to one or two names unless the others are clearly not this work.",
       "You may reject licensed or custom objects that are not a fit for this project.",
       "You may only name objects listed in the work pool.",
       "Do not invent Salesforce objects, volumes, data quality, prices, or capabilities.",
       "Do not treat unknown as false. If volume, quality, handoff, or freshness was not observed, say so.",
+      "Use each signal's exact strength. If Grounded answers is weak or mixed, do not say grounding is present, ready, or strong. Unobserved article content is not a knowledge base.",
       "Cite supportingFindingIds and supportingSignalIds from the provided lists only.",
       'Return JSON only: {"fits":[{"apiName":"","selected":true,"rank":1,"reason":"","risk":"","recommendation":"","supportingFindingIds":[],"supportingSignalIds":[],"confidence":"high"}]}.',
     ].join(" "),
@@ -214,15 +216,15 @@ export function groundOpportunityFits(
       ...fromSignals,
     ]);
 
+    const derived = confidenceFromSignals(
+      signals.filter((signal) => supportingSignalIds.includes(signal.key)),
+    );
+
     return {
       ...fit,
       supportingFindingIds,
       supportingSignalIds,
-      confidence:
-        fit.confidence ??
-        confidenceFromSignals(
-          signals.filter((signal) => supportingSignalIds.includes(signal.key)),
-        ),
+      confidence: derived === "low" ? "low" : (fit.confidence ?? derived),
     };
   });
 }
@@ -268,9 +270,7 @@ function defaultSupportingFindings(
 }
 
 function defaultSupportingSignals(signals: BusinessSignal[]) {
-  return signals
-    .filter((signal) => signal.strength !== "weak")
-    .map((signal) => signal.key);
+  return signals.map((signal) => signal.key);
 }
 
 function confidenceFromSignals(signals: BusinessSignal[]): "high" | "medium" | "low" {

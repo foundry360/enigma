@@ -110,6 +110,53 @@ export function calculateLine(
   };
 }
 
+export function hasSharedWorkAssumptions(lines: LineAssumptions[]) {
+  const complete = lines.filter(isLineComplete);
+  if (complete.length <= 1) {
+    return false;
+  }
+
+  const first = workFingerprint(complete[0]);
+  return complete.every((line) => workFingerprint(line) === first);
+}
+
+export function caseWorkVolume(lines: LineAssumptions[]) {
+  const volumes = lines
+    .map((line) => line.annualVolume)
+    .filter(isPresent);
+  if (volumes.length === 0) {
+    return null;
+  }
+
+  if (hasSharedWorkAssumptions(lines)) {
+    return volumes[0];
+  }
+
+  return volumes.reduce((sum, value) => sum + value, 0);
+}
+
+function workFingerprint(line: LineAssumptions) {
+  return [
+    line.annualVolume,
+    line.unitPrice,
+    line.hoursSavedPerUnit,
+    line.hourlyCost,
+  ].join("|");
+}
+
+function collapseSharedWork(lines: LineAssumptions[], results: LineResult[]) {
+  if (results.length <= 1 || !hasSharedWorkAssumptions(lines)) {
+    return results;
+  }
+
+  return [
+    {
+      ...results[0],
+      implementation: results.reduce((sum, line) => sum + line.implementation, 0),
+    },
+  ];
+}
+
 export function emptyRollup(timeToValueDays: number | null = null): CaseRollup {
   return {
     complete: false,
@@ -137,9 +184,12 @@ export function rollUpCase(input: CaseInputs): CaseRollup {
     return emptyRollup(timeToValueDays);
   }
 
-  const results = input.lines
-    .map((line) => calculateLine(line, adoption))
-    .filter((line): line is LineResult => line !== null);
+  const results = collapseSharedWork(
+    input.lines,
+    input.lines
+      .map((line) => calculateLine(line, adoption))
+      .filter((line): line is LineResult => line !== null),
+  );
 
   if (results.length === 0) {
     return emptyRollup(timeToValueDays);

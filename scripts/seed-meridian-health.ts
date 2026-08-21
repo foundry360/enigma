@@ -88,37 +88,27 @@ async function main() {
     console.log(`Organization already exists: ${organization.id}`);
   }
 
-  let [connection] = await sql<{ id: string }[]>`
+  const fakeConnections = await sql<{ id: string }[]>`
     select id
     from "PlatformConnection"
-    where "organizationId" = ${organization.id} and "platformType" = 'SALESFORCE'
-    order by "updatedAt" desc
-    limit 1
+    where
+      "platformType" = 'SALESFORCE'
+      and "externalOrgId" = '00D000000000002AAA'
   `;
 
-  if (!connection) {
-    const connectionId = crypto.randomUUID();
-    const [created] = await sql<{ id: string }[]>`
-      insert into "PlatformConnection" (
-        id, "tenantId", "organizationId", "platformType", status,
-        "externalOrgId", "externalOrgName", "connectedAt", "createdAt", "updatedAt"
-      )
-      values (
-        ${connectionId},
-        ${tenant.id},
-        ${organization.id},
-        'SALESFORCE',
-        'CONNECTED',
-        '00D000000000002AAA',
-        'Meridian Health Partners — Production',
-        now(),
-        now(),
-        now()
-      )
-      returning id
+  if (fakeConnections.length > 0) {
+    const fakeIds = fakeConnections.map((row) => row.id);
+    await sql`
+      delete from "ConnectionSecret"
+      where "connectionId" in ${sql(fakeIds)}
     `;
-    connection = created;
-    console.log(`Created Salesforce connection ${connection.id}`);
+    await sql`
+      delete from "PlatformConnection"
+      where id in ${sql(fakeIds)}
+    `;
+    console.log(
+      `Removed ${fakeConnections.length} seed Salesforce environment(s)`,
+    );
   }
 
   let [project] = await sql<{ id: string }[]>`
@@ -132,6 +122,21 @@ async function main() {
     console.log(`Project already exists: ${project.id}`);
     console.log(`http://localhost:3000/accounts/${organization.id}`);
     console.log(`http://localhost:3000/projects/${project.id}`);
+    return;
+  }
+
+  const [existing] = await sql<{ id: string; name: string }[]>`
+    select id, name
+    from "Project"
+    where "organizationId" = ${organization.id}
+    order by "createdAt" asc
+    limit 1
+  `;
+
+  if (existing) {
+    console.log(`Using existing project ${existing.name}: ${existing.id}`);
+    console.log(`http://localhost:3000/accounts/${organization.id}`);
+    console.log(`http://localhost:3000/projects/${existing.id}`);
     return;
   }
 
@@ -173,7 +178,7 @@ async function main() {
       'Medium',
       ${"A short list of credible service opportunities, volume assumptions, and a recommended first pilot."},
       ${"Sample project for layout and capability work. Not a live customer engagement."},
-      false,
+      true,
       now(),
       now()
     )
@@ -188,19 +193,6 @@ async function main() {
       ${tenant.id},
       ${projectId},
       'SALESFORCE',
-      now()
-    )
-  `;
-
-  await sql`
-    insert into "ProjectEnvironmentScope" (
-      id, "tenantId", "projectId", "connectionId", "createdAt"
-    )
-    values (
-      ${crypto.randomUUID()},
-      ${tenant.id},
-      ${projectId},
-      ${connection.id},
       now()
     )
   `;

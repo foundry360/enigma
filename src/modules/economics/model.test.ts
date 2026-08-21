@@ -108,15 +108,50 @@ describe("business case arithmetic", () => {
       enigmaDays: 60,
     });
     expect(rolled.complete).toBe(true);
-    expect(rolled.consumption).toBe(600);
-    expect(rolled.value).toBe(6000);
+    expect(rolled.consumption).toBe(300);
+    expect(rolled.value).toBe(3000);
     expect(rolled.implementation).toBeNull();
-    expect(rolled.netAnnual).toBe(5400);
+    expect(rolled.netAnnual).toBe(2700);
     expect(rolled.roi).toBeNull();
     expect(rolled.paybackMonths).toBeNull();
     expect(rolled.roc).toBe(10);
-    expect(rolled.roa).toBe((6000 / 12) * (120 / 30));
+    expect(rolled.roa).toBe((3000 / 12) * (120 / 30));
     expect(rolled.timeToValueDays).toBe(60);
+  });
+
+  it("counts identical copied work assumptions once", () => {
+    const copied = {
+      annualVolume: 25000,
+      unitPrice: 1.25,
+      hoursSavedPerUnit: 2,
+      hourlyCost: 110,
+      implementationCost: 0,
+    };
+    const rolled = rollUpCase({
+      lines: Array.from({ length: 9 }, () => copied),
+      adoption: 0.3,
+      baselineDays: 180,
+      enigmaDays: 60,
+      implementationCost: 50000,
+    });
+    expect(rolled.impacted).toBe(7500);
+    expect(rolled.consumption).toBe(9375);
+    expect(rolled.value).toBe(1_650_000);
+  });
+
+  it("still adds distinct work streams", () => {
+    const rolled = rollUpCase({
+      lines: [
+        completeLine,
+        { ...completeLine, annualVolume: 2000, unitPrice: 1 },
+      ],
+      adoption: 0.15,
+      baselineDays: 180,
+      enigmaDays: 60,
+    });
+    expect(rolled.impacted).toBe(450);
+    expect(rolled.consumption).toBe(300 + 300);
+    expect(rolled.value).toBe(3000 + 6000);
   });
 
   it("returns null ROI, payback, ROC, and ROA when the math is not honest", () => {
@@ -204,7 +239,7 @@ describe("business case arithmetic", () => {
       implementationCost: 36000,
     });
     expect(rolled.implementation).toBe(36000);
-    expect(rolled.roi).toBe(5400 / 36000);
+    expect(rolled.roi).toBe(2700 / 36000);
     expect(
       caseGaps({
         lines: [{ ...completeLine, implementationCost: null }],

@@ -1,4 +1,9 @@
 import { visibleFields } from "@/modules/enterprise/fields";
+import {
+  articleContentState,
+  articleSources,
+  formatArticleCounts,
+} from "@/modules/enterprise/knowledge-sources";
 import type { Evidence } from "@/modules/intelligence/types";
 import type { AssessmentFacts } from "@/modules/intelligence/types";
 import {
@@ -166,9 +171,13 @@ function environmentProfile(facts: AssessmentFacts): EnvironmentProfile {
     permissionSetCount: facts.security?.permissionSetCount ?? null,
     knowledgePosture: !facts.knowledge
       ? "unknown"
-      : facts.knowledge.enabled && (facts.knowledge.articleObjects?.length ?? 0) > 0
+      : articleContentState(facts.knowledge) === "published"
         ? "present"
-        : "absent",
+        : articleContentState(facts.knowledge) === "unpublished"
+          ? "unpublished"
+          : articleContentState(facts.knowledge) === "empty"
+            ? "absent"
+            : "unknown",
     integrationPosture: !facts.integrations
       ? "unknown"
       : facts.integrations.endpoints.length > 0
@@ -442,13 +451,21 @@ function dataInsight(facts: AssessmentFacts): DataInsight {
 }
 
 function knowledgeInsight(facts: AssessmentFacts): KnowledgeInsight {
+  const sources = articleSources(facts.knowledge?.articleObjects);
+  const articles = facts.knowledge?.articles;
+  const state = articleContentState(facts.knowledge ?? {});
+  const articleCountsKnown = state !== "unknown";
   return {
-    enabled: Boolean(facts.knowledge?.enabled),
-    sources: (facts.knowledge?.articleObjects ?? []).map(humanize),
+    enabled: state === "published",
+    sources: sources.map(humanize),
     categories: facts.knowledge?.dataCategories ?? [],
     coverageKnown: false,
     freshnessKnown: false,
     usefulnessKnown: Boolean(facts.knowledge?.usefulnessKnown),
+    articleCountsKnown,
+    draftCount: articles?.draft ?? null,
+    publishedCount: articles?.published ?? null,
+    archivedCount: articles?.archived ?? null,
   };
 }
 
@@ -855,31 +872,78 @@ function knowledgeFindings(
       finding({
         id: "knowledge-unknown",
         domain: "knowledge",
-        title: "Knowledge sources were not observed",
+        title: "Article content was not observed",
         summary:
-          "Approved content was not read on this run. That is unknown, not evidence that knowledge is absent.",
-        evidence: cite("knowledge_posture", "Knowledge posture was not stored."),
+          "Draft, published, and archived articles were not read on this run. That is unknown, not evidence that content is absent.",
+        evidence: cite("knowledge_posture", "Article content was not observed."),
         provenance: "unknown",
         confidence: "high",
-        businessImplication: "Grounded answers cannot be judged until a content source is observed.",
-        nextAction: "Re-run intelligence to read knowledge posture.",
+        businessImplication: "Grounded answers cannot be judged until article content is counted.",
+        nextAction: "Re-run intelligence to count draft, published, and archived articles.",
         relatedSignals: ["grounded_answers"],
       }),
     ];
   }
 
-  if (!knowledge.enabled || knowledge.sources.length === 0) {
+  const counts = {
+    draft: knowledge.draftCount ?? 0,
+    published: knowledge.publishedCount ?? 0,
+    archived: knowledge.archivedCount ?? 0,
+  };
+  const state = articleContentState({
+    articleCountsKnown: knowledge.articleCountsKnown,
+    articles: knowledge.articleCountsKnown ? counts : null,
+  });
+  const countEvidence = cite("knowledge_posture", formatArticleCounts(counts));
+
+  if (state === "unknown") {
     return [
       finding({
-        id: "knowledge-missing",
+        id: "knowledge-content-unknown",
         domain: "knowledge",
-        title: "No approved content source was found",
-        summary: "Answers would be invented or pulled from outside the org.",
-        evidence: cite("knowledge_posture", "No approved knowledge sources were found."),
+        title: "Article content was not observed",
+        summary:
+          "Draft, published, and archived articles were not counted.",
+        evidence: cite("knowledge_posture", "Article content was not observed."),
+        provenance: "unknown",
+        confidence: "high",
+        businessImplication: "Grounded answers cannot be judged until article content is counted.",
+        nextAction: "Re-run intelligence to count draft, published, and archived articles.",
+        relatedSignals: ["grounded_answers"],
+      }),
+    ];
+  }
+
+  if (state === "empty") {
+    return [
+      finding({
+        id: "knowledge-empty",
+        domain: "knowledge",
+        title: "No knowledge articles were found",
+        summary:
+          "No draft, published, or archived articles were found. An agent would invent answers or look outside the org.",
+        evidence: countEvidence,
         provenance: "observed",
         confidence: "high",
-        businessImplication: "Grounded answers are not supported yet.",
-        nextAction: "Identify one approved content source before a customer-facing topic.",
+        businessImplication: "There is no knowledge content to retrieve.",
+        nextAction: "Publish the articles an agent would need before a customer-facing Q&A topic.",
+        relatedSignals: ["grounded_answers"],
+      }),
+    ];
+  }
+
+  if (state === "unpublished") {
+    return [
+      finding({
+        id: "knowledge-unpublished",
+        domain: "knowledge",
+        title: "No published articles were found",
+        summary: `${formatArticleCounts(counts)} Published content is what an agent can retrieve. Draft and archived articles are not a live knowledge base.`,
+        evidence: countEvidence,
+        provenance: "observed",
+        confidence: "high",
+        businessImplication: "Grounded answers are not supported until articles are published.",
+        nextAction: "Publish the articles that should ground answers, then re-run intelligence.",
         relatedSignals: ["grounded_answers"],
       }),
     ];
@@ -889,20 +953,15 @@ function knowledgeFindings(
     finding({
       id: "knowledge-present",
       domain: "knowledge",
-      title: "An approved content source exists",
-      summary: `Approved content is present in ${joinAnd(knowledge.sources)}${
-        knowledge.categories.length
-          ? `, with categories ${joinAnd(knowledge.categories.slice(0, 6))}`
-          : ""
-      }. Existence is not the same as usefulness for grounding. Coverage, freshness, and retrieval fitness were not observed.`,
-      evidence: cite(
-        "knowledge_posture",
-        `Approved content sources: ${knowledge.sources.join(", ")}.`,
-      ),
-      provenance: "inferred",
-      confidence: "medium",
-      businessImplication: "A source exists. Grounded answers still require a topic whose content is actually covered.",
-      nextAction: "Validate whether this source can ground one high-volume topic before treating it as retrieval-ready.",
+      title: "Published articles are present",
+      summary: `${formatArticleCounts(counts)} An agent could retrieve those published answers. Counts are not coverage or freshness.`,
+      evidence: countEvidence,
+      provenance: "observed",
+      confidence: "high",
+      businessImplication:
+        "Published knowledge content exists. Grounded answers still require a topic those articles actually cover.",
+      nextAction:
+        "Validate whether the published articles can answer one high-volume question before treating retrieval as ready.",
       relatedSignals: ["grounded_answers"],
     }),
   ];
@@ -1292,7 +1351,32 @@ function buildGaps(
       relatedSignals: ["operating_path"],
     });
   }
-  if (!model.knowledge.coverageKnown || !model.knowledge.freshnessKnown) {
+  if (!model.knowledge.articleCountsKnown) {
+    gaps.push({
+      id: "gap-knowledge-fitness",
+      domain: "knowledge",
+      title: "Article content was not observed",
+      description:
+        "Draft, published, and archived articles were not counted.",
+      impact: "medium",
+      evidenceNeeded: "An allowlisted count of draft, published, and archived articles, without article bodies.",
+      relatedSignals: ["grounded_answers"],
+    });
+  } else if ((model.knowledge.publishedCount ?? 0) === 0) {
+    gaps.push({
+      id: "gap-knowledge-fitness",
+      domain: "knowledge",
+      title: "No published articles were found",
+      description:
+        "Grounded answers need published content. Draft and archived articles are not live retrieval content.",
+      impact: "high",
+      evidenceNeeded: "Published articles an agent could retrieve for one high-volume question.",
+      relatedSignals: ["grounded_answers"],
+    });
+  } else if (
+    model.knowledge.enabled &&
+    (!model.knowledge.coverageKnown || !model.knowledge.freshnessKnown)
+  ) {
     gaps.push({
       id: "gap-knowledge-fitness",
       domain: "knowledge",
@@ -1374,6 +1458,8 @@ function summarizeOrg(
         (item) =>
           item.relatedSignals.includes("writeback_control") ||
           item.relatedSignals.includes("access_surface") ||
+          item.id === "knowledge-empty" ||
+          item.id === "knowledge-unpublished" ||
           item.id === "knowledge-present",
       )
       .map((item) => item.title),
@@ -1480,6 +1566,13 @@ export function hydrateOrgIntelligence(
         customObjectNames.length ||
         (facts ? listedCustomObjects(facts.objects).length : 0) ||
         model.environment.customObjectCount,
+    },
+    knowledge: {
+      ...model.knowledge,
+      articleCountsKnown: model.knowledge.articleCountsKnown ?? false,
+      draftCount: model.knowledge.draftCount ?? null,
+      publishedCount: model.knowledge.publishedCount ?? null,
+      archivedCount: model.knowledge.archivedCount ?? null,
     },
   };
 }

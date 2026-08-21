@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
 import { intelligenceHref } from "@/lib/intelligence/routes";
@@ -27,6 +28,13 @@ export async function startDiscoveryAction(formData: FormData) {
     (result.error === "needs-connection" || result.error === "expired")
   ) {
     redirect(`/projects/${projectId}/connections?salesforce=expired`);
+  }
+
+  if (projectId) {
+    revalidatePath(intelligenceHref(projectId));
+    revalidatePath(intelligenceHref(projectId, "business-case"));
+    revalidatePath(intelligenceHref(projectId, "opportunities"));
+    revalidatePath(intelligenceHref(projectId, "deployment"));
   }
 
   return { ok: true as const, projectId };

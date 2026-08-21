@@ -119,6 +119,12 @@ export type KnowledgePosture = {
   articleObjects: string[];
   dataCategories: string[];
   usefulnessKnown?: boolean;
+  articleCountsKnown?: boolean;
+  articles?: {
+    draft: number;
+    published: number;
+    archived: number;
+  };
 };
 
 export type ProcessRule = {
